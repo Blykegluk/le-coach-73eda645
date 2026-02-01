@@ -20,7 +20,8 @@ export type Database = {
           avg_heart_rate: number | null
           calories_burned: number | null
           created_at: string
-          duration_min: number | null
+          distance_km: number | null
+          duration_min: number
           id: string
           notes: string | null
           performed_at: string
@@ -31,7 +32,8 @@ export type Database = {
           avg_heart_rate?: number | null
           calories_burned?: number | null
           created_at?: string
-          duration_min?: number | null
+          distance_km?: number | null
+          duration_min: number
           id?: string
           notes?: string | null
           performed_at?: string
@@ -42,7 +44,8 @@ export type Database = {
           avg_heart_rate?: number | null
           calories_burned?: number | null
           created_at?: string
-          duration_min?: number | null
+          distance_km?: number | null
+          duration_min?: number
           id?: string
           notes?: string | null
           performed_at?: string
@@ -140,51 +143,63 @@ export type Database = {
       profiles: {
         Row: {
           activity_level: string | null
-          avatar_url: string | null
           birth_date: string | null
           created_at: string
           first_name: string | null
           gender: string | null
           goal: string | null
-          height: number | null
+          height_cm: number | null
           id: string
-          last_name: string | null
-          target_weight: number | null
+          onboarding_complete: boolean | null
+          target_calories: number | null
+          target_sleep_hours: number | null
+          target_steps: number | null
+          target_water_ml: number | null
+          target_weight_kg: number | null
           updated_at: string
           user_id: string
-          weight: number | null
+          weekly_goal_kg: number | null
+          weight_kg: number | null
         }
         Insert: {
           activity_level?: string | null
-          avatar_url?: string | null
           birth_date?: string | null
           created_at?: string
           first_name?: string | null
           gender?: string | null
           goal?: string | null
-          height?: number | null
+          height_cm?: number | null
           id?: string
-          last_name?: string | null
-          target_weight?: number | null
+          onboarding_complete?: boolean | null
+          target_calories?: number | null
+          target_sleep_hours?: number | null
+          target_steps?: number | null
+          target_water_ml?: number | null
+          target_weight_kg?: number | null
           updated_at?: string
           user_id: string
-          weight?: number | null
+          weekly_goal_kg?: number | null
+          weight_kg?: number | null
         }
         Update: {
           activity_level?: string | null
-          avatar_url?: string | null
           birth_date?: string | null
           created_at?: string
           first_name?: string | null
           gender?: string | null
           goal?: string | null
-          height?: number | null
+          height_cm?: number | null
           id?: string
-          last_name?: string | null
-          target_weight?: number | null
+          onboarding_complete?: boolean | null
+          target_calories?: number | null
+          target_sleep_hours?: number | null
+          target_steps?: number | null
+          target_water_ml?: number | null
+          target_weight_kg?: number | null
           updated_at?: string
           user_id?: string
-          weight?: number | null
+          weekly_goal_kg?: number | null
+          weight_kg?: number | null
         }
         Relationships: []
       }
