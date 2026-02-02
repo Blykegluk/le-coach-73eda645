@@ -134,7 +134,9 @@ export default function OnboardingPage() {
 
       if (upsertError) {
         console.error('Error upserting profile:', upsertError);
-        setError("Erreur lors de la sauvegarde. Réessaie.");
+        // Show more detail in dev mode
+        const detail = upsertError.message || upsertError.code || 'Unknown error';
+        setError(`Erreur lors de la sauvegarde: ${detail}`);
         return;
       }
 
