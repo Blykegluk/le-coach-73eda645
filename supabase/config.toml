@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.goal-assistant]
 verify_jwt = false
+
+[functions.daily-tips]
+verify_jwt = false

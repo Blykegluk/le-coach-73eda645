@@ -311,11 +311,7 @@ const HomePage = () => {
       </div>
 
       {/* Daily Tips */}
-      <DailyTipsCard 
-        metrics={metrics} 
-        profile={profile} 
-        weeklySessionsCompleted={weeklySessionsCompleted} 
-      />
+      <DailyTipsCard />
 
       {/* Weekly progress */}
       <div className="mb-4 rounded-2xl border border-border bg-card p-4">
