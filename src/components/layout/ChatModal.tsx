@@ -1,8 +1,10 @@
 import { useRef, useEffect, useState } from 'react';
-import { X, Send, Plus, Camera, Mic, Loader2 } from 'lucide-react';
+import { X, Send, Plus, Camera, Mic, Loader2, Image as ImageIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import ImageCapture from '@/components/chat/ImageCapture';
+import VoiceRecorder from '@/components/chat/VoiceRecorder';
 
 interface ChatModalProps {
   isOpen: boolean;
@@ -16,17 +18,23 @@ const suggestions = [
   { emoji: '💧', label: 'Eau' },
 ];
 
-type Message = { role: "user" | "assistant"; content: string };
+type Message = { 
+  role: "user" | "assistant"; 
+  content: string;
+  imageUrl?: string; // Optional image URL for user messages
+};
 
 const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [inputMessage, setInputMessage] = useState('');
   const [showActions, setShowActions] = useState(false);
+  const [showImageCapture, setShowImageCapture] = useState(false);
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([
     { 
       role: "assistant", 
-      content: "Salut ! 👋 Je suis ton Coach HealthLab. Comment puis-je t'aider aujourd'hui ? Tu peux me parler de tes repas, ton entraînement ou tes objectifs !" 
+      content: "Salut ! 👋 Je suis ton Coach HealthLab. Comment puis-je t'aider aujourd'hui ? Tu peux me parler de tes repas, ton entraînement, tes objectifs, ou m'envoyer des photos de tes repas ou mesures !" 
     }
   ]);
   const [isLoading, setIsLoading] = useState(false);
@@ -52,11 +60,15 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
     }
   }, [messages]);
 
-  const handleSend = async (text?: string) => {
+  const handleSend = async (text?: string, imageUrl?: string) => {
     const messageText = text || inputMessage.trim();
-    if (!messageText || isLoading) return;
+    if ((!messageText && !imageUrl) || isLoading) return;
 
-    const userMsg: Message = { role: "user", content: messageText };
+    const userMsg: Message = { 
+      role: "user", 
+      content: messageText || (imageUrl ? "Analyse cette image" : ""),
+      imageUrl 
+    };
     setMessages(prev => [...prev, userMsg]);
     setInputMessage('');
     setIsLoading(true);
@@ -72,11 +84,12 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
           body: JSON.stringify({
-            messages: [...messages, userMsg].map(m => ({
+            messages: [...messages, { role: userMsg.role, content: userMsg.content }].map(m => ({
               role: m.role,
               content: m.content,
             })),
             userId,
+            imageUrl, // Pass the image URL for Vision analysis
           }),
         }
       );
@@ -109,6 +122,14 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleImageCaptured = (imageUrl: string) => {
+    handleSend("Analyse cette image", imageUrl);
+  };
+
+  const handleVoiceTranscription = (text: string) => {
+    handleSend(text);
   };
 
   const handleSuggestion = (label: string) => {
@@ -159,6 +180,16 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
                   </div>
                 )}
                 <div className={`flex max-w-[75%] flex-col ${isCoach ? 'items-start' : 'items-end'}`}>
+                  {/* Show image if present */}
+                  {msg.imageUrl && (
+                    <div className="mb-2 overflow-hidden rounded-xl">
+                      <img 
+                        src={msg.imageUrl} 
+                        alt="Uploaded" 
+                        className="max-h-48 w-auto object-cover"
+                      />
+                    </div>
+                  )}
                   <div
                     className={`rounded-2xl px-4 py-2.5 ${
                       isCoach
@@ -211,13 +242,25 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
               </button>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <button className="flex flex-col items-center gap-2 rounded-xl bg-muted p-4 transition-all active:scale-95">
+              <button 
+                onClick={() => {
+                  setShowActions(false);
+                  setShowImageCapture(true);
+                }}
+                className="flex flex-col items-center gap-2 rounded-xl bg-muted p-4 transition-all active:scale-95"
+              >
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                   <Camera className="h-6 w-6 text-primary" />
                 </div>
-                <span className="text-sm font-medium text-foreground">Photo repas</span>
+                <span className="text-sm font-medium text-foreground">Photo</span>
               </button>
-              <button className="flex flex-col items-center gap-2 rounded-xl bg-muted p-4 transition-all active:scale-95">
+              <button 
+                onClick={() => {
+                  setShowActions(false);
+                  setShowVoiceRecorder(true);
+                }}
+                className="flex flex-col items-center gap-2 rounded-xl bg-muted p-4 transition-all active:scale-95"
+              >
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                   <Mic className="h-6 w-6 text-primary" />
                 </div>
@@ -271,6 +314,21 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
           </button>
         </div>
       </div>
+
+      {/* Image Capture Modal */}
+      <ImageCapture
+        isOpen={showImageCapture}
+        onClose={() => setShowImageCapture(false)}
+        onImageCaptured={handleImageCaptured}
+        userId={userId}
+      />
+
+      {/* Voice Recorder Modal */}
+      <VoiceRecorder
+        isOpen={showVoiceRecorder}
+        onClose={() => setShowVoiceRecorder(false)}
+        onTranscription={handleVoiceTranscription}
+      />
     </div>
   );
 };
