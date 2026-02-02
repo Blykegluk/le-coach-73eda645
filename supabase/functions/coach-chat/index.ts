@@ -108,6 +108,39 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "log_activity",
+      description: "Enregistre une séance de sport ou activité physique",
+      parameters: {
+        type: "object",
+        properties: {
+          activity_type: {
+            type: "string",
+            description: "Type d'activité (ex: course, musculation, natation, vélo, yoga, marche, HIIT, crossfit, etc.)",
+          },
+          duration_min: {
+            type: "number",
+            description: "Durée de l'activité en minutes",
+          },
+          calories_burned: {
+            type: "number",
+            description: "Calories brûlées estimées (optionnel)",
+          },
+          distance_km: {
+            type: "number",
+            description: "Distance parcourue en km (optionnel, pour course/vélo/marche)",
+          },
+          notes: {
+            type: "string",
+            description: "Notes ou détails supplémentaires sur la séance",
+          },
+        },
+        required: ["activity_type", "duration_min"],
+      },
+    },
+  },
 ];
 
 // Execute tool calls
@@ -257,6 +290,48 @@ async function executeToolCall(
         };
       }
 
+      case "log_activity": {
+        const { error } = await supabase.from("activities").insert({
+          user_id: userId,
+          activity_type: args.activity_type,
+          duration_min: args.duration_min,
+          calories_burned: args.calories_burned || null,
+          distance_km: args.distance_km || null,
+          notes: args.notes || null,
+          performed_at: new Date().toISOString(),
+        });
+
+        if (error) throw error;
+
+        // Also update daily calories burned
+        if (args.calories_burned) {
+          const { data: currentMetrics } = await supabase
+            .from("daily_metrics")
+            .select("calories_burned")
+            .eq("user_id", userId)
+            .eq("date", today)
+            .maybeSingle();
+
+          const currentBurned = currentMetrics?.calories_burned || 0;
+          const newBurned = currentBurned + args.calories_burned;
+
+          await supabase.from("daily_metrics").upsert(
+            {
+              user_id: userId,
+              date: today,
+              calories_burned: newBurned,
+            },
+            { onConflict: "user_id,date" }
+          );
+        }
+
+        return {
+          success: true,
+          message: `🏋️ ${args.activity_type} enregistré (${args.duration_min} min${args.calories_burned ? `, ~${args.calories_burned} kcal brûlées` : ""})`,
+          data: args,
+        };
+      }
+
       default:
         return { success: false, message: `Outil inconnu: ${name}` };
     }
@@ -333,11 +408,13 @@ ${userContext}
 
 Ton rôle:
 - Aider l'utilisateur à atteindre ses objectifs de santé
-- Enregistrer ses repas, son hydratation et son poids via les outils disponibles
+- Enregistrer ses repas, son hydratation, son poids ET ses séances de sport via les outils disponibles
 - Donner des conseils personnalisés et motivants
 - Être concis mais chaleureux (max 2-3 paragraphes)
 
-Quand l'utilisateur mentionne un repas ou une boisson, utilise l'outil approprié pour l'enregistrer.
+Quand l'utilisateur mentionne un repas ou une boisson, utilise log_meal ou log_water.
+Quand il mentionne une séance de sport ou activité physique, utilise log_activity pour l'enregistrer.
+Quand il mentionne son poids, utilise log_weight.
 Quand il demande son bilan, utilise get_daily_summary puis commente les résultats.
 Utilise des emojis avec modération pour rendre la conversation plus vivante 🎯
 
