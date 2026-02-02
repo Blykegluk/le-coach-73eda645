@@ -1,5 +1,5 @@
-import { useRef, useEffect, useState } from 'react';
-import { X, Send, Plus, Camera, Mic, Loader2, Image as ImageIcon } from 'lucide-react';
+import { useRef, useEffect, useState, useCallback } from 'react';
+import { X, Send, Plus, Camera, Mic, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -19,9 +19,15 @@ const suggestions = [
 ];
 
 type Message = { 
+  id?: string;
   role: "user" | "assistant"; 
   content: string;
-  imageUrl?: string; // Optional image URL for user messages
+  imageUrl?: string;
+};
+
+const WELCOME_MESSAGE: Message = { 
+  role: "assistant", 
+  content: "Salut ! 👋 Je suis ton Coach HealthLab. Comment puis-je t'aider aujourd'hui ? Tu peux me parler de tes repas, ton entraînement, tes objectifs, ou m'envoyer des photos de tes repas ou mesures !" 
 };
 
 const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
@@ -31,28 +37,87 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
   const [showImageCapture, setShowImageCapture] = useState(false);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([
-    { 
-      role: "assistant", 
-      content: "Salut ! 👋 Je suis ton Coach HealthLab. Comment puis-je t'aider aujourd'hui ? Tu peux me parler de tes repas, ton entraînement, tes objectifs, ou m'envoyer des photos de tes repas ou mesures !" 
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
-  // Get current user
+  // Load chat history from database
+  const loadChatHistory = useCallback(async (uid: string) => {
+    setIsLoadingHistory(true);
+    try {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('id, role, content, image_url, created_at')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const loadedMessages: Message[] = data.map(msg => ({
+          id: msg.id,
+          role: msg.role as "user" | "assistant",
+          content: msg.content,
+          imageUrl: msg.image_url || undefined,
+        }));
+        setMessages(loadedMessages);
+      } else {
+        // No history, show welcome message
+        setMessages([WELCOME_MESSAGE]);
+      }
+    } catch (error) {
+      console.error('Error loading chat history:', error);
+      setMessages([WELCOME_MESSAGE]);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, []);
+
+  // Save a message to database
+  const saveMessage = useCallback(async (uid: string, message: Message) => {
+    try {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .insert({
+          user_id: uid,
+          role: message.role,
+          content: message.content,
+          image_url: message.imageUrl || null,
+        })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+      return data.id;
+    } catch (error) {
+      console.error('Error saving message:', error);
+      return null;
+    }
+  }, []);
+
+  // Get current user and load history
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      setUserId(user?.id || null);
+      if (user?.id) {
+        setUserId(user.id);
+        loadChatHistory(user.id);
+      }
     };
     getUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      setUserId(session?.user?.id || null);
+      const uid = session?.user?.id || null;
+      setUserId(uid);
+      if (uid) {
+        loadChatHistory(uid);
+      } else {
+        setMessages([WELCOME_MESSAGE]);
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [loadChatHistory]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -62,26 +127,31 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
 
   const handleSend = async (text?: string, imageUrl?: string) => {
     const messageText = text || inputMessage.trim();
-    if ((!messageText && !imageUrl) || isLoading) return;
+    if ((!messageText && !imageUrl) || isLoading || !userId) return;
 
     const userMsg: Message = { 
       role: "user", 
       content: messageText || (imageUrl ? "Analyse cette image" : ""),
       imageUrl 
     };
+    
+    // Add message to UI immediately
     setMessages(prev => [...prev, userMsg]);
     setInputMessage('');
     setIsLoading(true);
 
+    // Save user message to database
+    await saveMessage(userId, userMsg);
+
     try {
       // Call the edge function with tool calling support
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/coach-chat`,
+        `https://ldllojtzoetwcwbjmfib.supabase.co/functions/v1/coach-chat`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxkbGxvanR6b2V0d2N3YmptZmliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4OTkzNzQsImV4cCI6MjA4NTQ3NTM3NH0.NAINuQt1vmut_ILrp-YFsrgRZYXx3nJmIZ77Alnn2sw`,
           },
           body: JSON.stringify({
             messages: [...messages, { role: userMsg.role, content: userMsg.content }].map(m => ({
@@ -89,7 +159,7 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
               content: m.content,
             })),
             userId,
-            imageUrl, // Pass the image URL for Vision analysis
+            imageUrl,
           }),
         }
       );
@@ -110,15 +180,22 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
         });
       }
 
-      setMessages(prev => [...prev, { role: "assistant", content: data.content }]);
+      const assistantMsg: Message = { role: "assistant", content: data.content };
+      setMessages(prev => [...prev, assistantMsg]);
+      
+      // Save assistant message to database
+      await saveMessage(userId, assistantMsg);
 
     } catch (error) {
       console.error("Chat error:", error);
       toast.error(error instanceof Error ? error.message : "Erreur de connexion");
-      setMessages(prev => [
-        ...prev,
-        { role: "assistant", content: "Désolé, je rencontre un problème technique. Réessaie dans un instant ! 🔧" }
-      ]);
+      
+      const errorMsg: Message = { 
+        role: "assistant", 
+        content: "Désolé, je rencontre un problème technique. Réessaie dans un instant ! 🔧" 
+      };
+      setMessages(prev => [...prev, errorMsg]);
+      await saveMessage(userId, errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -169,57 +246,64 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
-        <div className="flex flex-col gap-4">
-          {messages.map((msg, index) => {
-            const isCoach = msg.role === 'assistant';
-            return (
-              <div key={index} className={`flex gap-2 ${isCoach ? 'justify-start' : 'justify-end'}`}>
-                {isCoach && (
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
-                    H
-                  </div>
-                )}
-                <div className={`flex max-w-[75%] flex-col ${isCoach ? 'items-start' : 'items-end'}`}>
-                  {/* Show image if present */}
-                  {msg.imageUrl && (
-                    <div className="mb-2 overflow-hidden rounded-xl">
-                      <img 
-                        src={msg.imageUrl} 
-                        alt="Uploaded" 
-                        className="max-h-48 w-auto object-cover"
-                      />
+        {isLoadingHistory ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <span className="ml-2 text-sm text-muted-foreground">Chargement de l'historique...</span>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {messages.map((msg, index) => {
+              const isCoach = msg.role === 'assistant';
+              return (
+                <div key={msg.id || index} className={`flex gap-2 ${isCoach ? 'justify-start' : 'justify-end'}`}>
+                  {isCoach && (
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                      H
                     </div>
                   )}
-                  <div
-                    className={`rounded-2xl px-4 py-2.5 ${
-                      isCoach
-                        ? 'rounded-tl-md bg-coach-bubble text-coach-bubble-foreground'
-                        : 'rounded-tr-md bg-user-bubble text-user-bubble-foreground'
-                    }`}
-                  >
-                    {isCoach ? (
-                      <div className="prose prose-sm max-w-none text-sm leading-relaxed text-inherit prose-p:my-1 prose-ul:my-1 prose-li:my-0">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  <div className={`flex max-w-[75%] flex-col ${isCoach ? 'items-start' : 'items-end'}`}>
+                    {/* Show image if present */}
+                    {msg.imageUrl && (
+                      <div className="mb-2 overflow-hidden rounded-xl">
+                        <img 
+                          src={msg.imageUrl} 
+                          alt="Uploaded" 
+                          className="max-h-48 w-auto object-cover"
+                        />
                       </div>
-                    ) : (
-                      <p className="text-sm leading-relaxed">{msg.content}</p>
                     )}
+                    <div
+                      className={`rounded-2xl px-4 py-2.5 ${
+                        isCoach
+                          ? 'rounded-tl-md bg-coach-bubble text-coach-bubble-foreground'
+                          : 'rounded-tr-md bg-user-bubble text-user-bubble-foreground'
+                      }`}
+                    >
+                      {isCoach ? (
+                        <div className="prose prose-sm max-w-none text-sm leading-relaxed text-inherit prose-p:my-1 prose-ul:my-1 prose-li:my-0">
+                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        <p className="text-sm leading-relaxed">{msg.content}</p>
+                      )}
+                    </div>
                   </div>
                 </div>
+              );
+            })}
+            {isLoading && (
+              <div className="flex gap-2 justify-start">
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                  H
+                </div>
+                <div className="rounded-2xl rounded-tl-md bg-coach-bubble px-4 py-2.5">
+                  <Loader2 className="h-5 w-5 animate-spin text-coach-bubble-foreground" />
+                </div>
               </div>
-            );
-          })}
-          {isLoading && (
-            <div className="flex gap-2 justify-start">
-              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
-                H
-              </div>
-              <div className="rounded-2xl rounded-tl-md bg-coach-bubble px-4 py-2.5">
-                <Loader2 className="h-5 w-5 animate-spin text-coach-bubble-foreground" />
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Actions modal */}
