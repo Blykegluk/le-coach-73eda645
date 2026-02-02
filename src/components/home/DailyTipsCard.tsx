@@ -188,57 +188,95 @@ const DailyTipsCard = ({ metrics, profile, weeklySessionsCompleted }: DailyTipsC
         type: 'reminder',
         priority: 4,
       });
-    } else if (hour >= 14 && hour <= 16) {
+    }
+
+    // === PROTEIN-BASED TIPS ===
+    const proteinGoal = (profile?.weight_kg ?? 60) * 2;
+    const proteinConsumed = metrics?.caloriesIn ? Math.round((metrics.caloriesIn * 0.15) / 4) : 0; // Estimation basée sur calories
+    const proteinPercentage = (proteinConsumed / proteinGoal) * 100;
+    
+    if (proteinPercentage < 50 && hour >= 14) {
       tips.push({
-        icon: <Battery className="h-4 w-4" />,
-        message: "Coup de fatigue ? Une petite pause ou un snack sain ! 🍎",
+        icon: <Utensils className="h-4 w-4" />,
+        message: `Pour atteindre ton quota de protéines, essaie un snack protéiné au goûter ! 🥜`,
         type: 'suggestion',
-        priority: 3,
+        priority: 7,
+      });
+    } else if (proteinPercentage >= 80 && proteinPercentage < 100) {
+      tips.push({
+        icon: <Utensils className="h-4 w-4" />,
+        message: "Tu approches de ton objectif protéines ! Un dernier effort au dîner 💪",
+        type: 'suggestion',
+        priority: 6,
+      });
+    } else if (proteinPercentage >= 100) {
+      tips.push({
+        icon: <Heart className="h-4 w-4" />,
+        message: "Objectif protéines atteint ! Tes muscles te remercient 🎯",
+        type: 'success',
+        priority: 7,
       });
     }
 
-    // === DEFAULT MOTIVATIONAL TIPS - Always ensure we have at least 3 ===
-    const motivationalTips: Tip[] = [
-      {
-        icon: <Lightbulb className="h-4 w-4" />,
-        message: "Chaque petit pas compte vers ton objectif ! ✨",
+    // === DYNAMIC HYDRATION PROGRESS TIPS ===
+    if (waterConsumed > 0 && waterPercentage < 100 && waterPercentage >= 30) {
+      const remaining = ((waterGoal - waterConsumed) / 1000).toFixed(1);
+      tips.push({
+        icon: <Droplets className="h-4 w-4" />,
+        message: `${(waterConsumed / 1000).toFixed(1)}L sur ${(waterGoal / 1000).toFixed(1)}L d'eau, continue à bien t'hydrater ! 💧`,
         type: 'suggestion',
-        priority: 1,
+        priority: 6,
+      });
+    }
+
+    // === SMART FALLBACK TIPS - Data-driven alternatives ===
+    const smartFallbackTips: Tip[] = [
+      {
+        icon: <Utensils className="h-4 w-4" />,
+        message: "Privilégie les protéines à chaque repas pour préserver ta masse musculaire 🍗",
+        type: 'suggestion',
+        priority: 4,
+      },
+      {
+        icon: <Droplets className="h-4 w-4" />,
+        message: "Boire avant d'avoir soif : hydrate-toi régulièrement ! 💧",
+        type: 'suggestion',
+        priority: 4,
+      },
+      {
+        icon: <Dumbbell className="h-4 w-4" />,
+        message: "Après l'entraînement, un apport en protéines dans les 2h optimise la récupération 💪",
+        type: 'suggestion',
+        priority: 4,
+      },
+      {
+        icon: <Moon className="h-4 w-4" />,
+        message: "7-8h de sommeil favorisent la récupération musculaire et la perte de gras 😴",
+        type: 'suggestion',
+        priority: 4,
+      },
+      {
+        icon: <Flame className="h-4 w-4" />,
+        message: "Marcher 30 min après les repas aide à réguler la glycémie et brûler plus de calories 🚶",
+        type: 'suggestion',
+        priority: 4,
       },
       {
         icon: <Heart className="h-4 w-4" />,
-        message: "La régularité est la clé du succès. Tu es sur la bonne voie ! 💪",
+        message: "Un déficit calorique modéré (300-500 kcal) préserve mieux la masse musculaire 📊",
         type: 'suggestion',
-        priority: 1,
-      },
-      {
-        icon: <Sparkles className="h-4 w-4" />,
-        message: "Parle à ton coach IA pour des conseils personnalisés ! 🤖",
-        type: 'suggestion',
-        priority: 2,
-      },
-      {
-        icon: <Battery className="h-4 w-4" />,
-        message: "Écoute ton corps, il sait ce dont il a besoin 🧘",
-        type: 'suggestion',
-        priority: 1,
-      },
-      {
-        icon: <Heart className="h-4 w-4" />,
-        message: "Le progrès, pas la perfection ! Continue comme ça 🌟",
-        type: 'suggestion',
-        priority: 1,
+        priority: 4,
       },
     ];
 
     // Sort by priority and take top tips
     const sortedTips = tips.sort((a, b) => b.priority - a.priority);
     
-    // If we have less than 3 tips, fill with motivational ones
-    while (sortedTips.length < 3 && motivationalTips.length > 0) {
-      // Pick a random motivational tip to add variety
-      const randomIndex = Math.floor(Math.random() * motivationalTips.length);
-      sortedTips.push(motivationalTips.splice(randomIndex, 1)[0]);
+    // If we have less than 3 tips, fill with smart fallback ones
+    while (sortedTips.length < 3 && smartFallbackTips.length > 0) {
+      // Pick a random smart tip to add variety
+      const randomIndex = Math.floor(Math.random() * smartFallbackTips.length);
+      sortedTips.push(smartFallbackTips.splice(randomIndex, 1)[0]);
     }
 
     return sortedTips.slice(0, 3);
@@ -246,29 +284,17 @@ const DailyTipsCard = ({ metrics, profile, weeklySessionsCompleted }: DailyTipsC
 
   const tips = generateTips();
 
-  const getTypeStyles = (type: Tip['type']) => {
-    switch (type) {
-      case 'success':
-        return 'bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-400';
-      case 'reminder':
-        return 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-400';
-      case 'suggestion':
-      default:
-        return 'bg-primary/10 border-primary/20 text-primary';
-    }
-  };
-
   return (
     <div className="mb-4">
       <div className="mb-2 flex items-center gap-2">
         <Lightbulb className="h-4 w-4 text-primary" />
         <span className="text-sm font-medium text-foreground">Conseils du jour</span>
       </div>
-      <div className="space-y-2">
+      <div className="rounded-2xl bg-green-500/10 border border-green-500/20 p-3 space-y-2">
         {tips.map((tip, index) => (
           <div
             key={index}
-            className={`flex items-start gap-3 rounded-xl border p-3 ${getTypeStyles(tip.type)}`}
+            className="flex items-start gap-3 text-green-700 dark:text-green-400"
           >
             <div className="mt-0.5 shrink-0">{tip.icon}</div>
             <p className="text-sm">{tip.message}</p>
