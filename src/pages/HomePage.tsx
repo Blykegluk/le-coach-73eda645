@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronRight, Zap, Flame, Target, Plus, Dumbbell, Apple, Droplets } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
@@ -6,12 +7,14 @@ import { healthProvider } from '@/providers/health';
 import { supabase } from '@/integrations/supabase/client';
 import type { HealthMetrics } from '@/providers/health';
 import { Skeleton } from '@/components/ui/skeleton';
-
+import GoalEditorModal from '@/components/profile/GoalEditorModal';
 const HomePage = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { profile } = useProfile();
   const [metrics, setMetrics] = useState<HealthMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [weeklySessionsCompleted, setWeeklySessionsCompleted] = useState(0);
 
   // Goals from profile or defaults
@@ -150,7 +153,10 @@ const HomePage = () => {
             </p>
           </div>
         </div>
-        <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 font-semibold text-primary-foreground transition-all hover:bg-primary/90 active:scale-[0.98]">
+        <button 
+          onClick={() => navigate('/training')}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 font-semibold text-primary-foreground transition-all hover:bg-primary/90 active:scale-[0.98]"
+        >
           <Zap className="h-5 w-5" />
           Commencer la séance
         </button>
@@ -249,29 +255,70 @@ const HomePage = () => {
       <div className="mb-4">
         <p className="mb-3 text-sm font-medium text-foreground">Accès rapide</p>
         <div className="space-y-2">
-          {[
-            { icon: Plus, title: 'Ajouter un repas', subtitle: 'Enregistre ce que tu manges' },
-            { icon: Dumbbell, title: 'Explorer les exercices', subtitle: 'Découvre les machines Keep Cool' },
-            { icon: Target, title: 'Définir un objectif', subtitle: 'Fixe tes objectifs fitness' },
-          ].map((action) => (
-            <button
-              key={action.title}
-              className="flex w-full items-center justify-between rounded-xl border border-border bg-card p-4 transition-all hover:bg-muted/50 active:scale-[0.99]"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                  <action.icon className="h-5 w-5 text-primary" />
-                </div>
-                <div className="text-left">
-                  <p className="font-medium text-foreground">{action.title}</p>
-                  <p className="text-sm text-muted-foreground">{action.subtitle}</p>
-                </div>
+          {/* Add meal button */}
+          <button
+            onClick={() => navigate('/nutrition')}
+            className="flex w-full items-center justify-between rounded-xl border border-border bg-card p-4 transition-all hover:bg-muted/50 active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                <Plus className="h-5 w-5 text-primary" />
               </div>
-              <ChevronRight className="h-5 w-5 text-muted-foreground" />
-            </button>
-          ))}
+              <div className="text-left">
+                <p className="font-medium text-foreground">Ajouter un repas</p>
+                <p className="text-sm text-muted-foreground">Enregistre ce que tu manges</p>
+              </div>
+            </div>
+            <ChevronRight className="h-5 w-5 text-muted-foreground" />
+          </button>
+
+          {/* Explore exercises button */}
+          <button
+            onClick={() => navigate('/training')}
+            className="flex w-full items-center justify-between rounded-xl border border-border bg-card p-4 transition-all hover:bg-muted/50 active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                <Dumbbell className="h-5 w-5 text-primary" />
+              </div>
+              <div className="text-left">
+                <p className="font-medium text-foreground">Explorer les exercices</p>
+                <p className="text-sm text-muted-foreground">Découvre les machines Keep Cool</p>
+              </div>
+            </div>
+            <ChevronRight className="h-5 w-5 text-muted-foreground" />
+          </button>
+
+          {/* Goal button - dynamic text based on whether goal exists */}
+          <button
+            onClick={() => setIsGoalModalOpen(true)}
+            className="flex w-full items-center justify-between rounded-xl border border-border bg-card p-4 transition-all hover:bg-muted/50 active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                <Target className="h-5 w-5 text-primary" />
+              </div>
+              <div className="text-left">
+                <p className="font-medium text-foreground">
+                  {profile?.goal ? 'Ajuster l\'objectif' : 'Définir un objectif'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {profile?.goal ? 'Modifie tes objectifs fitness' : 'Fixe tes objectifs fitness'}
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="h-5 w-5 text-muted-foreground" />
+          </button>
         </div>
       </div>
+
+      {/* Goal Editor Modal */}
+      <GoalEditorModal
+        isOpen={isGoalModalOpen}
+        onClose={() => setIsGoalModalOpen(false)}
+        currentGoal={profile?.goal}
+        currentTargetWeight={profile?.target_weight_kg}
+      />
     </div>
   );
 };
