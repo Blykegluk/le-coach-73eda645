@@ -294,8 +294,8 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
                           : 'rounded-tr-md bg-user-bubble text-user-bubble-foreground'
                       }`}
                     >
-                      {isCoach ? (
-                        <div className="prose prose-sm max-w-none text-sm leading-relaxed text-inherit prose-p:my-1 prose-ul:my-1 prose-li:my-0">
+                    {isCoach ? (
+                        <div className="coach-message-content">
                           <ReactMarkdown>{msg.content}</ReactMarkdown>
                         </div>
                       ) : (
