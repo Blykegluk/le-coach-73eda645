@@ -27,6 +27,15 @@ const GOAL_MAPPINGS: Record<string, string> = {
   wellness: "Bien-être général",
 };
 
+interface ValidatedGoal {
+  validated: boolean;
+  goal_code: string;
+  goal_label: string;
+  target_weight: number | null;
+  current_body_fat_pct: number | null;
+  target_body_fat_pct: number | null;
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -76,13 +85,18 @@ RÈGLES IMPORTANTES:
 2. Si l'utilisateur veut maintenir son poids mais réduire son % de graisse, c'est "recomposition" (car cela implique de remplacer le gras par du muscle)
 3. Demande des précisions si nécessaire (poids cible, % de masse grasse visé, etc.)
 4. Sois encourageant et bienveillant
-5. Dès que tu as assez d'infos pour valider un objectif, inclus dans ta réponse un bloc JSON avec le format suivant:
-   VALIDATED_GOAL: {"goal_code": "xxx", "goal_label": "Description claire de l'objectif", "target_weight": null}
+5. IMPORTANT: Extrais TOUTES les données chiffrées mentionnées par l'utilisateur :
+   - Poids cible (target_weight)
+   - % de masse grasse actuel (current_body_fat_pct)
+   - % de masse grasse cible (target_body_fat_pct)
+6. Dès que tu as assez d'infos pour valider un objectif, inclus dans ta réponse un bloc JSON avec le format suivant:
+   VALIDATED_GOAL: {"goal_code": "xxx", "goal_label": "Description claire", "target_weight": null, "current_body_fat_pct": null, "target_body_fat_pct": null}
 
 Exemples de validation:
-- "Je veux perdre 5kg" → VALIDATED_GOAL: {"goal_code": "weight_loss", "goal_label": "Perdre 5 kg", "target_weight": 75}
-- "Je veux maintenir 76kg et passer de 18% à 13% de gras" → VALIDATED_GOAL: {"goal_code": "recomposition", "goal_label": "Recomposition: 76 kg avec 13% de masse grasse", "target_weight": 76}
-- "Je veux prendre de la masse musculaire" → VALIDATED_GOAL: {"goal_code": "muscle_gain", "goal_label": "Prise de masse musculaire", "target_weight": null}
+- "Je veux perdre 5kg" → VALIDATED_GOAL: {"goal_code": "weight_loss", "goal_label": "Perdre 5 kg", "target_weight": 75, "current_body_fat_pct": null, "target_body_fat_pct": null}
+- "Je veux maintenir 76kg et passer de 18% à 13% de gras" → VALIDATED_GOAL: {"goal_code": "recomposition", "goal_label": "Recomposition: 76 kg, de 18% à 13% de masse grasse", "target_weight": 76, "current_body_fat_pct": 18, "target_body_fat_pct": 13}
+- "Je veux prendre de la masse musculaire" → VALIDATED_GOAL: {"goal_code": "muscle_gain", "goal_label": "Prise de masse musculaire", "target_weight": null, "current_body_fat_pct": null, "target_body_fat_pct": null}
+- "Je suis à 22% de gras et je veux descendre à 15%" → VALIDATED_GOAL: {"goal_code": "fat_loss", "goal_label": "Passer de 22% à 15% de masse grasse", "target_weight": null, "current_body_fat_pct": 22, "target_body_fat_pct": 15}
 
 Réponds toujours en français, de manière concise et encourageante.`;
 
@@ -118,8 +132,9 @@ Réponds toujours en français, de manière concise et encourageante.`;
     console.log("AI response received:", assistantContent.substring(0, 100));
 
     // Parse the response to check for validated goal
-    let validatedGoal = null;
-    const goalMatch = assistantContent.match(/VALIDATED_GOAL:\s*(\{[^}]+\})/);
+    let validatedGoal: ValidatedGoal | null = null;
+    // Match JSON that may span multiple lines and contain nested values
+    const goalMatch = assistantContent.match(/VALIDATED_GOAL:\s*(\{[\s\S]*?\}(?=\s*(?:[^{]|$)))/);
     
     if (goalMatch) {
       try {
@@ -128,7 +143,9 @@ Réponds toujours en français, de manière concise et encourageante.`;
           validated: true,
           goal_code: parsed.goal_code,
           goal_label: parsed.goal_label,
-          target_weight: parsed.target_weight,
+          target_weight: parsed.target_weight ?? null,
+          current_body_fat_pct: parsed.current_body_fat_pct ?? null,
+          target_body_fat_pct: parsed.target_body_fat_pct ?? null,
         };
         console.log("Goal validated:", validatedGoal);
       } catch (e) {

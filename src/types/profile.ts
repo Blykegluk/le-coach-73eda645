@@ -17,6 +17,8 @@ export interface Profile {
   target_steps: number | null;
   target_water_ml: number | null;
   target_sleep_hours: number | null;
+  current_body_fat_pct: number | null;
+  target_body_fat_pct: number | null;
   onboarding_complete: boolean | null;
   created_at: string;
   updated_at: string;

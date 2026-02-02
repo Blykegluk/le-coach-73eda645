@@ -40,7 +40,11 @@ export default function OnboardingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const [formData, setFormData] = useState<Partial<OnboardingData> & { custom_goal_label?: string }>({
+  const [formData, setFormData] = useState<Partial<OnboardingData> & { 
+    custom_goal_label?: string;
+    current_body_fat_pct?: number;
+    target_body_fat_pct?: number;
+  }>({
     first_name: '',
     birth_date: '',
     gender: undefined,
@@ -50,6 +54,8 @@ export default function OnboardingPage() {
     goal: undefined,
     target_weight: undefined,
     custom_goal_label: undefined,
+    current_body_fat_pct: undefined,
+    target_body_fat_pct: undefined,
   });
 
   const updateField = <K extends keyof OnboardingData>(
@@ -124,6 +130,8 @@ export default function OnboardingPage() {
         activity_level: formData.activity_level || null,
         goal: formData.goal || null,
         target_weight_kg: formData.target_weight ?? null,
+        current_body_fat_pct: formData.current_body_fat_pct ?? null,
+        target_body_fat_pct: formData.target_body_fat_pct ?? null,
         onboarding_complete: true,
       };
 
@@ -335,13 +343,19 @@ export default function OnboardingPage() {
           height: formData.height,
           activity_level: formData.activity_level,
         }}
-        onGoalValidated={(goalCode, goalLabel, targetWeight) => {
+        onGoalValidated={(goalCode, goalLabel, targetWeight, currentBodyFatPct, targetBodyFatPct) => {
           updateField('goal', goalCode as OnboardingData['goal']);
           if (goalCode === 'custom') {
             setFormData(prev => ({ ...prev, custom_goal_label: goalLabel }));
           }
           if (targetWeight) {
             updateField('target_weight', targetWeight);
+          }
+          if (currentBodyFatPct !== undefined) {
+            setFormData(prev => ({ ...prev, current_body_fat_pct: currentBodyFatPct }));
+          }
+          if (targetBodyFatPct !== undefined) {
+            setFormData(prev => ({ ...prev, target_body_fat_pct: targetBodyFatPct }));
           }
         }}
       />

@@ -13,6 +13,8 @@ interface ValidatedGoal {
   goal_code: string;
   goal_label: string;
   target_weight?: number;
+  current_body_fat_pct?: number;
+  target_body_fat_pct?: number;
 }
 
 interface GoalAssistantProps {
@@ -21,7 +23,13 @@ interface GoalAssistantProps {
     height?: number;
     activity_level?: string;
   };
-  onGoalValidated: (goalCode: string, goalLabel: string, targetWeight?: number) => void;
+  onGoalValidated: (
+    goalCode: string,
+    goalLabel: string,
+    targetWeight?: number,
+    currentBodyFatPct?: number,
+    targetBodyFatPct?: number
+  ) => void;
   suggestions: Array<{ value: string; label: string; emoji: string; description?: string }>;
   selectedGoal?: string;
   onSuggestionSelect: (value: string) => void;
@@ -72,7 +80,9 @@ export default function GoalAssistant({
         onGoalValidated(
           data.validatedGoal.goal_code,
           data.validatedGoal.goal_label,
-          data.validatedGoal.target_weight
+          data.validatedGoal.target_weight,
+          data.validatedGoal.current_body_fat_pct,
+          data.validatedGoal.target_body_fat_pct
         );
       }
     } catch (err) {
