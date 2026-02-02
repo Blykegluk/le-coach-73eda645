@@ -5,6 +5,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import ImageCapture from '@/components/chat/ImageCapture';
 import VoiceRecorder from '@/components/chat/VoiceRecorder';
+import { useWorkout } from '@/contexts/WorkoutContext';
+import { useNavigate } from 'react-router-dom';
 
 interface ChatModalProps {
   isOpen: boolean;
@@ -40,6 +42,8 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const { setGeneratedWorkout } = useWorkout();
+  const navigate = useNavigate();
 
   // Load chat history from database
   const loadChatHistory = useCallback(async (uid: string) => {
@@ -171,11 +175,21 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
 
       const data = await response.json();
       
-      // Show toast for actions executed
+      // Show toast for actions executed and handle special actions
       if (data.actions && data.actions.length > 0) {
-        data.actions.forEach((action: { name: string; result: { success: boolean; message: string } }) => {
+        data.actions.forEach((action: { name: string; result: { success: boolean; message: string; data?: { workout?: unknown; type?: string } } }) => {
           if (action.result.success) {
             toast.success(action.result.message);
+            
+            // Check if a workout was generated
+            if (action.name === "generate_workout" && action.result.data?.workout) {
+              setGeneratedWorkout(action.result.data.workout as import('@/components/training/NextWorkoutCard').Workout);
+              // Navigate to training page to show the generated workout
+              setTimeout(() => {
+                navigate('/training');
+                onClose();
+              }, 1500);
+            }
           }
         });
       }
