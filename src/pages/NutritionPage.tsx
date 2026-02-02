@@ -194,12 +194,16 @@ const NutritionPage = () => {
 
   // Group logs by meal type and get actual logged time
   const mealsByType = MEAL_TYPES.map(mealType => {
-    // Handle backward compatibility for old 'snack' type
-    const matchingTypes = mealType.type === 'morning_snack' 
-      ? ['morning_snack', 'snack'] 
-      : [mealType.type];
-    
-    const logs = nutritionLogs.filter(log => matchingTypes.includes(log.meal_type));
+    // Backward compatibility for old 'snack' type:
+    // - before ~14h => morning_snack
+    // - after ~14h  => afternoon_snack
+    const logs = nutritionLogs.filter((log) => {
+      if (log.meal_type === mealType.type) return true;
+      if (log.meal_type !== 'snack') return false;
+      const hour = new Date(log.logged_at).getHours();
+      const isAfternoon = hour >= 14;
+      return mealType.type === (isAfternoon ? 'afternoon_snack' : 'morning_snack');
+    });
     const totalCalories = logs.reduce((sum, log) => sum + (log.calories || 0), 0);
     const description = logs.map(log => log.food_name).join(', ');
     
@@ -421,6 +425,7 @@ const NutritionPage = () => {
         onClose={() => setMealDetail({ isOpen: false, mealName: '', logs: [] })}
         mealName={mealDetail.mealName}
         logs={mealDetail.logs}
+        onChanged={fetchTodayNutrition}
       />
     </div>
   );
