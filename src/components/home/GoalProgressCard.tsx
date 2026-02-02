@@ -87,8 +87,26 @@ const GoalProgressCard = ({ profile, currentWeight, currentBodyFat }: GoalProgre
   const showDownTrend = goal === 'weight_loss' || goal === 'fat_loss' || 
     (goal === 'recomposition' && trackBodyFat) || (goal === 'maintain' && trackBodyFat);
 
+  // Calculate overall progress percentage
+  const overallProgress = (() => {
+    let totalProgress = 0;
+    let count = 0;
+    if (trackWeight) {
+      totalProgress += weightProgress;
+      count++;
+    }
+    if (trackBodyFat) {
+      totalProgress += fatProgress;
+      count++;
+    }
+    return count > 0 ? Math.round(totalProgress / count) : 0;
+  })();
+
   return (
     <div className="mb-4 rounded-2xl border border-border bg-card p-4">
+      {/* Section title */}
+      <p className="mb-3 text-sm font-medium text-foreground">Progression</p>
+      
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {showDownTrend ? (
@@ -103,9 +121,17 @@ const GoalProgressCard = ({ profile, currentWeight, currentBodyFat }: GoalProgre
             🎉 Objectif atteint !
           </span>
         ) : (
-          <span className="text-xs text-muted-foreground">
-            En cours...
-          </span>
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-20 overflow-hidden rounded-full bg-muted">
+              <div 
+                className="h-full rounded-full bg-primary transition-all duration-500"
+                style={{ width: `${overallProgress}%` }}
+              />
+            </div>
+            <span className="text-xs font-medium text-primary">
+              {overallProgress}%
+            </span>
+          </div>
         )}
       </div>
 
