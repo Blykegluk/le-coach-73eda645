@@ -26,9 +26,11 @@ interface NutritionSummary {
 
 const MEAL_TYPES = [
   { type: 'breakfast', name: 'Petit-déjeuner', time: '08:00', icon: Coffee },
+  { type: 'morning_snack', name: 'Collation', time: '10:30', icon: Apple },
   { type: 'lunch', name: 'Déjeuner', time: '12:30', icon: UtensilsCrossed },
+  { type: 'afternoon_snack', name: 'Goûter', time: '16:00', icon: Apple },
   { type: 'dinner', name: 'Dîner', time: '19:30', icon: Moon },
-  { type: 'snack', name: 'Collations', time: '', icon: Apple },
+  { type: 'dessert', name: 'Dessert', time: '20:30', icon: Apple },
 ];
 
 // Calculate daily goals based on profile (simplified Harris-Benedict + activity multiplier)
