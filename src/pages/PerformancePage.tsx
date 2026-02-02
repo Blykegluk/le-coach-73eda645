@@ -88,10 +88,12 @@ const PerformancePage = () => {
     {
       id: 'weight',
       name: 'Poids actuel',
-      current: profile.weight || 0,
-      target: profile.target_weight || profile.weight || 0,
+      current: profile.weight_kg || 0,
+      target: profile.target_weight_kg || profile.weight_kg || 0,
       unit: 'kg',
-      type: profile.target_weight && profile.weight ? (profile.target_weight < profile.weight ? 'loss' : 'gain') : 'maintain',
+      type: profile.target_weight_kg && profile.weight_kg
+        ? (profile.target_weight_kg < profile.weight_kg ? 'loss' : 'gain')
+        : 'maintain',
     },
   ].filter(g => g.target > 0) : [];
 

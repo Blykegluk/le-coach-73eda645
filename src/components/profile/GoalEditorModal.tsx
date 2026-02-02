@@ -44,7 +44,7 @@ export default function GoalEditorModal({
     try {
       const updates: Record<string, unknown> = {
         goal: selectedGoal,
-        target_weight: targetWeight || null,
+        target_weight_kg: targetWeight || null,
       };
 
       const { error } = await supabase
