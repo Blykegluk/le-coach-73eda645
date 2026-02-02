@@ -32,7 +32,7 @@ const MEAL_TYPES = [
 ];
 
 // Calculate daily goals based on profile (simplified Harris-Benedict + activity multiplier)
-function calculateDailyGoals(profile: { weight?: number; height?: number; birth_date?: string; gender?: string; activity_level?: string; goal?: string } | null): NutritionSummary {
+function calculateDailyGoals(profile: { weight_kg?: number | null; height_cm?: number | null; birth_date?: string | null; gender?: string | null; activity_level?: string | null; goal?: string | null } | null): NutritionSummary {
   // Default goals if no profile
   const defaults = {
     calories: { consumed: 0, goal: 2000 },
@@ -42,11 +42,11 @@ function calculateDailyGoals(profile: { weight?: number; height?: number; birth_
     hydration: { consumed: 0, goal: 2.5 },
   };
 
-  if (!profile?.weight || !profile?.height) return defaults;
+  if (!profile?.weight_kg || !profile?.height_cm) return defaults;
 
   // Simple BMR calculation
-  const weight = profile.weight;
-  const height = profile.height;
+  const weight = profile.weight_kg;
+  const height = profile.height_cm;
   const age = profile.birth_date 
     ? Math.floor((Date.now() - new Date(profile.birth_date).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
     : 30;

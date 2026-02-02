@@ -113,37 +113,53 @@ export default function OnboardingPage() {
     setIsSubmitting(true);
     setError(null);
 
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({
-        first_name: formData.first_name,
-        birth_date: formData.birth_date,
-        gender: formData.gender,
-        height_cm: formData.height,
-        weight_kg: formData.weight,
-        activity_level: formData.activity_level,
-        goal: formData.goal,
-        target_weight_kg: formData.target_weight || null,
+    try {
+      const profilePayload = {
+        user_id: user.id,
+        first_name: (formData.first_name || '').trim() || null,
+        birth_date: formData.birth_date || null,
+        gender: formData.gender || null,
+        height_cm: formData.height ?? null,
+        weight_kg: formData.weight ?? null,
+        activity_level: formData.activity_level || null,
+        goal: formData.goal || null,
+        target_weight_kg: formData.target_weight ?? null,
         onboarding_complete: true,
-      })
-      .eq('user_id', user.id);
+      };
 
-    if (updateError) {
-      console.error('Error updating profile:', updateError);
-      setError('Erreur lors de la sauvegarde. Réessaie.');
+      // Upsert guarantees the row exists (update if present, insert otherwise)
+      const { error: upsertError } = await supabase
+        .from('profiles')
+        .upsert(profilePayload, { onConflict: 'user_id' });
+
+      if (upsertError) {
+        console.error('Error upserting profile:', upsertError);
+        setError("Erreur lors de la sauvegarde. Réessaie.");
+        return;
+      }
+
+      // Also set initial weight in daily_metrics
+      const today = new Date().toISOString().split('T')[0];
+      const { error: metricsError } = await supabase
+        .from('daily_metrics')
+        .upsert(
+          {
+            user_id: user.id,
+            date: today,
+            weight: formData.weight ?? null,
+          },
+          { onConflict: 'user_id,date' }
+        );
+
+      if (metricsError) {
+        // Non-blocking, but log it so we can debug if needed
+        console.error('Error upserting daily_metrics:', metricsError);
+      }
+
+      navigate('/', { replace: true });
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-
-    // Also set initial weight in daily_metrics
-    const today = new Date().toISOString().split('T')[0];
-    await supabase.from('daily_metrics').upsert({
-      user_id: user.id,
-      date: today,
-      weight: formData.weight,
-    }, { onConflict: 'user_id,date' });
-
-    navigate('/', { replace: true });
   };
 
   const renderStepIndicator = () => (

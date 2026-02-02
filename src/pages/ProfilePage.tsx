@@ -50,7 +50,7 @@ const ProfilePage = () => {
   };
 
   const age = calculateAge(profile?.birth_date ?? null);
-  const bmi = calculateBMI(profile?.weight ?? null, profile?.height ?? null);
+  const bmi = calculateBMI(profile?.weight_kg ?? null, profile?.height_cm ?? null);
   const memberSince = profile?.created_at 
     ? new Date(profile.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
     : '-';
@@ -110,8 +110,8 @@ const ProfilePage = () => {
       {/* Stats - REAL DATA */}
       <div className="mb-4 grid grid-cols-4 gap-2">
         {[
-          { label: 'Taille', value: profile?.height ? `${profile.height}cm` : '-' },
-          { label: 'Poids', value: profile?.weight ? `${profile.weight}kg` : '-' },
+          { label: 'Taille', value: profile?.height_cm ? `${profile.height_cm}cm` : '-' },
+          { label: 'Poids', value: profile?.weight_kg ? `${profile.weight_kg}kg` : '-' },
           { label: 'Âge', value: age ? `${age} ans` : '-' },
           { label: 'IMC', value: bmi },
         ].map((stat) => (
@@ -149,7 +149,7 @@ const ProfilePage = () => {
         isOpen={isGoalModalOpen}
         onClose={() => setIsGoalModalOpen(false)}
         currentGoal={profile?.goal}
-        currentTargetWeight={profile?.target_weight}
+        currentTargetWeight={profile?.target_weight_kg}
       />
 
       {/* Settings */}
