@@ -3,6 +3,7 @@ import { ChevronRight, Zap, Flame, Target, Plus, Dumbbell, Apple, Droplets } fro
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { healthProvider } from '@/providers/health';
+import { supabase } from '@/integrations/supabase/client';
 import type { HealthMetrics } from '@/providers/health';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -11,6 +12,7 @@ const HomePage = () => {
   const { profile } = useProfile();
   const [metrics, setMetrics] = useState<HealthMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [weeklySessionsCompleted, setWeeklySessionsCompleted] = useState(0);
 
   // Goals from profile or defaults
   const caloriesGoal = 2000; // Could be calculated based on profile
@@ -25,8 +27,32 @@ const HomePage = () => {
     setIsLoading(false);
   }, [user]);
 
+  // Fetch weekly sessions count
+  const fetchWeeklySessions = useCallback(async () => {
+    if (!user) return;
+
+    // Get start of current week (Monday)
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Adjust for Monday start
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - diff);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const { count, error } = await supabase
+      .from('activities')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .gte('performed_at', startOfWeek.toISOString());
+
+    if (!error && count !== null) {
+      setWeeklySessionsCompleted(count);
+    }
+  }, [user]);
+
   useEffect(() => {
     fetchMetrics();
+    fetchWeeklySessions();
 
     // Subscribe to real-time updates
     if (user) {
@@ -35,9 +61,29 @@ const HomePage = () => {
         setMetrics(newMetrics);
       });
 
-      return unsubscribe;
+      // Subscribe to activities changes
+      const activitiesChannel = supabase
+        .channel('homepage_activities')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'activities',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            fetchWeeklySessions();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        unsubscribe();
+        supabase.removeChannel(activitiesChannel);
+      };
     }
-  }, [user, fetchMetrics]);
+  }, [user, fetchMetrics, fetchWeeklySessions]);
 
   const firstName = profile?.first_name || user?.email?.split('@')[0] || 'Athlète';
   const caloriesConsumed = metrics?.caloriesIn || 0;
@@ -52,7 +98,6 @@ const HomePage = () => {
     duration: 45,
   };
 
-  const weeklySessionsCompleted = 0; // Will be calculated from activities
   const weeklySessionsTotal = profile?.activity_level === 'very_active' ? 6 
     : profile?.activity_level === 'active' ? 5
     : profile?.activity_level === 'moderate' ? 4
