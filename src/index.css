@@ -7,6 +7,7 @@
 
 @layer base {
   :root {
+    /* Light theme */
     --background: 210 20% 98%;
     --foreground: 220 20% 10%;
 
@@ -16,8 +17,9 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 20% 10%;
 
-    --primary: 160 84% 39%;
+    --primary: 174 75% 42%;
     --primary-foreground: 0 0% 100%;
+    --primary-glow: 174 90% 55%;
 
     --secondary: 210 20% 96%;
     --secondary-foreground: 220 20% 25%;
@@ -25,7 +27,7 @@
     --muted: 210 15% 94%;
     --muted-foreground: 220 10% 50%;
 
-    --accent: 160 70% 45%;
+    --accent: 174 70% 45%;
     --accent-foreground: 0 0% 100%;
 
     --success: 142 76% 36%;
@@ -39,25 +41,34 @@
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 160 84% 39%;
+    --ring: 174 75% 42%;
 
     --radius: 1rem;
 
+    /* Glass effect variables */
+    --glass-bg: 0 0% 100% / 0.7;
+    --glass-border: 0 0% 100% / 0.3;
+
+    /* Chat bubbles */
     --coach-bubble: 220 14% 96%;
     --coach-bubble-foreground: 220 20% 20%;
-    --user-bubble: 160 84% 39%;
+    --user-bubble: 174 75% 42%;
     --user-bubble-foreground: 0 0% 100%;
 
-    --chart-real: 160 84% 39%;
+    /* Charts */
+    --chart-real: 174 75% 42%;
     --chart-target: 220 10% 70%;
     --chart-grid: 220 13% 91%;
 
-    --ring-progress: 160 84% 39%;
+    /* Progress rings */
+    --ring-progress: 174 75% 42%;
     --ring-background: 220 14% 93%;
 
+    /* Safe areas */
     --safe-area-top: env(safe-area-inset-top, 44px);
     --safe-area-bottom: env(safe-area-inset-bottom, 34px);
 
+    /* Sidebar */
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
@@ -65,58 +76,92 @@
     --sidebar-accent: 240 4.8% 95.9%;
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 160 84% 39%;
+    --sidebar-ring: 174 75% 42%;
+
+    /* Fitness specific colors */
+    --energy: 38 92% 50%;
+    --energy-light: 38 92% 90%;
+    --calories: 0 84% 60%;
+    --calories-light: 0 84% 90%;
+    --water: 199 89% 48%;
+    --water-light: 199 89% 90%;
+    --sleep: 262 83% 58%;
+    --sleep-light: 262 83% 90%;
+    --heart: 0 84% 60%;
+    --heart-light: 0 84% 90%;
   }
 
   .dark {
-    --background: 220 20% 8%;
+    /* Dark "science premium" palette */
+    --background: 222 35% 8%;
     --foreground: 210 20% 98%;
 
-    --card: 220 20% 12%;
+    --card: 222 30% 12%;
     --card-foreground: 210 20% 98%;
 
-    --popover: 220 20% 12%;
+    --popover: 222 30% 12%;
     --popover-foreground: 210 20% 98%;
 
-    --primary: 160 70% 45%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 174 75% 50%;
+    --primary-foreground: 222 35% 8%;
+    --primary-glow: 174 90% 60%;
 
-    --secondary: 220 15% 18%;
+    --secondary: 222 25% 16%;
     --secondary-foreground: 210 20% 90%;
 
-    --muted: 220 15% 20%;
-    --muted-foreground: 220 10% 60%;
+    --muted: 222 25% 18%;
+    --muted-foreground: 220 10% 55%;
 
-    --accent: 160 70% 45%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 174 75% 50%;
+    --accent-foreground: 222 35% 8%;
 
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 20%;
-    --input: 220 15% 20%;
-    --ring: 160 70% 45%;
+    --border: 222 20% 18%;
+    --input: 222 20% 18%;
+    --ring: 174 75% 50%;
 
-    --coach-bubble: 220 15% 18%;
+    /* Glass effect variables - dark */
+    --glass-bg: 222 30% 15% / 0.6;
+    --glass-border: 174 75% 50% / 0.15;
+
+    /* Chat bubbles - dark */
+    --coach-bubble: 222 25% 16%;
     --coach-bubble-foreground: 210 20% 90%;
-    --user-bubble: 160 70% 40%;
+    --user-bubble: 174 75% 45%;
     --user-bubble-foreground: 0 0% 100%;
 
-    --chart-real: 160 70% 50%;
-    --chart-target: 220 10% 50%;
-    --chart-grid: 220 15% 25%;
+    /* Charts - dark */
+    --chart-real: 174 75% 55%;
+    --chart-target: 220 10% 45%;
+    --chart-grid: 222 20% 22%;
 
-    --ring-progress: 160 70% 50%;
-    --ring-background: 220 15% 20%;
+    /* Progress rings - dark */
+    --ring-progress: 174 75% 55%;
+    --ring-background: 222 20% 20%;
 
-    --sidebar-background: 220 20% 10%;
+    /* Sidebar - dark */
+    --sidebar-background: 222 30% 10%;
     --sidebar-foreground: 210 20% 90%;
-    --sidebar-primary: 160 70% 50%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 15% 15%;
+    --sidebar-primary: 174 75% 55%;
+    --sidebar-primary-foreground: 222 35% 8%;
+    --sidebar-accent: 222 25% 15%;
     --sidebar-accent-foreground: 210 20% 90%;
-    --sidebar-border: 220 15% 20%;
-    --sidebar-ring: 160 70% 45%;
+    --sidebar-border: 222 20% 18%;
+    --sidebar-ring: 174 75% 50%;
+
+    /* Fitness specific colors - dark */
+    --energy: 38 92% 55%;
+    --energy-light: 38 50% 20%;
+    --calories: 0 75% 55%;
+    --calories-light: 0 50% 20%;
+    --water: 199 89% 55%;
+    --water-light: 199 50% 20%;
+    --sleep: 262 83% 65%;
+    --sleep-light: 262 50% 20%;
+    --heart: 0 75% 55%;
+    --heart-light: 0 50% 20%;
   }
 }
 
@@ -164,6 +209,65 @@
 
   .safe-bottom {
     padding-bottom: var(--safe-area-bottom);
+  }
+
+  /* Glass morphism effects */
+  .glass {
+    background: hsl(var(--glass-bg));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid hsl(var(--glass-border));
+  }
+
+  .glass-card {
+    background: hsl(var(--glass-bg));
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid hsl(var(--glass-border));
+    box-shadow: 0 8px 32px hsl(222 35% 5% / 0.3);
+  }
+
+  /* Glow effects */
+  .glow-sm {
+    box-shadow: 0 0 15px -3px hsl(var(--primary) / 0.4);
+  }
+
+  .glow-md {
+    box-shadow: 0 0 25px -5px hsl(var(--primary) / 0.5);
+  }
+
+  .glow-lg {
+    box-shadow: 0 0 40px -5px hsl(var(--primary) / 0.6);
+  }
+
+  .glow-text {
+    text-shadow: 0 0 20px hsl(var(--primary-glow) / 0.6);
+  }
+
+  /* Premium card styles */
+  .card-premium {
+    @apply rounded-2xl border border-border bg-card transition-all duration-300;
+    box-shadow: 0 4px 20px -4px hsl(222 35% 5% / 0.2);
+  }
+
+  .card-premium:hover {
+    box-shadow: 0 8px 30px -4px hsl(var(--primary) / 0.2);
+    border-color: hsl(var(--primary) / 0.3);
+  }
+
+  /* Background gradient glow */
+  .bg-gradient-glow {
+    background: 
+      radial-gradient(ellipse 80% 50% at 50% -20%, hsl(var(--primary) / 0.15), transparent),
+      hsl(var(--background));
+  }
+
+  /* Gradient text */
+  .text-gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   /* Coach message markdown styling */

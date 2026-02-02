@@ -247,13 +247,13 @@ const NutritionPage = () => {
   return (
     <div className="safe-top px-4 pb-4 pt-2">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-6 animate-fade-in">
         <h1 className="text-2xl font-bold text-foreground">Nutrition</h1>
         <p className="text-sm text-muted-foreground">Suivi alimentaire du jour</p>
       </div>
 
       {/* Calories ring */}
-      <div className="mb-4 rounded-2xl border border-border bg-card p-4">
+      <div className="mb-4 card-premium p-4 animate-slide-up">
         <p className="mb-2 text-xs text-muted-foreground">Calories consommées</p>
         <div className="flex items-center justify-between">
           <div>
@@ -266,6 +266,19 @@ const NutritionPage = () => {
           </div>
           <div className="relative">
             <svg width="90" height="90" className="-rotate-90">
+              <defs>
+                <linearGradient id="caloriesGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="hsl(var(--primary))" />
+                  <stop offset="100%" stopColor="hsl(var(--primary-glow))" />
+                </linearGradient>
+                <filter id="glow">
+                  <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                  <feMerge>
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+              </defs>
               <circle
                 cx="45"
                 cy="45"
@@ -279,29 +292,33 @@ const NutritionPage = () => {
                 cy="45"
                 r="40"
                 fill="none"
-                stroke="hsl(var(--primary))"
+                stroke="url(#caloriesGradient)"
                 strokeWidth="8"
                 strokeLinecap="round"
                 strokeDasharray={circumference}
                 strokeDashoffset={strokeDashoffset}
+                filter="url(#glow)"
                 className="transition-all duration-500"
               />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
-              <Utensils className="h-6 w-6 text-primary" />
+              <div className="relative">
+                <Utensils className="h-6 w-6 text-primary" />
+                <div className="absolute inset-0 bg-primary/30 blur-sm rounded-full" />
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Macros */}
-      <div className="mb-4 grid grid-cols-3 gap-3">
+      <div className="mb-4 grid grid-cols-3 gap-3 animate-slide-up" style={{ animationDelay: '0.1s' }}>
         {[
-          { name: 'Protéines', value: nutritionData.protein, color: 'bg-primary' },
-          { name: 'Glucides', value: nutritionData.carbs, color: 'bg-primary' },
-          { name: 'Lipides', value: nutritionData.fat, color: 'bg-warning' },
+          { name: 'Protéines', value: nutritionData.protein, gradient: 'from-primary to-primary-glow' },
+          { name: 'Glucides', value: nutritionData.carbs, gradient: 'from-primary to-primary-glow' },
+          { name: 'Lipides', value: nutritionData.fat, gradient: 'from-energy to-energy/70' },
         ].map((macro) => (
-          <div key={macro.name} className="rounded-2xl border border-border bg-card p-3">
+          <div key={macro.name} className="card-premium p-3 group">
             <p className="mb-1 text-xs text-muted-foreground">{macro.name}</p>
             <p className="mb-2 text-lg font-bold text-foreground">
               {Math.round(macro.value.consumed)}
@@ -311,7 +328,7 @@ const NutritionPage = () => {
             </p>
             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
               <div
-                className={`h-full rounded-full ${macro.color} transition-all`}
+                className={`h-full rounded-full bg-gradient-to-r ${macro.gradient} transition-all`}
                 style={{ width: `${Math.min((macro.value.consumed / macro.value.goal) * 100, 100)}%` }}
               />
             </div>
@@ -320,11 +337,12 @@ const NutritionPage = () => {
       </div>
 
       {/* Hydration */}
-      <div className="mb-4 rounded-2xl border border-border bg-card p-4">
+      <div className="mb-4 card-premium p-4 animate-slide-up" style={{ animationDelay: '0.2s' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900/30">
-              <Droplets className="h-5 w-5 text-sky-500" />
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-water/10">
+              <Droplets className="h-5 w-5 text-water" />
+              <div className="absolute inset-0 rounded-full bg-water/20 blur-sm -z-10" />
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Hydratation</p>
@@ -338,7 +356,7 @@ const NutritionPage = () => {
           </div>
           <button 
             onClick={() => addHydration(0.25)}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card transition-all hover:bg-muted active:scale-95"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card transition-all hover:bg-primary/10 hover:border-primary hover:shadow-glow-sm active:scale-95"
           >
             <Plus className="h-5 w-5 text-foreground" />
           </button>
@@ -346,16 +364,16 @@ const NutritionPage = () => {
       </div>
 
       {/* Meals */}
-      <div>
+      <div className="animate-slide-up" style={{ animationDelay: '0.3s' }}>
         <div className="mb-3 flex items-center justify-between">
           <p className="text-sm font-medium text-foreground">Repas du jour</p>
-          <button className="flex items-center gap-1 text-sm font-medium text-primary">
+          <button className="flex items-center gap-1 text-sm font-medium text-primary hover:text-primary-glow transition-colors">
             Historique
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
         <div className="space-y-2">
-          {mealsByType.map((meal) => {
+          {mealsByType.map((meal, index) => {
             const Icon = meal.icon;
             const isEmpty = !meal.description;
             
@@ -367,16 +385,18 @@ const NutritionPage = () => {
                     setMealDetail({ isOpen: true, mealName: meal.name, logs: meal.logs });
                   }
                 }}
-                className={`rounded-2xl border bg-card p-4 transition-all ${
-                  isEmpty ? 'border-dashed border-border' : 'border-border cursor-pointer hover:bg-muted/50 active:scale-[0.98]'
+                className={`card-premium p-4 animate-slide-up ${
+                  isEmpty ? 'border-dashed' : 'cursor-pointer'
                 }`}
+                style={{ animationDelay: `${0.3 + index * 0.05}s` }}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                    <div className={`relative flex h-10 w-10 items-center justify-center rounded-full ${
                       isEmpty ? 'bg-muted' : 'bg-primary/10'
                     }`}>
                       <Icon className={`h-5 w-5 ${isEmpty ? 'text-muted-foreground' : 'text-primary'}`} />
+                      {!isEmpty && <div className="absolute inset-0 rounded-full bg-primary/20 blur-sm -z-10" />}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
@@ -394,7 +414,7 @@ const NutritionPage = () => {
                         e.stopPropagation();
                         setAddMealModal({ isOpen: true, mealType: meal.type, mealName: meal.name });
                       }}
-                      className="flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-all hover:bg-muted active:scale-95"
+                      className="flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-all hover:bg-primary/10 hover:border-primary hover:shadow-glow-sm active:scale-95"
                     >
                       <Plus className="h-4 w-4" />
                       Ajouter

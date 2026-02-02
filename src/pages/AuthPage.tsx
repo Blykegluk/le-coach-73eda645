@@ -4,7 +4,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Activity, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useEffect } from 'react';
@@ -120,8 +119,11 @@ const AuthPage = () => {
 
   if (authLoading) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex h-screen w-screen items-center justify-center bg-gradient-glow">
+        <div className="relative">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="absolute inset-0 animate-ping rounded-full bg-primary/20" />
+        </div>
       </div>
     );
   }
@@ -129,30 +131,39 @@ const AuthPage = () => {
   // Landing view
   if (mode === 'landing') {
     return (
-      <div className="flex h-screen w-screen flex-col bg-gradient-to-br from-background via-background to-primary/5">
+      <div className="flex h-screen w-screen flex-col bg-gradient-glow overflow-hidden">
+        {/* Background glow effects */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px]" />
+          <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[100px]" />
+        </div>
+
         {/* Hero Section */}
-        <div className="flex flex-1 flex-col items-center justify-center px-6">
+        <div className="relative flex flex-1 flex-col items-center justify-center px-6">
           {/* Logo */}
-          <div className="mb-8 flex h-20 w-20 items-center justify-center rounded-3xl bg-primary shadow-lg shadow-primary/30">
-            <Activity className="h-10 w-10 text-primary-foreground" />
+          <div className="mb-8 relative animate-fade-in">
+            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-primary to-primary-glow shadow-glow-lg">
+              <Activity className="h-10 w-10 text-primary-foreground" />
+            </div>
+            <div className="absolute inset-0 rounded-3xl bg-primary/30 blur-xl -z-10 animate-pulse-soft" />
           </div>
           
           {/* Title & Slogan */}
-          <h1 className="mb-2 text-center text-3xl font-bold text-foreground">
+          <h1 className="mb-2 text-center text-3xl font-bold text-foreground animate-slide-up" style={{ animationDelay: '0.1s' }}>
             Votre Coach Santé
           </h1>
-          <p className="mb-12 max-w-xs text-center text-muted-foreground">
+          <p className="mb-12 max-w-xs text-center text-muted-foreground animate-slide-up" style={{ animationDelay: '0.2s' }}>
             Nutrition, entraînement et récupération. Tout piloté par IA.
           </p>
 
           {/* Auth Buttons */}
-          <div className="w-full max-w-sm space-y-4">
+          <div className="w-full max-w-sm space-y-4 animate-slide-up" style={{ animationDelay: '0.3s' }}>
             {/* Google Button */}
             <Button
               onClick={handleGoogleSignIn}
               disabled={isLoading}
-              className="h-14 w-full gap-3 rounded-2xl bg-card text-foreground shadow-md hover:bg-muted"
-              variant="outline"
+              className="h-14 w-full gap-3 rounded-2xl glass-card hover:shadow-glow-sm transition-all duration-300"
+              variant="glass"
             >
               {isLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -183,16 +194,16 @@ const AuthPage = () => {
 
             {/* Divider */}
             <div className="flex items-center gap-4">
-              <div className="h-px flex-1 bg-border" />
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
               <span className="text-xs text-muted-foreground">ou</span>
-              <div className="h-px flex-1 bg-border" />
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
             </div>
 
             {/* Email option */}
             <Button
               onClick={() => setMode('login')}
               variant="ghost"
-              className="h-12 w-full text-muted-foreground hover:text-foreground"
+              className="h-12 w-full text-muted-foreground hover:text-foreground hover:bg-muted/50"
             >
               <Mail className="mr-2 h-4 w-4" />
               Avec email et mot de passe
@@ -201,7 +212,7 @@ const AuthPage = () => {
         </div>
 
         {/* Footer */}
-        <div className="safe-bottom pb-8 text-center">
+        <div className="safe-bottom relative pb-8 text-center">
           <p className="text-xs text-muted-foreground">
             En continuant, vous acceptez nos conditions d'utilisation
           </p>
@@ -212,97 +223,101 @@ const AuthPage = () => {
 
   // Email Login/Signup view
   return (
-    <div className="flex h-screen w-screen flex-col bg-background">
+    <div className="flex h-screen w-screen flex-col bg-gradient-glow">
+      {/* Background glow */}
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
+
       {/* Header */}
-      <div className="safe-top flex items-center px-4 pt-4">
+      <div className="safe-top relative flex items-center px-4 pt-4">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setMode('landing')}
-          className="text-muted-foreground"
+          className="text-muted-foreground hover:text-foreground"
         >
           ← Retour
         </Button>
       </div>
 
       {/* Form */}
-      <div className="flex flex-1 flex-col items-center justify-center px-6">
-        <div className="mb-8 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-          <Activity className="h-8 w-8 text-primary" />
+      <div className="relative flex flex-1 flex-col items-center justify-center px-6">
+        <div className="mb-8 relative animate-scale-in">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20">
+            <Activity className="h-8 w-8 text-primary" />
+          </div>
         </div>
 
-        <h2 className="mb-2 text-2xl font-bold text-foreground">
+        <h2 className="mb-2 text-2xl font-bold text-foreground animate-slide-up">
           {mode === 'login' ? 'Bon retour !' : 'Créer un compte'}
         </h2>
-        <p className="mb-8 text-muted-foreground">
+        <p className="mb-8 text-muted-foreground animate-slide-up" style={{ animationDelay: '0.1s' }}>
           {mode === 'login' ? 'Connectez-vous pour continuer' : 'Inscrivez-vous pour commencer'}
         </p>
 
-        <Card className="w-full max-w-sm border-0 bg-transparent shadow-none">
-          <CardContent className="p-0">
-            <form onSubmit={handleEmailAuth} className="space-y-4">
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="email"
-                  placeholder="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="h-14 rounded-2xl border-border bg-card pl-12 text-base"
-                />
-              </div>
+        <div className="w-full max-w-sm animate-slide-up" style={{ animationDelay: '0.2s' }}>
+          <form onSubmit={handleEmailAuth} className="space-y-4">
+            <div className="relative group">
+              <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
+              <Input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="h-14 rounded-2xl border-border bg-card/50 pl-12 text-base backdrop-blur-sm focus:border-primary focus:ring-primary/20 focus:shadow-glow-sm transition-all"
+              />
+            </div>
 
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Mot de passe"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  className="h-14 rounded-2xl border-border bg-card pl-12 pr-12 text-base"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="h-14 w-full rounded-2xl text-base font-semibold"
-              >
-                {isLoading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : mode === 'login' ? (
-                  'Se connecter'
-                ) : (
-                  "S'inscrire"
-                )}
-              </Button>
-            </form>
-
-            {/* Toggle mode */}
-            <div className="mt-6 text-center">
+            <div className="relative group">
+              <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Mot de passe"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                className="h-14 rounded-2xl border-border bg-card/50 pl-12 pr-12 text-base backdrop-blur-sm focus:border-primary focus:ring-primary/20 focus:shadow-glow-sm transition-all"
+              />
               <button
-                onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-                className="text-sm text-muted-foreground hover:text-primary"
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
               >
-                {mode === 'login' ? (
-                  <>Pas de compte ? <span className="font-medium text-primary">Inscrivez-vous</span></>
-                ) : (
-                  <>Déjà un compte ? <span className="font-medium text-primary">Connectez-vous</span></>
-                )}
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
             </div>
-          </CardContent>
-        </Card>
+
+            <Button
+              type="submit"
+              disabled={isLoading}
+              variant="premium"
+              className="h-14 w-full rounded-2xl text-base font-semibold"
+            >
+              {isLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : mode === 'login' ? (
+                'Se connecter'
+              ) : (
+                "S'inscrire"
+              )}
+            </Button>
+          </form>
+
+          {/* Toggle mode */}
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+              className="text-sm text-muted-foreground hover:text-primary transition-colors"
+            >
+              {mode === 'login' ? (
+                <>Pas de compte ? <span className="font-medium text-primary">Inscrivez-vous</span></>
+              ) : (
+                <>Déjà un compte ? <span className="font-medium text-primary">Connectez-vous</span></>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

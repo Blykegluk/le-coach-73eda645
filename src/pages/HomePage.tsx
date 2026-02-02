@@ -209,26 +209,31 @@ const HomePage = () => {
   return (
     <div className="safe-top px-4 pb-4 pt-2">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-6 animate-fade-in">
         <span className="text-sm text-muted-foreground">Bonjour 👋</span>
         <h1 className="text-2xl font-bold text-foreground">
-          {firstName}, prêt à transpirer ?
+          {firstName}, <span className="text-gradient-primary">prêt à transpirer ?</span>
         </h1>
       </div>
 
       {/* Goal Progress Card */}
-      <GoalProgressCard 
-        profile={profile} 
-        currentWeight={currentWeight}
-        currentBodyFat={currentBodyFat}
-      />
+      <div className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
+        <GoalProgressCard 
+          profile={profile} 
+          currentWeight={currentWeight}
+          currentBodyFat={currentBodyFat}
+        />
+      </div>
 
       {/* Nutrition summary - Calories, Protéines, Hydratation */}
-      <div className="mb-4 grid grid-cols-3 gap-2">
+      <div className="mb-4 grid grid-cols-3 gap-2 animate-slide-up" style={{ animationDelay: '0.2s' }}>
         {/* Calories Card */}
-        <div className="rounded-2xl border border-border bg-card p-3">
+        <div className="card-premium p-3 group">
           <div className="mb-1.5 flex items-center gap-1.5">
-            <Flame className="h-3.5 w-3.5 text-muted-foreground" />
+            <div className="relative">
+              <Flame className="h-3.5 w-3.5 text-primary" />
+              <div className="absolute inset-0 bg-primary/30 blur-sm rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
             <span className="text-xs text-muted-foreground">Calories</span>
           </div>
           {caloriesConsumed > 0 ? (
@@ -241,7 +246,7 @@ const HomePage = () => {
               </p>
               <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                 <div 
-                  className="h-full rounded-full bg-primary transition-all"
+                  className="h-full rounded-full bg-gradient-to-r from-primary to-primary-glow transition-all"
                   style={{ width: `${Math.min(caloriesPercentage, 100)}%` }}
                 />
               </div>
@@ -254,9 +259,12 @@ const HomePage = () => {
         </div>
 
         {/* Protein Card */}
-        <div className="rounded-2xl border border-border bg-card p-3">
+        <div className="card-premium p-3 group">
           <div className="mb-1.5 flex items-center gap-1.5">
-            <Beef className="h-3.5 w-3.5 text-muted-foreground" />
+            <div className="relative">
+              <Beef className="h-3.5 w-3.5 text-primary" />
+              <div className="absolute inset-0 bg-primary/30 blur-sm rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
             <span className="text-xs text-muted-foreground">Protéines</span>
           </div>
           {proteinConsumed > 0 ? (
@@ -269,7 +277,7 @@ const HomePage = () => {
               </p>
               <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                 <div 
-                  className="h-full rounded-full bg-primary transition-all"
+                  className="h-full rounded-full bg-gradient-to-r from-primary to-primary-glow transition-all"
                   style={{ width: `${Math.min(proteinPercentage, 100)}%` }}
                 />
               </div>
@@ -282,9 +290,12 @@ const HomePage = () => {
         </div>
 
         {/* Hydration Card */}
-        <div className="rounded-2xl border border-border bg-card p-3">
+        <div className="card-premium p-3 group">
           <div className="mb-1.5 flex items-center gap-1.5">
-            <Droplets className="h-3.5 w-3.5 text-muted-foreground" />
+            <div className="relative">
+              <Droplets className="h-3.5 w-3.5 text-water" />
+              <div className="absolute inset-0 bg-water/30 blur-sm rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
             <span className="text-xs text-muted-foreground">Hydratation</span>
           </div>
           {waterConsumed > 0 ? (
@@ -297,7 +308,7 @@ const HomePage = () => {
               </p>
               <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                 <div 
-                  className="h-full rounded-full bg-primary transition-all"
+                  className="h-full rounded-full bg-gradient-to-r from-water to-water/70 transition-all"
                   style={{ width: `${Math.min(waterPercentage, 100)}%` }}
                 />
               </div>
@@ -311,15 +322,18 @@ const HomePage = () => {
       </div>
 
       {/* Daily Tips */}
-      <DailyTipsCard />
+      <div className="animate-slide-up" style={{ animationDelay: '0.3s' }}>
+        <DailyTipsCard />
+      </div>
 
       {/* Weekly progress */}
-      <div className="mb-4 rounded-2xl border border-border bg-card p-4">
+      <div className="mb-4 card-premium p-4 animate-slide-up" style={{ animationDelay: '0.4s' }}>
         <p className="mb-2 text-sm font-medium text-foreground">Cette semaine</p>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
               <Target className="h-5 w-5 text-primary" />
+              <div className="absolute inset-0 rounded-full bg-primary/20 blur-sm -z-10" />
             </div>
             <div>
               <p className="font-semibold text-foreground">
@@ -342,17 +356,18 @@ const HomePage = () => {
       </div>
 
       {/* Quick actions */}
-      <div className="mb-4">
+      <div className="mb-4 animate-slide-up" style={{ animationDelay: '0.5s' }}>
         <p className="mb-3 text-sm font-medium text-foreground">Accès rapide</p>
         <div className="space-y-2">
           {/* Add meal button */}
           <button
             onClick={() => navigate('/nutrition')}
-            className="flex w-full items-center justify-between rounded-xl border border-border bg-card p-4 transition-all hover:bg-muted/50 active:scale-[0.99]"
+            className="flex w-full items-center justify-between card-premium p-4"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
                 <Plus className="h-5 w-5 text-primary" />
+                <div className="absolute inset-0 rounded-xl bg-primary/20 blur-sm -z-10 opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
               <div className="text-left">
                 <p className="font-medium text-foreground">Ajouter un repas</p>
@@ -365,10 +380,10 @@ const HomePage = () => {
           {/* Explore equipment button */}
           <button
             onClick={() => navigate('/training?section=equipment')}
-            className="flex w-full items-center justify-between rounded-xl border border-border bg-card p-4 transition-all hover:bg-muted/50 active:scale-[0.99]"
+            className="flex w-full items-center justify-between card-premium p-4"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
                 <Dumbbell className="h-5 w-5 text-primary" />
               </div>
               <div className="text-left">
@@ -382,10 +397,10 @@ const HomePage = () => {
           {/* Goal button */}
           <button
             onClick={() => setIsGoalModalOpen(true)}
-            className="flex w-full items-center justify-between rounded-xl border border-border bg-card p-4 transition-all hover:bg-muted/50 active:scale-[0.99]"
+            className="flex w-full items-center justify-between card-premium p-4"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
                 <Target className="h-5 w-5 text-primary" />
               </div>
               <div className="text-left">

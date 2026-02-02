@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Settings, ChevronRight, Target, Apple, Watch, Bell, Shield, HelpCircle, LogOut, User } from 'lucide-react';
+import { Settings, ChevronRight, Target, Apple, Watch, Bell, Shield, HelpCircle, LogOut, User, Moon, Sun } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,6 +18,7 @@ const GOAL_LABELS: Record<string, string> = {
 const ProfilePage = () => {
   const { user, signOut } = useAuth();
   const { profile, isLoading } = useProfile();
+  const { theme, setTheme } = useTheme();
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
 
   const settingsItems = [
@@ -76,26 +78,29 @@ const ProfilePage = () => {
   return (
     <div className="safe-top px-4 pb-4 pt-2">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between animate-fade-in">
         <h1 className="text-2xl font-bold text-foreground">Profil</h1>
-        <button className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/80">
+        <button className="flex h-10 w-10 items-center justify-center rounded-full bg-muted/50 text-muted-foreground transition-all hover:bg-muted hover:text-foreground">
           <Settings className="h-5 w-5" />
         </button>
       </div>
 
       {/* User info - REAL DATA */}
-      <div className="mb-4 rounded-2xl border border-border bg-card p-4">
+      <div className="mb-4 card-premium p-4 animate-slide-up">
         <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary">
-            {profile?.avatar_url ? (
-              <img 
-                src={profile.avatar_url} 
-                alt="Avatar" 
-                className="h-14 w-14 rounded-full object-cover"
-              />
-            ) : (
-              <User className="h-7 w-7 text-primary-foreground" />
-            )}
+          <div className="relative">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow shadow-glow-md">
+              {profile?.avatar_url ? (
+                <img 
+                  src={profile.avatar_url} 
+                  alt="Avatar" 
+                  className="h-14 w-14 rounded-full object-cover"
+                />
+              ) : (
+                <User className="h-7 w-7 text-primary-foreground" />
+              )}
+            </div>
+            <div className="absolute inset-0 rounded-full animate-halo-pulse" />
           </div>
           <div>
             <h2 className="text-lg font-semibold text-foreground">
@@ -108,19 +113,20 @@ const ProfilePage = () => {
       </div>
 
       {/* Stats - REAL DATA */}
-      <div className="mb-4 grid grid-cols-4 gap-2">
+      <div className="mb-4 grid grid-cols-4 gap-2 animate-slide-up" style={{ animationDelay: '0.1s' }}>
         {[
           { label: 'Taille', value: profile?.height_cm ? `${profile.height_cm}cm` : '-' },
           { label: 'Poids', value: profile?.weight_kg ? `${profile.weight_kg}kg` : '-' },
           { label: 'Âge', value: age ? `${age} ans` : '-' },
           { label: 'IMC', value: bmi },
-        ].map((stat) => (
+        ].map((stat, index) => (
           <div
             key={stat.label}
-            className="rounded-2xl border border-border bg-card p-3 text-center"
+            className="card-premium p-3 text-center group"
+            style={{ animationDelay: `${0.1 + index * 0.05}s` }}
           >
             <p className="text-xs text-muted-foreground">{stat.label}</p>
-            <p className="font-bold text-foreground">{stat.value}</p>
+            <p className="font-bold text-foreground group-hover:text-gradient-primary transition-all">{stat.value}</p>
           </div>
         ))}
       </div>
@@ -128,11 +134,13 @@ const ProfilePage = () => {
       {/* Main goal - REAL DATA with edit capability */}
       <button 
         onClick={() => setIsGoalModalOpen(true)}
-        className="mb-4 flex w-full items-center justify-between rounded-2xl border border-border bg-card p-4 transition-all hover:bg-muted/50 active:scale-[0.99]"
+        className="mb-4 flex w-full items-center justify-between card-premium p-4 animate-slide-up"
+        style={{ animationDelay: '0.2s' }}
       >
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
             <Target className="h-5 w-5 text-primary" />
+            <div className="absolute inset-0 rounded-full bg-primary/20 blur-sm -z-10" />
           </div>
           <div className="text-left">
             <p className="text-xs text-muted-foreground">Objectif principal</p>
@@ -152,18 +160,54 @@ const ProfilePage = () => {
         currentTargetWeight={profile?.target_weight_kg}
       />
 
+      {/* Theme Toggle */}
+      <div className="mb-4 card-premium p-4 animate-slide-up" style={{ animationDelay: '0.25s' }}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+              {theme === 'dark' ? (
+                <Moon className="h-5 w-5 text-primary" />
+              ) : (
+                <Sun className="h-5 w-5 text-primary" />
+              )}
+              <div className="absolute inset-0 rounded-full bg-primary/20 blur-sm -z-10" />
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Thème</p>
+              <p className="text-xs text-muted-foreground">
+                {theme === 'dark' ? 'Mode sombre' : 'Mode clair'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className={`relative h-8 w-14 rounded-full transition-all duration-300 ${
+              theme === 'dark' 
+                ? 'bg-gradient-to-r from-primary to-primary-glow shadow-glow-sm' 
+                : 'bg-muted'
+            }`}
+          >
+            <div
+              className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow-md transition-all duration-300 ${
+                theme === 'dark' ? 'left-7' : 'left-1'
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+
       {/* Settings */}
-      <div className="mb-4">
+      <div className="mb-4 animate-slide-up" style={{ animationDelay: '0.3s' }}>
         <p className="mb-3 text-sm font-medium text-foreground">Paramètres</p>
         <div className="space-y-1">
-          {settingsItems.map((item) => (
+          {settingsItems.map((item, index) => (
             <button
               key={item.label}
-              className="flex w-full items-center justify-between rounded-xl p-3 transition-all hover:bg-muted/50 active:scale-[0.99]"
+              className="flex w-full items-center justify-between rounded-xl p-3 transition-all hover:bg-muted/50 active:scale-[0.99] group"
             >
               <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-                  <item.icon className="h-4 w-4 text-muted-foreground" />
+                <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-muted group-hover:bg-primary/10 transition-colors">
+                  <item.icon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>
                 <span className="text-foreground">{item.label}</span>
               </div>
@@ -176,14 +220,17 @@ const ProfilePage = () => {
       {/* Logout - FUNCTIONAL */}
       <button 
         onClick={signOut}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-card py-4 text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive active:scale-[0.99]"
+        className="flex w-full items-center justify-center gap-2 card-premium py-4 text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 active:scale-[0.99] animate-slide-up"
+        style={{ animationDelay: '0.4s' }}
       >
         <LogOut className="h-5 w-5" />
         <span className="font-medium">Se déconnecter</span>
       </button>
 
       {/* Version */}
-      <p className="mt-4 text-center text-xs text-muted-foreground">HealthLab Coach v1.0.0</p>
+      <p className="mt-4 text-center text-xs text-muted-foreground animate-fade-in" style={{ animationDelay: '0.5s' }}>
+        HealthLab Coach v1.0.0
+      </p>
     </div>
   );
 };
