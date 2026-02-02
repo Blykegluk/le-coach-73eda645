@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Zap, Flame, Target, Plus, Dumbbell, Apple, Droplets } from 'lucide-react';
+import { ChevronRight, Flame, Target, Plus, Dumbbell, Droplets } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { healthProvider } from '@/providers/health';
@@ -8,6 +8,9 @@ import { supabase } from '@/integrations/supabase/client';
 import type { HealthMetrics } from '@/providers/health';
 import { Skeleton } from '@/components/ui/skeleton';
 import GoalEditorModal from '@/components/profile/GoalEditorModal';
+import GoalProgressCard from '@/components/home/GoalProgressCard';
+import DailyTipsCard from '@/components/home/DailyTipsCard';
+
 const HomePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -16,10 +19,11 @@ const HomePage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [weeklySessionsCompleted, setWeeklySessionsCompleted] = useState(0);
+  const [currentWeight, setCurrentWeight] = useState<number | null>(null);
 
   // Goals from profile or defaults
-  const caloriesGoal = 2000; // Could be calculated based on profile
-  const waterGoal = 2500; // ml
+  const caloriesGoal = profile?.target_calories ?? 2000;
+  const waterGoal = profile?.target_water_ml ?? 2500;
 
   const fetchMetrics = useCallback(async () => {
     if (!user) return;
@@ -30,6 +34,40 @@ const HomePage = () => {
     setIsLoading(false);
   }, [user]);
 
+  // Fetch current weight from latest daily_metrics or body_composition
+  const fetchCurrentWeight = useCallback(async () => {
+    if (!user) return;
+
+    // Try daily_metrics first
+    const { data: dailyData } = await supabase
+      .from('daily_metrics')
+      .select('weight')
+      .eq('user_id', user.id)
+      .not('weight', 'is', null)
+      .order('date', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (dailyData?.weight) {
+      setCurrentWeight(dailyData.weight);
+      return;
+    }
+
+    // Fallback to body_composition
+    const { data: bodyData } = await supabase
+      .from('body_composition')
+      .select('weight_kg')
+      .eq('user_id', user.id)
+      .not('weight_kg', 'is', null)
+      .order('measured_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (bodyData?.weight_kg) {
+      setCurrentWeight(bodyData.weight_kg);
+    }
+  }, [user]);
+
   // Fetch weekly sessions count
   const fetchWeeklySessions = useCallback(async () => {
     if (!user) return;
@@ -37,7 +75,7 @@ const HomePage = () => {
     // Get start of current week (Monday)
     const now = new Date();
     const dayOfWeek = now.getDay();
-    const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Adjust for Monday start
+    const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - diff);
     startOfWeek.setHours(0, 0, 0, 0);
@@ -56,6 +94,7 @@ const HomePage = () => {
   useEffect(() => {
     fetchMetrics();
     fetchWeeklySessions();
+    fetchCurrentWeight();
 
     // Subscribe to real-time updates
     if (user) {
@@ -86,20 +125,13 @@ const HomePage = () => {
         supabase.removeChannel(activitiesChannel);
       };
     }
-  }, [user, fetchMetrics, fetchWeeklySessions]);
+  }, [user, fetchMetrics, fetchWeeklySessions, fetchCurrentWeight]);
 
   const firstName = profile?.first_name || user?.email?.split('@')[0] || 'Athlète';
   const caloriesConsumed = metrics?.caloriesIn || 0;
   const caloriesPercentage = (caloriesConsumed / caloriesGoal) * 100;
   const waterConsumed = metrics?.waterMl || 0;
   const waterPercentage = (waterConsumed / waterGoal) * 100;
-
-  // Mock workout data (will be replaced with real data later)
-  const todayWorkout = {
-    name: 'Full Body',
-    exercises: 8,
-    duration: 45,
-  };
 
   const weeklySessionsTotal = profile?.activity_level === 'very_active' ? 6 
     : profile?.activity_level === 'active' ? 5
@@ -114,11 +146,12 @@ const HomePage = () => {
           <Skeleton className="mb-2 h-4 w-24" />
           <Skeleton className="h-8 w-48" />
         </div>
-        <Skeleton className="mb-4 h-40 w-full rounded-2xl" />
+        <Skeleton className="mb-4 h-24 w-full rounded-2xl" />
         <div className="mb-4 grid grid-cols-2 gap-3">
           <Skeleton className="h-32 rounded-2xl" />
           <Skeleton className="h-32 rounded-2xl" />
         </div>
+        <Skeleton className="mb-4 h-20 w-full rounded-2xl" />
         <Skeleton className="h-24 w-full rounded-2xl" />
       </div>
     );
@@ -134,41 +167,19 @@ const HomePage = () => {
         </h1>
       </div>
 
-      {/* Today's workout */}
-      <div className="mb-4 rounded-2xl border border-border bg-card p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm font-medium text-foreground">Séance du jour</span>
-          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-            Planifiée
-          </span>
-        </div>
-        <div className="mb-4 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-            <Dumbbell className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <p className="font-semibold text-foreground">{todayWorkout.name}</p>
-            <p className="text-sm text-muted-foreground">
-              {todayWorkout.exercises} exercices • {todayWorkout.duration} min
-            </p>
-          </div>
-        </div>
-        <button 
-          onClick={() => navigate('/training')}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 font-semibold text-primary-foreground transition-all hover:bg-primary/90 active:scale-[0.98]"
-        >
-          <Zap className="h-5 w-5" />
-          Commencer la séance
-        </button>
-      </div>
+      {/* Goal Progress Card */}
+      <GoalProgressCard 
+        profile={profile} 
+        currentWeight={currentWeight} 
+      />
 
-      {/* Nutrition summary - REAL DATA */}
+      {/* Nutrition summary - Calories consommées & Eau */}
       <div className="mb-4 grid grid-cols-2 gap-3">
-        {/* Calories Card */}
+        {/* Calories Card - Clarified as "consommées" */}
         <div className="rounded-2xl border border-border bg-card p-4">
           <div className="mb-2 flex items-center gap-2">
             <Flame className="h-4 w-4 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">Calories</span>
+            <span className="text-xs text-muted-foreground">Calories consommées</span>
           </div>
           {caloriesConsumed > 0 ? (
             <>
@@ -223,7 +234,14 @@ const HomePage = () => {
         </div>
       </div>
 
-      {/* Weekly progress - REAL DATA */}
+      {/* Daily Tips */}
+      <DailyTipsCard 
+        metrics={metrics} 
+        profile={profile} 
+        weeklySessionsCompleted={weeklySessionsCompleted} 
+      />
+
+      {/* Weekly progress */}
       <div className="mb-4 rounded-2xl border border-border bg-card p-4">
         <p className="mb-2 text-sm font-medium text-foreground">Cette semaine</p>
         <div className="flex items-center justify-between">
@@ -289,7 +307,7 @@ const HomePage = () => {
             <ChevronRight className="h-5 w-5 text-muted-foreground" />
           </button>
 
-          {/* Goal button - dynamic text based on whether goal exists */}
+          {/* Goal button */}
           <button
             onClick={() => setIsGoalModalOpen(true)}
             className="flex w-full items-center justify-between rounded-xl border border-border bg-card p-4 transition-all hover:bg-muted/50 active:scale-[0.99]"
