@@ -119,12 +119,13 @@ export default function OnboardingPage() {
         first_name: formData.first_name,
         birth_date: formData.birth_date,
         gender: formData.gender,
-        height: formData.height,
-        weight: formData.weight,
+        height_cm: formData.height,
+        weight_kg: formData.weight,
         activity_level: formData.activity_level,
         goal: formData.goal,
-        target_weight: formData.target_weight || null,
-      } as Record<string, unknown>)
+        target_weight_kg: formData.target_weight || null,
+        onboarding_complete: true,
+      })
       .eq('user_id', user.id);
 
     if (updateError) {
