@@ -53,6 +53,81 @@ export type Database = {
         }
         Relationships: []
       }
+      body_composition: {
+        Row: {
+          bmi: number | null
+          bmr_kcal: number | null
+          body_age: number | null
+          body_fat_pct: number | null
+          bone_mass_kg: number | null
+          created_at: string
+          fat_mass_kg: number | null
+          id: string
+          lean_mass_kg: number | null
+          measured_at: string
+          muscle_mass_kg: number | null
+          photo_url: string | null
+          protein_kg: number | null
+          protein_pct: number | null
+          raw_data: Json | null
+          skeletal_muscle_pct: number | null
+          standard_weight_kg: number | null
+          subcutaneous_fat_pct: number | null
+          user_id: string
+          visceral_fat_index: number | null
+          water_pct: number | null
+          weight_kg: number | null
+        }
+        Insert: {
+          bmi?: number | null
+          bmr_kcal?: number | null
+          body_age?: number | null
+          body_fat_pct?: number | null
+          bone_mass_kg?: number | null
+          created_at?: string
+          fat_mass_kg?: number | null
+          id?: string
+          lean_mass_kg?: number | null
+          measured_at?: string
+          muscle_mass_kg?: number | null
+          photo_url?: string | null
+          protein_kg?: number | null
+          protein_pct?: number | null
+          raw_data?: Json | null
+          skeletal_muscle_pct?: number | null
+          standard_weight_kg?: number | null
+          subcutaneous_fat_pct?: number | null
+          user_id: string
+          visceral_fat_index?: number | null
+          water_pct?: number | null
+          weight_kg?: number | null
+        }
+        Update: {
+          bmi?: number | null
+          bmr_kcal?: number | null
+          body_age?: number | null
+          body_fat_pct?: number | null
+          bone_mass_kg?: number | null
+          created_at?: string
+          fat_mass_kg?: number | null
+          id?: string
+          lean_mass_kg?: number | null
+          measured_at?: string
+          muscle_mass_kg?: number | null
+          photo_url?: string | null
+          protein_kg?: number | null
+          protein_pct?: number | null
+          raw_data?: Json | null
+          skeletal_muscle_pct?: number | null
+          standard_weight_kg?: number | null
+          subcutaneous_fat_pct?: number | null
+          user_id?: string
+          visceral_fat_index?: number | null
+          water_pct?: number | null
+          weight_kg?: number | null
+        }
+        Relationships: []
+      }
       daily_metrics: {
         Row: {
           body_fat_pct: number | null
@@ -157,8 +232,11 @@ export type Database = {
           onboarding_complete: boolean | null
           target_body_fat_pct: number | null
           target_calories: number | null
+          target_lean_mass_kg: number | null
+          target_muscle_mass_kg: number | null
           target_sleep_hours: number | null
           target_steps: number | null
+          target_visceral_fat_index: number | null
           target_water_ml: number | null
           target_weight_kg: number | null
           updated_at: string
@@ -179,8 +257,11 @@ export type Database = {
           onboarding_complete?: boolean | null
           target_body_fat_pct?: number | null
           target_calories?: number | null
+          target_lean_mass_kg?: number | null
+          target_muscle_mass_kg?: number | null
           target_sleep_hours?: number | null
           target_steps?: number | null
+          target_visceral_fat_index?: number | null
           target_water_ml?: number | null
           target_weight_kg?: number | null
           updated_at?: string
@@ -201,8 +282,11 @@ export type Database = {
           onboarding_complete?: boolean | null
           target_body_fat_pct?: number | null
           target_calories?: number | null
+          target_lean_mass_kg?: number | null
+          target_muscle_mass_kg?: number | null
           target_sleep_hours?: number | null
           target_steps?: number | null
+          target_visceral_fat_index?: number | null
           target_water_ml?: number | null
           target_weight_kg?: number | null
           updated_at?: string
