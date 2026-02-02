@@ -8,6 +8,52 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const MEAL_DEFAULT_TIMES: Record<string, string> = {
+  breakfast: "08:00",
+  morning_snack: "10:30",
+  lunch: "12:30",
+  afternoon_snack: "16:00",
+  dinner: "19:30",
+  dessert: "20:30",
+};
+
+const MEAL_TYPE_LABELS: Record<string, string> = {
+  breakfast: "petit-déjeuner",
+  morning_snack: "collation",
+  lunch: "déjeuner",
+  afternoon_snack: "goûter",
+  dinner: "dîner",
+  dessert: "dessert",
+};
+
+function normalizeTimeToHHMM(input?: string): string | null {
+  if (!input) return null;
+  const raw = String(input).trim().toLowerCase();
+  if (!raw) return null;
+
+  // Supported examples: "17:30", "17h30", "17 h 30", "17h"
+  const full = raw.match(/^(\d{1,2})\s*(?:h|:)\s*(\d{2})$/);
+  const hourOnly = raw.match(/^(\d{1,2})\s*h$/);
+
+  const toHHMM = (h: number, m: number) => {
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    if (h < 0 || h > 23) return null;
+    if (m < 0 || m > 59) return null;
+    const hh = String(h).padStart(2, "0");
+    const mm = String(m).padStart(2, "0");
+    return `${hh}:${mm}`;
+  };
+
+  if (full) return toHHMM(parseInt(full[1], 10), parseInt(full[2], 10));
+  if (hourOnly) return toHHMM(parseInt(hourOnly[1], 10), 0);
+
+  // Fallback: already HH:MM?
+  const hhmm = raw.match(/^(\d{2}):(\d{2})$/);
+  if (hhmm) return toHHMM(parseInt(hhmm[1], 10), parseInt(hhmm[2], 10));
+
+  return null;
+}
+
 interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
@@ -112,9 +158,18 @@ const tools = [
             type: "string",
             description: "ID du repas à modifier (obtenu via get_recent_meals)",
           },
+          meal_type: {
+            type: "string",
+            enum: ["breakfast", "morning_snack", "lunch", "afternoon_snack", "dinner", "dessert"],
+            description: "Nouveau type de repas (optionnel). Exemple: 'afternoon_snack' quand l'utilisateur dit 'goûter'.",
+          },
           food_name: {
             type: "string",
             description: "Nouveau nom/description du repas (optionnel)",
+          },
+          estimated_time: {
+            type: "string",
+            description: "Heure estimée du repas au format HH:MM (ex: '17:30'). Si précisée, met à jour logged_at.",
           },
           calories: {
             type: "number",
@@ -540,22 +595,24 @@ async function executeToolCall(
 
       case "log_meal": {
         // Calculate logged_at based on meal type and estimated time
-        const mealDefaultTimes: Record<string, string> = {
-          breakfast: "08:00",
-          morning_snack: "10:30",
-          lunch: "12:30",
-          afternoon_snack: "16:00",
-          dinner: "19:30",
-          dessert: "20:30",
-        };
-        
         // Use estimated_time if provided, otherwise use default for meal type
-        const timeToUse = args.estimated_time || mealDefaultTimes[args.meal_type] || "12:00";
+        const timeToUse =
+          normalizeTimeToHHMM(args.estimated_time) ||
+          MEAL_DEFAULT_TIMES[args.meal_type] ||
+          "12:00";
+
+        // Backward compatibility in case a model still outputs "snack"
+        let normalizedMealType = args.meal_type;
+        if (normalizedMealType === "snack") {
+          const hour = parseInt(String(timeToUse).split(":")[0] || "12", 10);
+          normalizedMealType = hour >= 14 ? "afternoon_snack" : "morning_snack";
+        }
+
         const loggedAt = `${today}T${timeToUse}:00`;
         
         const { error } = await supabase.from("nutrition_logs").insert({
           user_id: userId,
-          meal_type: args.meal_type,
+          meal_type: normalizedMealType,
           food_name: args.food_name,
           calories: args.calories || 0,
           protein: args.protein || 0,
@@ -586,18 +643,9 @@ async function executeToolCall(
           { onConflict: "user_id,date" }
         );
 
-        const mealTypeLabels: Record<string, string> = {
-          breakfast: "petit-déjeuner",
-          morning_snack: "collation",
-          lunch: "déjeuner",
-          afternoon_snack: "goûter",
-          dinner: "dîner",
-          dessert: "dessert",
-        };
-
         return {
           success: true,
-          message: `🍽️ ${args.food_name} enregistré en ${mealTypeLabels[args.meal_type] || args.meal_type} (${args.calories} kcal)`,
+          message: `🍽️ ${args.food_name} enregistré en ${MEAL_TYPE_LABELS[normalizedMealType] || normalizedMealType} (${args.calories} kcal)`,
           data: args,
         };
       }
@@ -636,7 +684,7 @@ async function executeToolCall(
         // First get the current meal to calculate calorie difference
         const { data: currentMeal } = await supabase
           .from("nutrition_logs")
-          .select("calories, food_name")
+          .select("calories, food_name, logged_at, meal_type")
           .eq("id", args.meal_id)
           .eq("user_id", userId)
           .maybeSingle();
@@ -646,11 +694,33 @@ async function executeToolCall(
         }
 
         const updates: any = {};
+        if (args.meal_type !== undefined) updates.meal_type = args.meal_type;
         if (args.food_name !== undefined) updates.food_name = args.food_name;
         if (args.calories !== undefined) updates.calories = args.calories;
         if (args.protein !== undefined) updates.protein = args.protein;
         if (args.carbs !== undefined) updates.carbs = args.carbs;
         if (args.fat !== undefined) updates.fat = args.fat;
+
+        // If the user specifies an hour (or changes meal type), update logged_at accordingly
+        const currentLoggedAtStr = String(currentMeal.logged_at || `${today}T12:00:00`);
+        const mealDate = currentLoggedAtStr.includes("T")
+          ? currentLoggedAtStr.split("T")[0]
+          : today;
+
+        let timeToUse: string | null = normalizeTimeToHHMM(args.estimated_time);
+
+        // If meal type changed but no explicit time, snap to typical time to place it in the right slot.
+        if (
+          !timeToUse &&
+          args.meal_type !== undefined &&
+          args.meal_type !== currentMeal.meal_type
+        ) {
+          timeToUse = MEAL_DEFAULT_TIMES[args.meal_type] || null;
+        }
+
+        if (timeToUse) {
+          updates.logged_at = `${mealDate}T${timeToUse}:00`;
+        }
 
         const { error } = await supabase
           .from("nutrition_logs")
@@ -667,19 +737,28 @@ async function executeToolCall(
             .from("daily_metrics")
             .select("calories_in")
             .eq("user_id", userId)
-            .eq("date", today)
+            .eq("date", mealDate)
             .maybeSingle();
 
           const newCalories = (metrics?.calories_in || 0) + calorieDiff;
           await supabase.from("daily_metrics").upsert(
-            { user_id: userId, date: today, calories_in: Math.max(0, newCalories) },
+            { user_id: userId, date: mealDate, calories_in: Math.max(0, newCalories) },
             { onConflict: "user_id,date" }
           );
         }
 
+        const nextMealType = updates.meal_type || currentMeal.meal_type;
+        const nextTime = updates.logged_at
+          ? String(updates.logged_at).split("T")[1]?.slice(0, 5)
+          : null;
+        const movedSuffix =
+          args.meal_type !== undefined || args.estimated_time !== undefined
+            ? ` → ${MEAL_TYPE_LABELS[nextMealType] || nextMealType}${nextTime ? ` (${nextTime})` : ""}`
+            : "";
+
         return {
           success: true,
-          message: `✏️ "${currentMeal.food_name}" mis à jour${args.protein ? ` (${args.protein}g protéines)` : ""}`,
+          message: `✏️ "${currentMeal.food_name}" mis à jour${movedSuffix}${args.protein ? ` (${args.protein}g protéines)` : ""}`,
           data: updates,
         };
       }
@@ -1727,6 +1806,11 @@ RÈGLES IMPORTANTES:
 2. Quand l'utilisateur CORRIGE ou PRÉCISE une entrée précédente → utilise d'abord get_recent_meals ou get_recent_activities pour trouver l'entrée, puis update_meal ou update_activity
 3. Si tu as un DOUTE sur si c'est un nouvel élément ou une correction → DEMANDE à l'utilisateur!
 4. Quand l'utilisateur veut supprimer quelque chose → utilise delete_meal ou delete_activity
+
+CORRECTIONS DE TYPE/HEURE DE REPAS (TRÈS IMPORTANT):
+- Si l'utilisateur dit par ex. "c'était mon goûter de 17h30, pas une collation du matin" →
+  1) get_recent_meals (pour identifier l'ID)
+  2) update_meal avec meal_type = afternoon_snack ET estimated_time = "17:30" (et ajuste aussi food_name si nécessaire)
 
 DÉTECTION ET SAUVEGARDE DES INFORMATIONS DE SANTÉ:
 Quand l'utilisateur mentionne une information de santé importante, tu DOIS l'enregistrer avec save_health_context:

@@ -1,8 +1,17 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Flame, Beef, Wheat, Droplet } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { Flame, Beef, Wheat, Droplet, Pencil, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface NutritionLog {
   id: string;
+  meal_type?: string;
   food_name: string;
   calories: number;
   protein: number;
@@ -16,18 +25,140 @@ interface MealDetailSheetProps {
   onClose: () => void;
   mealName: string;
   logs: NutritionLog[];
+  onChanged?: () => void;
 }
 
-const MealDetailSheet = ({ isOpen, onClose, mealName, logs }: MealDetailSheetProps) => {
-  const totals = logs.reduce(
-    (acc, log) => ({
-      calories: acc.calories + (log.calories || 0),
-      protein: acc.protein + (log.protein || 0),
-      carbs: acc.carbs + (log.carbs || 0),
-      fat: acc.fat + (log.fat || 0),
-    }),
-    { calories: 0, protein: 0, carbs: 0, fat: 0 }
+const MEAL_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'breakfast', label: 'Petit-déjeuner' },
+  { value: 'morning_snack', label: 'Collation' },
+  { value: 'lunch', label: 'Déjeuner' },
+  { value: 'afternoon_snack', label: 'Goûter' },
+  { value: 'dinner', label: 'Dîner' },
+  { value: 'dessert', label: 'Dessert' },
+];
+
+function getTimeHHMM(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString('fr-FR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  } catch {
+    return '12:00';
+  }
+}
+
+function getDatePart(iso: string): string {
+  const str = String(iso);
+  if (str.includes('T')) return str.split('T')[0];
+  try {
+    return new Date(iso).toISOString().split('T')[0];
+  } catch {
+    return new Date().toISOString().split('T')[0];
+  }
+}
+
+const MealDetailSheet = ({ isOpen, onClose, mealName, logs, onChanged }: MealDetailSheetProps) => {
+  const { toast } = useToast();
+  const [editing, setEditing] = useState<NutritionLog | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [form, setForm] = useState({
+    food_name: '',
+    calories: '',
+    protein: '',
+    carbs: '',
+    fat: '',
+    meal_type: 'lunch',
+    time: '12:00',
+  });
+
+  const totals = useMemo(
+    () =>
+      logs.reduce(
+        (acc, log) => ({
+          calories: acc.calories + (log.calories || 0),
+          protein: acc.protein + (log.protein || 0),
+          carbs: acc.carbs + (log.carbs || 0),
+          fat: acc.fat + (log.fat || 0),
+        }),
+        { calories: 0, protein: 0, carbs: 0, fat: 0 }
+      ),
+    [logs]
   );
+
+  useEffect(() => {
+    if (!editing) return;
+    setForm({
+      food_name: editing.food_name || '',
+      calories: String(editing.calories ?? 0),
+      protein: String(editing.protein ?? 0),
+      carbs: String(editing.carbs ?? 0),
+      fat: String(editing.fat ?? 0),
+      meal_type: editing.meal_type || 'lunch',
+      time: getTimeHHMM(editing.logged_at),
+    });
+  }, [editing]);
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    setIsSaving(true);
+    try {
+      const datePart = getDatePart(editing.logged_at);
+      const loggedAt = `${datePart}T${form.time}:00`;
+
+      const { error } = await supabase
+        .from('nutrition_logs')
+        .update({
+          food_name: form.food_name.trim() || editing.food_name,
+          calories: Math.round(Number(form.calories) || 0),
+          protein: Number(form.protein) || 0,
+          carbs: Number(form.carbs) || 0,
+          fat: Number(form.fat) || 0,
+          meal_type: form.meal_type,
+          logged_at: loggedAt,
+        })
+        .eq('id', editing.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Aliment mis à jour',
+        description: 'Les changements ont été enregistrés.',
+      });
+      setEditing(null);
+      onChanged?.();
+    } catch (e: any) {
+      console.error(e);
+      toast({
+        title: 'Erreur',
+        description: e?.message || "Impossible de modifier l'aliment.",
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const deleteLog = async (logId: string) => {
+    try {
+      const { error } = await supabase.from('nutrition_logs').delete().eq('id', logId);
+      if (error) throw error;
+
+      toast({
+        title: 'Aliment supprimé',
+        description: 'La ligne a été supprimée.',
+      });
+      onChanged?.();
+    } catch (e: any) {
+      console.error(e);
+      toast({
+        title: 'Erreur',
+        description: e?.message || "Impossible de supprimer l'aliment.",
+        variant: 'destructive',
+      });
+    }
+  };
 
   const macros = [
     { name: 'Calories', value: Math.round(totals.calories), unit: 'kcal', icon: Flame, color: 'text-orange-500 bg-orange-100 dark:bg-orange-900/30' },
@@ -72,7 +203,52 @@ const MealDetailSheet = ({ isOpen, onClose, mealName, logs }: MealDetailSheetPro
           <div className="space-y-2">
             {logs.map((log) => (
               <div key={log.id} className="rounded-xl border border-border bg-muted/50 p-3">
-                <p className="font-medium text-foreground mb-2">{log.food_name}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-medium text-foreground mb-2">{log.food_name}</p>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9"
+                      onClick={() => setEditing(log)}
+                      aria-label="Modifier"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9"
+                          aria-label="Supprimer"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Supprimer cet aliment ?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Cette action est définitive.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Annuler</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => deleteLog(log.id)}
+                          >
+                            Supprimer
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
                 <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <Flame className="h-3 w-3 text-orange-500" />
@@ -95,6 +271,102 @@ const MealDetailSheet = ({ isOpen, onClose, mealName, logs }: MealDetailSheetPro
             ))}
           </div>
         </div>
+
+        {/* Edit dialog */}
+        <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Modifier un aliment</DialogTitle>
+            </DialogHeader>
+
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="food_name">Nom</Label>
+                <Input
+                  id="food_name"
+                  value={form.food_name}
+                  onChange={(e) => setForm((s) => ({ ...s, food_name: e.target.value }))}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="meal_type">Repas</Label>
+                  <select
+                    id="meal_type"
+                    value={form.meal_type}
+                    onChange={(e) => setForm((s) => ({ ...s, meal_type: e.target.value }))}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    {MEAL_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="time">Heure</Label>
+                  <Input
+                    id="time"
+                    type="time"
+                    value={form.time}
+                    onChange={(e) => setForm((s) => ({ ...s, time: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="calories">Calories (kcal)</Label>
+                  <Input
+                    id="calories"
+                    inputMode="numeric"
+                    value={form.calories}
+                    onChange={(e) => setForm((s) => ({ ...s, calories: e.target.value }))}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="protein">Protéines (g)</Label>
+                  <Input
+                    id="protein"
+                    inputMode="decimal"
+                    value={form.protein}
+                    onChange={(e) => setForm((s) => ({ ...s, protein: e.target.value }))}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="carbs">Glucides (g)</Label>
+                  <Input
+                    id="carbs"
+                    inputMode="decimal"
+                    value={form.carbs}
+                    onChange={(e) => setForm((s) => ({ ...s, carbs: e.target.value }))}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="fat">Lipides (g)</Label>
+                  <Input
+                    id="fat"
+                    inputMode="decimal"
+                    value={form.fat}
+                    onChange={(e) => setForm((s) => ({ ...s, fat: e.target.value }))}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditing(null)} disabled={isSaving}>
+                Annuler
+              </Button>
+              <Button type="button" onClick={saveEdit} disabled={isSaving}>
+                Enregistrer
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </SheetContent>
     </Sheet>
   );
