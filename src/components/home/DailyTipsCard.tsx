@@ -197,35 +197,51 @@ const DailyTipsCard = ({ metrics, profile, weeklySessionsCompleted }: DailyTipsC
       });
     }
 
-    // === DEFAULT MOTIVATIONAL TIPS ===
-    if (tips.length < 3) {
-      const motivationalTips: Tip[] = [
-        {
-          icon: <Lightbulb className="h-4 w-4" />,
-          message: "Chaque petit pas compte vers ton objectif ! ✨",
-          type: 'suggestion',
-          priority: 1,
-        },
-        {
-          icon: <Heart className="h-4 w-4" />,
-          message: "La régularité est la clé du succès. Tu es sur la bonne voie ! 💪",
-          type: 'suggestion',
-          priority: 1,
-        },
-        {
-          icon: <Sparkles className="h-4 w-4" />,
-          message: "Parle à ton coach IA pour des conseils personnalisés ! 🤖",
-          type: 'suggestion',
-          priority: 2,
-        },
-      ];
-      tips.push(...motivationalTips);
+    // === DEFAULT MOTIVATIONAL TIPS - Always ensure we have at least 3 ===
+    const motivationalTips: Tip[] = [
+      {
+        icon: <Lightbulb className="h-4 w-4" />,
+        message: "Chaque petit pas compte vers ton objectif ! ✨",
+        type: 'suggestion',
+        priority: 1,
+      },
+      {
+        icon: <Heart className="h-4 w-4" />,
+        message: "La régularité est la clé du succès. Tu es sur la bonne voie ! 💪",
+        type: 'suggestion',
+        priority: 1,
+      },
+      {
+        icon: <Sparkles className="h-4 w-4" />,
+        message: "Parle à ton coach IA pour des conseils personnalisés ! 🤖",
+        type: 'suggestion',
+        priority: 2,
+      },
+      {
+        icon: <Battery className="h-4 w-4" />,
+        message: "Écoute ton corps, il sait ce dont il a besoin 🧘",
+        type: 'suggestion',
+        priority: 1,
+      },
+      {
+        icon: <Heart className="h-4 w-4" />,
+        message: "Le progrès, pas la perfection ! Continue comme ça 🌟",
+        type: 'suggestion',
+        priority: 1,
+      },
+    ];
+
+    // Sort by priority and take top tips
+    const sortedTips = tips.sort((a, b) => b.priority - a.priority);
+    
+    // If we have less than 3 tips, fill with motivational ones
+    while (sortedTips.length < 3 && motivationalTips.length > 0) {
+      // Pick a random motivational tip to add variety
+      const randomIndex = Math.floor(Math.random() * motivationalTips.length);
+      sortedTips.push(motivationalTips.splice(randomIndex, 1)[0]);
     }
 
-    // Sort by priority (highest first) and return top 3
-    return tips
-      .sort((a, b) => b.priority - a.priority)
-      .slice(0, 3);
+    return sortedTips.slice(0, 3);
   };
 
   const tips = generateTips();
