@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { WorkoutProvider } from "@/contexts/WorkoutContext";
 import ProtectedRoute from "@/components/layout/ProtectedRoute";
 import OnboardingGate from "@/components/layout/OnboardingGate";
 import AppLayout from "./components/layout/AppLayout";
@@ -24,31 +25,33 @@ const App = () => (
       <Toaster />
       <Sonner />
       <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            {/* Public route */}
-            <Route path="/auth" element={<AuthPage />} />
-            
-            {/* Protected routes - require authentication */}
-            <Route element={<ProtectedRoute />}>
-              {/* Onboarding - accessible after login but before profile completion */}
-              <Route path="/onboarding" element={<OnboardingPage />} />
+        <WorkoutProvider>
+          <BrowserRouter>
+            <Routes>
+              {/* Public route */}
+              <Route path="/auth" element={<AuthPage />} />
               
-              {/* Main app routes - require completed profile */}
-              <Route element={<OnboardingGate />}>
-                <Route element={<AppLayout />}>
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="/training" element={<TrainingPage />} />
-                  <Route path="/nutrition" element={<NutritionPage />} />
-                  <Route path="/performance" element={<PerformancePage />} />
-                  <Route path="/profile" element={<ProfilePage />} />
+              {/* Protected routes - require authentication */}
+              <Route element={<ProtectedRoute />}>
+                {/* Onboarding - accessible after login but before profile completion */}
+                <Route path="/onboarding" element={<OnboardingPage />} />
+                
+                {/* Main app routes - require completed profile */}
+                <Route element={<OnboardingGate />}>
+                  <Route element={<AppLayout />}>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/training" element={<TrainingPage />} />
+                    <Route path="/nutrition" element={<NutritionPage />} />
+                    <Route path="/performance" element={<PerformancePage />} />
+                    <Route path="/profile" element={<ProfilePage />} />
+                  </Route>
                 </Route>
               </Route>
-            </Route>
-            
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
+              
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </WorkoutProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

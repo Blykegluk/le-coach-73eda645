@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Dumbbell, Clock, RefreshCw, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { getExerciseIcon } from './ExerciseIcons';
 
 interface Exercise {
   name: string;
@@ -14,7 +15,7 @@ interface Exercise {
   notes?: string;
 }
 
-interface Workout {
+export interface Workout {
   workout_name: string;
   target_muscles: string[];
   estimated_duration_min: number;
@@ -23,50 +24,18 @@ interface Workout {
   coach_advice: string;
 }
 
-// Exercise images mapping
-const getExerciseImage = (exerciseName: string): string => {
-  const name = exerciseName.toLowerCase();
-  
-  // Chest exercises
-  if (name.includes("développé") || name.includes("bench") || name.includes("pec")) {
-    return "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=100&h=100&fit=crop";
-  }
-  // Back exercises
-  if (name.includes("tirage") || name.includes("rowing") || name.includes("pull") || name.includes("dos")) {
-    return "https://images.unsplash.com/photo-1603287681836-b174ce5074c2?w=100&h=100&fit=crop";
-  }
-  // Leg exercises
-  if (name.includes("squat") || name.includes("jambes") || name.includes("leg") || name.includes("presse")) {
-    return "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=100&h=100&fit=crop";
-  }
-  // Shoulder exercises
-  if (name.includes("épaule") || name.includes("shoulder") || name.includes("élévation") || name.includes("military")) {
-    return "https://images.unsplash.com/photo-1581009146145-b5ef050c149a?w=100&h=100&fit=crop";
-  }
-  // Arms
-  if (name.includes("curl") || name.includes("biceps") || name.includes("triceps") || name.includes("bras")) {
-    return "https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=100&h=100&fit=crop";
-  }
-  // Core
-  if (name.includes("abdo") || name.includes("planche") || name.includes("crunch") || name.includes("gainage")) {
-    return "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=100&h=100&fit=crop";
-  }
-  // Cardio
-  if (name.includes("cardio") || name.includes("rameur") || name.includes("vélo") || name.includes("tapis")) {
-    return "https://images.unsplash.com/photo-1538805060514-97d9cc17730c?w=100&h=100&fit=crop";
-  }
-  
-  // Default fitness image
-  return "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=100&h=100&fit=crop";
-};
+interface NextWorkoutCardProps {
+  externalWorkout?: Workout | null;
+  onWorkoutGenerated?: (workout: Workout) => void;
+}
 
-export const NextWorkoutCard = () => {
+export const NextWorkoutCard = ({ externalWorkout, onWorkoutGenerated }: NextWorkoutCardProps) => {
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const fetchWorkout = async () => {
+  const fetchWorkout = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
@@ -88,17 +57,30 @@ export const NextWorkoutCard = () => {
       if (data?.error) throw new Error(data.error);
 
       setWorkout(data);
+      onWorkoutGenerated?.(data);
     } catch (err) {
       console.error("Error fetching workout:", err);
       setError("Impossible de générer la séance");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [onWorkoutGenerated]);
 
+  // Use external workout if provided
   useEffect(() => {
-    fetchWorkout();
-  }, []);
+    if (externalWorkout) {
+      setWorkout(externalWorkout);
+      setIsLoading(false);
+      setError(null);
+    }
+  }, [externalWorkout]);
+
+  // Fetch workout on mount if no external workout
+  useEffect(() => {
+    if (!externalWorkout) {
+      fetchWorkout();
+    }
+  }, [externalWorkout, fetchWorkout]);
 
   if (isLoading) {
     return (
@@ -173,31 +155,32 @@ export const NextWorkoutCard = () => {
 
       {/* Exercises */}
       <div className="p-4 space-y-3">
-        {workout.exercises.slice(0, isExpanded ? undefined : 4).map((exercise, index) => (
-          <div
-            key={index}
-            className="flex items-center gap-3 rounded-xl bg-muted/30 p-3"
-          >
-            <img
-              src={getExerciseImage(exercise.name)}
-              alt={exercise.name}
-              className="h-14 w-14 rounded-xl object-cover"
-            />
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-foreground text-sm truncate">{exercise.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {exercise.sets} × {exercise.reps} • {exercise.weight_recommendation}
-              </p>
-              {exercise.notes && (
-                <p className="text-xs text-muted-foreground/70 truncate mt-0.5">{exercise.notes}</p>
-              )}
+        {workout.exercises.slice(0, isExpanded ? undefined : 4).map((exercise, index) => {
+          const ExerciseIcon = getExerciseIcon(exercise.name);
+          return (
+            <div
+              key={index}
+              className="flex items-center gap-3 rounded-xl bg-muted/30 p-3"
+            >
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10">
+                <ExerciseIcon className="h-10 w-10" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-foreground text-sm truncate">{exercise.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {exercise.sets} × {exercise.reps} • {exercise.weight_recommendation}
+                </p>
+                {exercise.notes && (
+                  <p className="text-xs text-muted-foreground/70 truncate mt-0.5">{exercise.notes}</p>
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground text-right">
+                <span className="text-primary font-medium">{exercise.rest_seconds}s</span>
+                <p className="text-muted-foreground/70">repos</p>
+              </div>
             </div>
-            <div className="text-xs text-muted-foreground text-right">
-              <span className="text-primary font-medium">{exercise.rest_seconds}s</span>
-              <p className="text-muted-foreground/70">repos</p>
-            </div>
-          </div>
-        ))}
+          );
+        })}
 
         {workout.exercises.length > 4 && (
           <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>

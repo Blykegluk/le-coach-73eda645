@@ -454,6 +454,41 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "generate_workout",
+      description: "Génère un programme d'entraînement personnalisé pour la prochaine séance. Utiliser quand l'utilisateur demande une séance, veut changer de focus (haut du corps, bas du corps, cardio, etc.), ou demande des adaptations.",
+      parameters: {
+        type: "object",
+        properties: {
+          focus: {
+            type: "string",
+            description: "Focus de la séance: 'upper_body' (haut du corps), 'lower_body' (bas du corps), 'full_body' (corps entier), 'push' (poussée), 'pull' (tirage), 'cardio', 'core' (abdos), ou un groupe musculaire spécifique",
+          },
+          intensity: {
+            type: "string",
+            enum: ["light", "moderate", "intense"],
+            description: "Intensité souhaitée: light (récupération), moderate (normal), intense (dépassement)",
+          },
+          duration_min: {
+            type: "number",
+            description: "Durée souhaitée en minutes (optionnel, défaut: 45-60)",
+          },
+          exclude_exercises: {
+            type: "array",
+            items: { type: "string" },
+            description: "Exercices à éviter (optionnel)",
+          },
+          special_request: {
+            type: "string",
+            description: "Demande spéciale de l'utilisateur (ex: 'plus de cardio', 'exercices sans machine', 'focus biceps')",
+          },
+        },
+        required: [],
+      },
+    },
+  },
 ];
 
 // Execute tool calls
@@ -1268,6 +1303,194 @@ async function executeToolCall(
         return {
           success: true,
           message: `🗑️ Information supprimée: ${args.key}`,
+        };
+      }
+
+      case "generate_workout": {
+        // Get user profile and goals
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        // Get recent activities (last 2 weeks)
+        const twoWeeksAgo = new Date();
+        twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+        
+        const { data: activities } = await supabase
+          .from("activities")
+          .select("*")
+          .eq("user_id", userId)
+          .gte("performed_at", twoWeeksAgo.toISOString())
+          .order("performed_at", { ascending: false });
+
+        // Get health context (injuries, limitations)
+        const { data: healthContext } = await supabase
+          .from("user_context")
+          .select("*")
+          .eq("user_id", userId);
+
+        // Get user's available equipment
+        const equipmentContext = healthContext?.find((c: { key: string }) => c.key === "gym_equipment");
+        const availableEquipment = equipmentContext?.value || "Standard gym equipment";
+
+        // Build context
+        const goal = profile?.goal || "general_fitness";
+        const injuries = healthContext?.filter((c: { key: string }) => 
+          c.key.includes("injury") || c.key.includes("limitation") || c.key.includes("blessure")
+        ) || [];
+
+        const recentWorkoutTypes = activities?.map((a: { activity_type: string }) => a.activity_type) || [];
+        const lastWorkout = activities?.[0];
+        const daysSinceLastWorkout = lastWorkout 
+          ? Math.floor((Date.now() - new Date(lastWorkout.performed_at).getTime()) / (1000 * 60 * 60 * 24))
+          : 7;
+
+        // Count workout types in last 2 weeks for balance
+        const workoutCounts: Record<string, number> = {};
+        recentWorkoutTypes.forEach((type: string) => {
+          const normalized = type.toLowerCase();
+          if (normalized.includes("jambes") || normalized.includes("leg") || normalized.includes("squat")) {
+            workoutCounts["legs"] = (workoutCounts["legs"] || 0) + 1;
+          } else if (normalized.includes("dos") || normalized.includes("back") || normalized.includes("tirage")) {
+            workoutCounts["back"] = (workoutCounts["back"] || 0) + 1;
+          } else if (normalized.includes("pec") || normalized.includes("chest") || normalized.includes("poitrine")) {
+            workoutCounts["chest"] = (workoutCounts["chest"] || 0) + 1;
+          } else if (normalized.includes("épaule") || normalized.includes("shoulder")) {
+            workoutCounts["shoulders"] = (workoutCounts["shoulders"] || 0) + 1;
+          } else if (normalized.includes("bras") || normalized.includes("biceps") || normalized.includes("triceps") || normalized.includes("arm")) {
+            workoutCounts["arms"] = (workoutCounts["arms"] || 0) + 1;
+          } else if (normalized.includes("cardio") || normalized.includes("course") || normalized.includes("vélo")) {
+            workoutCounts["cardio"] = (workoutCounts["cardio"] || 0) + 1;
+          } else {
+            workoutCounts["full_body"] = (workoutCounts["full_body"] || 0) + 1;
+          }
+        });
+
+        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+        if (!LOVABLE_API_KEY) {
+          return { success: false, message: "LOVABLE_API_KEY not configured" };
+        }
+
+        // Build focus instruction based on args
+        let focusInstruction = "";
+        if (args.focus) {
+          const focusMap: Record<string, string> = {
+            upper_body: "haut du corps (pectoraux, dos, épaules, bras)",
+            lower_body: "bas du corps (quadriceps, ischio-jambiers, mollets, fessiers)",
+            full_body: "corps entier (exercices polyarticulaires)",
+            push: "mouvements de poussée (pectoraux, épaules, triceps)",
+            pull: "mouvements de tirage (dos, biceps)",
+            cardio: "cardio et endurance",
+            core: "abdominaux et gainage",
+          };
+          focusInstruction = `\nFOCUS DEMANDÉ: ${focusMap[args.focus] || args.focus}`;
+        }
+
+        let intensityInstruction = "";
+        if (args.intensity) {
+          const intensityMap: Record<string, string> = {
+            light: "Légère - récupération active, poids légers, repos longs",
+            moderate: "Modérée - charge standard, 60-75% du max",
+            intense: "Intense - charge lourde, 80-90% du max, techniques d'intensification",
+          };
+          intensityInstruction = `\nINTENSITÉ: ${intensityMap[args.intensity] || args.intensity}`;
+        }
+
+        const systemPrompt = `Tu es un coach fitness expert. Tu dois générer un programme d'entraînement personnalisé.
+
+PROFIL UTILISATEUR:
+- Objectif: ${goal === "lose_fat" ? "Perte de gras" : goal === "build_muscle" ? "Prise de muscle" : goal === "maintain" ? "Maintien" : "Forme générale"}
+- Poids actuel: ${profile?.weight_kg || "Non renseigné"} kg
+- Poids cible: ${profile?.target_weight_kg || "Non renseigné"} kg
+
+CONTRAINTES DE SANTÉ:
+${injuries.length > 0 ? injuries.map((i: { value: string }) => `- ${i.value}`).join("\n") : "Aucune contrainte particulière"}
+
+ÉQUIPEMENT DISPONIBLE:
+${availableEquipment}
+
+HISTORIQUE RÉCENT (2 semaines):
+- Dernière séance: ${lastWorkout ? `${lastWorkout.activity_type} il y a ${daysSinceLastWorkout} jour(s)` : "Aucune séance récente"}
+- Répartition: ${Object.entries(workoutCounts).map(([k, v]) => `${k}: ${v}x`).join(", ") || "Aucune donnée"}
+${focusInstruction}
+${intensityInstruction}
+${args.special_request ? `\nDEMANDE SPÉCIALE: ${args.special_request}` : ""}
+${args.exclude_exercises?.length ? `\nEXERCICES À ÉVITER: ${args.exclude_exercises.join(", ")}` : ""}
+${args.duration_min ? `\nDURÉE SOUHAITÉE: ${args.duration_min} minutes` : ""}
+
+RÈGLES:
+1. Propose 4-6 exercices adaptés
+2. Pour chaque exercice: nom, séries, répétitions, poids recommandé
+3. Équilibre les groupes musculaires selon l'historique et le focus demandé
+4. Adapte l'intensité au niveau de récupération
+5. Respecte ABSOLUMENT les contraintes de santé
+
+IMPORTANT: Retourne un JSON valide avec cette structure exacte:
+{
+  "workout_name": "Nom de la séance",
+  "target_muscles": ["groupe1", "groupe2"],
+  "estimated_duration_min": 45,
+  "exercises": [
+    {
+      "name": "Nom de l'exercice",
+      "sets": 3,
+      "reps": "10-12",
+      "weight_recommendation": "70% du max ou 20kg",
+      "rest_seconds": 90,
+      "notes": "Conseil technique optionnel"
+    }
+  ],
+  "warmup_notes": "Conseil d'échauffement",
+  "coach_advice": "Conseil personnalisé pour cette séance"
+}`;
+
+        const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-3-flash-preview",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: "Génère ma prochaine séance d'entraînement selon les paramètres." },
+            ],
+            response_format: { type: "json_object" },
+          }),
+        });
+
+        if (!aiResponse.ok) {
+          console.error("AI gateway error:", aiResponse.status);
+          return { success: false, message: "Erreur lors de la génération du workout" };
+        }
+
+        const aiResult = await aiResponse.json();
+        const content = aiResult.choices?.[0]?.message?.content;
+
+        if (!content) {
+          return { success: false, message: "Pas de réponse de l'IA" };
+        }
+
+        // Parse the JSON response
+        let workout;
+        try {
+          workout = JSON.parse(content);
+        } catch {
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            workout = JSON.parse(jsonMatch[0]);
+          } else {
+            return { success: false, message: "Format de réponse invalide" };
+          }
+        }
+
+        return {
+          success: true,
+          message: `💪 Séance générée: ${workout.workout_name} (~${workout.estimated_duration_min} min, ${workout.exercises?.length || 0} exercices)`,
+          data: { workout, type: "workout_generated" },
         };
       }
 
