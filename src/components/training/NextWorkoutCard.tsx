@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Dumbbell, Clock, RefreshCw, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Dumbbell, Clock, RefreshCw, AlertCircle, ChevronDown, ChevronUp, Play } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { getExerciseIcon } from './ExerciseIcons';
+import { ActiveWorkoutSession } from './ActiveWorkoutSession';
 
 interface Exercise {
   name: string;
@@ -34,6 +35,7 @@ export const NextWorkoutCard = ({ externalWorkout, onWorkoutGenerated }: NextWor
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isSessionActive, setIsSessionActive] = useState(false);
 
   const fetchWorkout = useCallback(async () => {
     setIsLoading(true);
@@ -81,6 +83,29 @@ export const NextWorkoutCard = ({ externalWorkout, onWorkoutGenerated }: NextWor
       fetchWorkout();
     }
   }, [externalWorkout, fetchWorkout]);
+
+  const handleStartSession = () => {
+    if (workout) {
+      setIsSessionActive(true);
+    }
+  };
+
+  const handleSessionComplete = () => {
+    setIsSessionActive(false);
+    // Optionally refresh workout for next time
+    fetchWorkout();
+  };
+
+  // Show active session
+  if (isSessionActive && workout) {
+    return (
+      <ActiveWorkoutSession 
+        workout={workout}
+        onClose={() => setIsSessionActive(false)}
+        onComplete={handleSessionComplete}
+      />
+    );
+  }
 
   if (isLoading) {
     return (
@@ -201,6 +226,18 @@ export const NextWorkoutCard = ({ externalWorkout, onWorkoutGenerated }: NextWor
             </CollapsibleTrigger>
           </Collapsible>
         )}
+      </div>
+
+      {/* Start session button */}
+      <div className="px-4 pb-4">
+        <Button 
+          className="w-full" 
+          size="lg"
+          onClick={handleStartSession}
+        >
+          <Play className="h-5 w-5 mr-2" />
+          Lancer la séance
+        </Button>
       </div>
 
       {/* Coach advice */}
