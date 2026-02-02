@@ -18,25 +18,71 @@ interface Activity {
   performed_at: string;
 }
 
+// Estimate calories if not stored (MET-based calculation)
+const estimateCalories = (activity: Activity, weightKg: number = 70): number => {
+  if (activity.calories_burned !== null && activity.calories_burned > 0) {
+    return activity.calories_burned;
+  }
+  
+  const activityLower = activity.activity_type.toLowerCase();
+  let met = 4; // default moderate
+  
+  if (activityLower.includes("course") || activityLower.includes("running") || activityLower.includes("jogging")) {
+    met = 8;
+  } else if (activityLower.includes("musculation") || activityLower.includes("muscu") || activityLower.includes("poids") || activityLower.includes("épaules") || activityLower.includes("jambes") || activityLower.includes("dos") || activityLower.includes("pec")) {
+    met = 5;
+  } else if (activityLower.includes("hiit") || activityLower.includes("crossfit") || activityLower.includes("hyrox")) {
+    met = 10;
+  } else if (activityLower.includes("vélo") || activityLower.includes("cycling") || activityLower.includes("bike")) {
+    met = 7;
+  } else if (activityLower.includes("natation") || activityLower.includes("swimming") || activityLower.includes("nage")) {
+    met = 7;
+  } else if (activityLower.includes("yoga") || activityLower.includes("stretching") || activityLower.includes("pilates")) {
+    met = 3;
+  } else if (activityLower.includes("marche") || activityLower.includes("walk")) {
+    met = 3.5;
+  } else if (activityLower.includes("rameur") || activityLower.includes("rowing")) {
+    met = 7;
+  } else if (activityLower.includes("boxe") || activityLower.includes("boxing") || activityLower.includes("combat")) {
+    met = 9;
+  } else if (activityLower.includes("escalade") || activityLower.includes("climbing")) {
+    met = 8;
+  }
+  
+  return Math.round(met * weightKg * (activity.duration_min / 60));
+};
+
 const TrainingPage = () => {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [userWeight, setUserWeight] = useState<number>(70);
   const [isLoading, setIsLoading] = useState(true);
   const equipmentRef = useRef<HTMLDivElement>(null);
 
   const fetchActivities = useCallback(async () => {
     if (!user) return;
 
-    const { data, error } = await supabase
-      .from('activities')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('performed_at', { ascending: false })
-      .limit(20);
+    // Fetch activities and user weight in parallel
+    const [activitiesRes, profileRes] = await Promise.all([
+      supabase
+        .from('activities')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('performed_at', { ascending: false })
+        .limit(20),
+      supabase
+        .from('profiles')
+        .select('weight_kg')
+        .eq('user_id', user.id)
+        .maybeSingle()
+    ]);
 
-    if (!error && data) {
-      setActivities(data as Activity[]);
+    if (!activitiesRes.error && activitiesRes.data) {
+      setActivities(activitiesRes.data as Activity[]);
+    }
+    if (profileRes.data?.weight_kg) {
+      setUserWeight(profileRes.data.weight_kg);
     }
     setIsLoading(false);
   }, [user]);
@@ -104,14 +150,14 @@ const TrainingPage = () => {
     return !isWithinInterval(date, { start: weekStart, end: weekEnd });
   });
 
-  // Stats for the week
+  // Stats for the week (use estimated calories if not stored)
   const weeklyStats = activities
     .filter(a => isWithinInterval(new Date(a.performed_at), { start: weekStart, end: weekEnd }))
     .reduce(
       (acc, a) => ({
         sessions: acc.sessions + 1,
         totalMinutes: acc.totalMinutes + a.duration_min,
-        totalCalories: acc.totalCalories + (a.calories_burned || 0),
+        totalCalories: acc.totalCalories + estimateCalories(a, userWeight),
       }),
       { sessions: 0, totalMinutes: 0, totalCalories: 0 }
     );
@@ -120,43 +166,46 @@ const TrainingPage = () => {
     return format(new Date(dateStr), "HH:mm");
   };
 
-  const ActivityCard = ({ activity }: { activity: Activity }) => (
-    <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-all hover:bg-muted/30">
-      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-        <Dumbbell className="h-6 w-6 text-primary" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-foreground capitalize truncate">{activity.activity_type}</p>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            {activity.duration_min} min
-          </span>
-          {activity.calories_burned && (
+  const ActivityCard = ({ activity }: { activity: Activity }) => {
+    const calories = estimateCalories(activity, userWeight);
+    const isEstimated = activity.calories_burned === null || activity.calories_burned === 0;
+    
+    return (
+      <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-all hover:bg-muted/30">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+          <Dumbbell className="h-6 w-6 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-foreground capitalize truncate">{activity.activity_type}</p>
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {activity.duration_min} min
+            </span>
             <span className="flex items-center gap-1">
               <Flame className="h-3 w-3" />
-              {activity.calories_burned} kcal
+              ~{calories} kcal{isEstimated ? '*' : ''}
             </span>
-          )}
-          {activity.distance_km && (
-            <span>{activity.distance_km} km</span>
+            {activity.distance_km && (
+              <span>{activity.distance_km} km</span>
+            )}
+          </div>
+          {activity.notes && (
+            <p className="text-xs text-muted-foreground/70 truncate mt-1">{activity.notes}</p>
           )}
         </div>
-        {activity.notes && (
-          <p className="text-xs text-muted-foreground/70 truncate mt-1">{activity.notes}</p>
-        )}
+        <div className="flex flex-col items-end gap-1">
+          <span className="text-xs text-muted-foreground">{formatTime(activity.performed_at)}</span>
+          <button
+            onClick={() => handleDeleteActivity(activity.id)}
+            className="p-1 text-muted-foreground/50 hover:text-destructive transition-colors"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
       </div>
-      <div className="flex flex-col items-end gap-1">
-        <span className="text-xs text-muted-foreground">{formatTime(activity.performed_at)}</span>
-        <button
-          onClick={() => handleDeleteActivity(activity.id)}
-          className="p-1 text-muted-foreground/50 hover:text-destructive transition-colors"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const ActivitySection = ({ title, items }: { title: string; items: Activity[] }) => {
     if (items.length === 0) return null;
