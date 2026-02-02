@@ -51,8 +51,8 @@ const tools = [
         properties: {
           meal_type: {
             type: "string",
-            enum: ["breakfast", "lunch", "dinner", "snack"],
-            description: "Type de repas",
+            enum: ["breakfast", "morning_snack", "lunch", "afternoon_snack", "dinner", "dessert"],
+            description: "Type de repas: breakfast (petit-déjeuner), morning_snack (collation du matin), lunch (déjeuner), afternoon_snack (goûter), dinner (dîner), dessert",
           },
           food_name: {
             type: "string",
