@@ -55,6 +55,7 @@ export type Database = {
       }
       daily_metrics: {
         Row: {
+          body_fat_pct: number | null
           calories_burned: number | null
           calories_in: number | null
           created_at: string
@@ -68,6 +69,7 @@ export type Database = {
           weight: number | null
         }
         Insert: {
+          body_fat_pct?: number | null
           calories_burned?: number | null
           calories_in?: number | null
           created_at?: string
@@ -81,6 +83,7 @@ export type Database = {
           weight?: number | null
         }
         Update: {
+          body_fat_pct?: number | null
           calories_burned?: number | null
           calories_in?: number | null
           created_at?: string
@@ -145,12 +148,14 @@ export type Database = {
           activity_level: string | null
           birth_date: string | null
           created_at: string
+          current_body_fat_pct: number | null
           first_name: string | null
           gender: string | null
           goal: string | null
           height_cm: number | null
           id: string
           onboarding_complete: boolean | null
+          target_body_fat_pct: number | null
           target_calories: number | null
           target_sleep_hours: number | null
           target_steps: number | null
@@ -165,12 +170,14 @@ export type Database = {
           activity_level?: string | null
           birth_date?: string | null
           created_at?: string
+          current_body_fat_pct?: number | null
           first_name?: string | null
           gender?: string | null
           goal?: string | null
           height_cm?: number | null
           id?: string
           onboarding_complete?: boolean | null
+          target_body_fat_pct?: number | null
           target_calories?: number | null
           target_sleep_hours?: number | null
           target_steps?: number | null
@@ -185,12 +192,14 @@ export type Database = {
           activity_level?: string | null
           birth_date?: string | null
           created_at?: string
+          current_body_fat_pct?: number | null
           first_name?: string | null
           gender?: string | null
           goal?: string | null
           height_cm?: number | null
           id?: string
           onboarding_complete?: boolean | null
+          target_body_fat_pct?: number | null
           target_calories?: number | null
           target_sleep_hours?: number | null
           target_steps?: number | null

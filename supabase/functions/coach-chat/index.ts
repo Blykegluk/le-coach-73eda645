@@ -283,6 +283,23 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "log_body_fat",
+      description: "Enregistre le pourcentage de masse grasse de l'utilisateur",
+      parameters: {
+        type: "object",
+        properties: {
+          body_fat_pct: {
+            type: "number",
+            description: "Pourcentage de masse grasse (ex: 18.5)",
+          },
+        },
+        required: ["body_fat_pct"],
+      },
+    },
+  },
 ];
 
 // Execute tool calls
@@ -639,8 +656,18 @@ async function executeToolCall(
 
         const { data: profile } = await supabase
           .from("profiles")
-          .select("target_calories, target_water_ml, target_weight_kg, weight_kg, goal")
+          .select("target_calories, target_water_ml, target_weight_kg, weight_kg, goal, current_body_fat_pct, target_body_fat_pct")
           .eq("user_id", userId)
+          .maybeSingle();
+
+        // Get latest body fat from daily metrics
+        const { data: latestBodyFat } = await supabase
+          .from("daily_metrics")
+          .select("body_fat_pct, date")
+          .eq("user_id", userId)
+          .not("body_fat_pct", "is", null)
+          .order("date", { ascending: false })
+          .limit(1)
           .maybeSingle();
 
         return {
@@ -656,6 +683,10 @@ async function executeToolCall(
             weight: metrics?.weight || profile?.weight_kg,
             target_weight: profile?.target_weight_kg,
             goal: profile?.goal,
+            current_body_fat_pct: profile?.current_body_fat_pct,
+            target_body_fat_pct: profile?.target_body_fat_pct,
+            latest_body_fat: latestBodyFat?.body_fat_pct,
+            latest_body_fat_date: latestBodyFat?.date,
             meals_count: meals?.length || 0,
             meals: meals || [],
             activities_count: activities?.length || 0,
@@ -731,6 +762,48 @@ async function executeToolCall(
         };
       }
 
+      case "log_body_fat": {
+        const { error } = await supabase.from("daily_metrics").upsert(
+          {
+            user_id: userId,
+            date: today,
+            body_fat_pct: args.body_fat_pct,
+          },
+          { onConflict: "user_id,date" }
+        );
+
+        if (error) throw error;
+
+        // Get profile goal info for progress feedback
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("current_body_fat_pct, target_body_fat_pct")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        let progressMsg = "";
+        if (profile?.current_body_fat_pct && profile?.target_body_fat_pct) {
+          const start = profile.current_body_fat_pct;
+          const target = profile.target_body_fat_pct;
+          const current = args.body_fat_pct;
+          const totalToLose = start - target;
+          const lost = start - current;
+          const progressPct = Math.round((lost / totalToLose) * 100);
+          
+          if (progressPct > 0 && progressPct <= 100) {
+            progressMsg = ` Tu as atteint ${progressPct}% de ton objectif ! (${start}% → ${current}% → ${target}%)`;
+          } else if (current <= target) {
+            progressMsg = " 🎉 Tu as atteint ton objectif !";
+          }
+        }
+
+        return {
+          success: true,
+          message: `📊 Masse grasse enregistrée: ${args.body_fat_pct}%${progressMsg}`,
+          data: { body_fat_pct: args.body_fat_pct },
+        };
+      }
+
       default:
         return { success: false, message: `Outil inconnu: ${name}` };
     }
@@ -793,7 +866,7 @@ serve(async (req) => {
     if (userId) {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("first_name, goal, weight_kg, target_weight_kg, height_cm, activity_level")
+        .select("first_name, goal, weight_kg, target_weight_kg, height_cm, activity_level, current_body_fat_pct, target_body_fat_pct")
         .eq("user_id", userId)
         .maybeSingle();
 
@@ -803,16 +876,28 @@ serve(async (req) => {
           fat_loss: "perdre de la masse graisseuse",
           muscle_gain: "prendre du muscle",
           maintain: "maintenir son poids",
-          recomposition: "recomposition corporelle",
+          recomposition: "recomposition corporelle (perdre du gras et gagner du muscle)",
           wellness: "bien-être général",
         };
         const goalKey = profile.goal || "";
+        
+        // Build detailed goal context
+        let goalContext = goalLabels[goalKey] || "améliorer sa santé";
+        if (profile.current_body_fat_pct || profile.target_body_fat_pct) {
+          const parts: string[] = [];
+          if (profile.current_body_fat_pct) parts.push(`départ: ${profile.current_body_fat_pct}%`);
+          if (profile.target_body_fat_pct) parts.push(`objectif: ${profile.target_body_fat_pct}%`);
+          goalContext += ` (masse grasse: ${parts.join(" → ")})`;
+        }
+        
         userContext = `
 L'utilisateur s'appelle ${profile.first_name || "l'utilisateur"}.
-Son objectif est de ${goalLabels[goalKey] || "améliorer sa santé"}.
+Son objectif est de ${goalContext}.
 ${profile.weight_kg ? `Poids actuel: ${profile.weight_kg}kg` : ""}
 ${profile.target_weight_kg ? `Poids cible: ${profile.target_weight_kg}kg` : ""}
 ${profile.height_cm ? `Taille: ${profile.height_cm}cm` : ""}
+${profile.current_body_fat_pct ? `Masse grasse de départ: ${profile.current_body_fat_pct}%` : ""}
+${profile.target_body_fat_pct ? `Masse grasse cible: ${profile.target_body_fat_pct}%` : ""}
 `;
       }
     }
