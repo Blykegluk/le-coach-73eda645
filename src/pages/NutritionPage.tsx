@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { Skeleton } from '@/components/ui/skeleton';
 import AddMealModal from '@/components/nutrition/AddMealModal';
+import MealDetailSheet from '@/components/nutrition/MealDetailSheet';
 
 interface NutritionLog {
   id: string;
@@ -113,6 +114,11 @@ const NutritionPage = () => {
     isOpen: false,
     mealType: '',
     mealName: '',
+  });
+  const [mealDetail, setMealDetail] = useState<{ isOpen: boolean; mealName: string; logs: NutritionLog[] }>({
+    isOpen: false,
+    mealName: '',
+    logs: [],
   });
 
   const baseGoals = calculateDailyGoals(profile);
@@ -352,8 +358,13 @@ const NutritionPage = () => {
             return (
               <div
                 key={meal.type}
+                onClick={() => {
+                  if (!isEmpty) {
+                    setMealDetail({ isOpen: true, mealName: meal.name, logs: meal.logs });
+                  }
+                }}
                 className={`rounded-2xl border bg-card p-4 transition-all ${
-                  isEmpty ? 'border-dashed border-border' : 'border-border'
+                  isEmpty ? 'border-dashed border-border' : 'border-border cursor-pointer hover:bg-muted/50 active:scale-[0.98]'
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -375,14 +386,17 @@ const NutritionPage = () => {
                   </div>
                   {isEmpty ? (
                     <button 
-                      onClick={() => setAddMealModal({ isOpen: true, mealType: meal.type, mealName: meal.name })}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAddMealModal({ isOpen: true, mealType: meal.type, mealName: meal.name });
+                      }}
                       className="flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-all hover:bg-muted active:scale-95"
                     >
                       <Plus className="h-4 w-4" />
                       Ajouter
                     </button>
                   ) : (
-                    <span className="font-semibold text-foreground">{meal.totalCalories} kcal</span>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
                   )}
                 </div>
               </div>
@@ -399,6 +413,14 @@ const NutritionPage = () => {
         userId={user?.id || null}
         mealType={addMealModal.mealType}
         mealName={addMealModal.mealName}
+      />
+
+      {/* Meal Detail Sheet */}
+      <MealDetailSheet
+        isOpen={mealDetail.isOpen}
+        onClose={() => setMealDetail({ isOpen: false, mealName: '', logs: [] })}
+        mealName={mealDetail.mealName}
+        logs={mealDetail.logs}
       />
     </div>
   );
