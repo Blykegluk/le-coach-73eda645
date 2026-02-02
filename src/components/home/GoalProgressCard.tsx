@@ -1,19 +1,22 @@
-import { TrendingUp, TrendingDown, Target, Scale } from 'lucide-react';
+import { TrendingUp, TrendingDown, Target, Scale, Percent } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import type { Profile } from '@/types/profile';
 
 interface GoalProgressCardProps {
   profile: Profile | null;
   currentWeight: number | null;
+  currentBodyFat: number | null;
 }
 
-const GoalProgressCard = ({ profile, currentWeight }: GoalProgressCardProps) => {
+const GoalProgressCard = ({ profile, currentWeight, currentBodyFat }: GoalProgressCardProps) => {
   const startWeight = profile?.weight_kg;
   const targetWeight = profile?.target_weight_kg;
+  const startBodyFat = profile?.current_body_fat_pct;
+  const targetBodyFat = profile?.target_body_fat_pct;
   const goal = profile?.goal;
 
   // If no goal or weights, show placeholder
-  if (!goal || !startWeight || !targetWeight) {
+  if (!goal || !startWeight) {
     return (
       <div className="mb-4 rounded-2xl border border-border bg-card p-4">
         <div className="flex items-center gap-3">
@@ -31,20 +34,41 @@ const GoalProgressCard = ({ profile, currentWeight }: GoalProgressCardProps) => 
     );
   }
 
-  const actualWeight = currentWeight ?? startWeight;
-  const isWeightLoss = targetWeight < startWeight;
-  const totalChange = Math.abs(targetWeight - startWeight);
-  const currentChange = isWeightLoss 
-    ? startWeight - actualWeight 
-    : actualWeight - startWeight;
-  
-  // Calculate progress percentage (clamped between 0 and 100)
-  const progressPercentage = totalChange > 0 
-    ? Math.min(Math.max((currentChange / totalChange) * 100, 0), 100)
-    : 0;
+  // Determine what metrics to track based on goal
+  const trackWeight = goal !== 'maintain' && targetWeight && targetWeight !== startWeight;
+  const trackBodyFat = targetBodyFat && startBodyFat && targetBodyFat !== startBodyFat;
 
-  const remainingKg = Math.abs(targetWeight - actualWeight);
-  const hasReachedGoal = remainingKg < 0.5;
+  // Calculate weight progress
+  const actualWeight = currentWeight ?? startWeight;
+  const isWeightLoss = targetWeight ? targetWeight < startWeight : false;
+  const weightTotalChange = targetWeight ? Math.abs(targetWeight - startWeight) : 0;
+  const weightCurrentChange = targetWeight 
+    ? (isWeightLoss ? startWeight - actualWeight : actualWeight - startWeight)
+    : 0;
+  const weightProgress = weightTotalChange > 0 
+    ? Math.min(Math.max((weightCurrentChange / weightTotalChange) * 100, 0), 100)
+    : 0;
+  const weightRemaining = targetWeight ? Math.abs(targetWeight - actualWeight) : 0;
+  const weightReached = weightRemaining < 0.5;
+
+  // Calculate body fat progress
+  const actualBodyFat = currentBodyFat ?? startBodyFat ?? 0;
+  const isFatLoss = targetBodyFat ? targetBodyFat < (startBodyFat ?? 0) : false;
+  const fatTotalChange = targetBodyFat && startBodyFat ? Math.abs(targetBodyFat - startBodyFat) : 0;
+  const fatCurrentChange = targetBodyFat && startBodyFat
+    ? (isFatLoss ? startBodyFat - actualBodyFat : actualBodyFat - startBodyFat)
+    : 0;
+  const fatProgress = fatTotalChange > 0 
+    ? Math.min(Math.max((fatCurrentChange / fatTotalChange) * 100, 0), 100)
+    : 0;
+  const fatRemaining = targetBodyFat ? Math.abs(targetBodyFat - actualBodyFat) : 0;
+  const fatReached = fatRemaining < 0.5;
+
+  // Overall goal reached only if ALL tracked metrics are reached
+  const hasReachedGoal = 
+    (!trackWeight || weightReached) && 
+    (!trackBodyFat || fatReached) &&
+    (trackWeight || trackBodyFat); // At least one metric must be tracked
 
   // Goal label
   const getGoalLabel = () => {
@@ -59,11 +83,15 @@ const GoalProgressCard = ({ profile, currentWeight }: GoalProgressCardProps) => 
     }
   };
 
+  // Determine trend icon
+  const showDownTrend = goal === 'weight_loss' || goal === 'fat_loss' || 
+    (goal === 'recomposition' && trackBodyFat) || (goal === 'maintain' && trackBodyFat);
+
   return (
     <div className="mb-4 rounded-2xl border border-border bg-card p-4">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {isWeightLoss ? (
+          {showDownTrend ? (
             <TrendingDown className="h-4 w-4 text-primary" />
           ) : (
             <TrendingUp className="h-4 w-4 text-primary" />
@@ -76,32 +104,71 @@ const GoalProgressCard = ({ profile, currentWeight }: GoalProgressCardProps) => 
           </span>
         ) : (
           <span className="text-xs text-muted-foreground">
-            Encore {remainingKg.toFixed(1)} kg
+            En cours...
           </span>
         )}
       </div>
 
-      {/* Progress bar */}
-      <div className="mb-3">
-        <Progress value={progressPercentage} className="h-3" />
-      </div>
-
-      {/* Weight indicators */}
-      <div className="flex items-center justify-between text-sm">
-        <div className="flex items-center gap-1.5">
-          <Scale className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-muted-foreground">Départ:</span>
-          <span className="font-medium text-foreground">{startWeight} kg</span>
+      {/* Weight progress - only if tracking weight */}
+      {trackWeight && (
+        <div className="mb-3">
+          <div className="mb-1 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-1.5">
+              <Scale className="h-3 w-3 text-muted-foreground" />
+              <span className="text-muted-foreground">Poids</span>
+            </div>
+            {weightReached ? (
+              <span className="text-green-600">✓ Atteint</span>
+            ) : (
+              <span className="text-muted-foreground">
+                Encore {weightRemaining.toFixed(1)} kg
+              </span>
+            )}
+          </div>
+          <Progress value={weightProgress} className="h-2" />
+          <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+            <span>{startWeight} kg</span>
+            <span className="font-semibold text-primary">{actualWeight.toFixed(1)} kg</span>
+            <span>{targetWeight} kg</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
+      )}
+
+      {/* Body fat progress - only if tracking body fat */}
+      {trackBodyFat && (
+        <div className="mb-1">
+          <div className="mb-1 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-1.5">
+              <Percent className="h-3 w-3 text-muted-foreground" />
+              <span className="text-muted-foreground">Masse grasse</span>
+            </div>
+            {fatReached ? (
+              <span className="text-green-600">✓ Atteint</span>
+            ) : (
+              <span className="text-muted-foreground">
+                Encore {fatRemaining.toFixed(1)}%
+              </span>
+            )}
+          </div>
+          <Progress value={fatProgress} className="h-2" />
+          <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+            <span>{startBodyFat}%</span>
+            <span className="font-semibold text-primary">{actualBodyFat.toFixed(1)}%</span>
+            <span>{targetBodyFat}%</span>
+          </div>
+        </div>
+      )}
+
+      {/* Maintain goal - show current status */}
+      {goal === 'maintain' && !trackBodyFat && (
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-1.5">
+            <Scale className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-muted-foreground">Poids actuel:</span>
+          </div>
           <span className="font-semibold text-primary">{actualWeight.toFixed(1)} kg</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <Target className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-muted-foreground">Objectif:</span>
-          <span className="font-medium text-foreground">{targetWeight} kg</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

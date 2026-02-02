@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Flame, Target, Plus, Dumbbell, Droplets } from 'lucide-react';
+import { ChevronRight, Flame, Target, Plus, Dumbbell, Droplets, Beef } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { healthProvider } from '@/providers/health';
@@ -20,51 +20,80 @@ const HomePage = () => {
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [weeklySessionsCompleted, setWeeklySessionsCompleted] = useState(0);
   const [currentWeight, setCurrentWeight] = useState<number | null>(null);
+  const [currentBodyFat, setCurrentBodyFat] = useState<number | null>(null);
+  const [proteinConsumed, setProteinConsumed] = useState<number>(0);
 
   // Goals from profile or defaults
   const caloriesGoal = profile?.target_calories ?? 2000;
   const waterGoal = profile?.target_water_ml ?? 2500;
+  // Protein goal: default to 2g per kg of body weight
+  const proteinGoal = profile?.weight_kg ? Math.round(profile.weight_kg * 2) : 120;
 
   const fetchMetrics = useCallback(async () => {
     if (!user) return;
-    
     healthProvider.setUserId(user.id);
     const todayMetrics = await healthProvider.getTodayMetrics();
     setMetrics(todayMetrics);
     setIsLoading(false);
   }, [user]);
 
-  // Fetch current weight from latest daily_metrics or body_composition
-  const fetchCurrentWeight = useCallback(async () => {
+  // Fetch current weight and body fat from latest data
+  const fetchCurrentMetrics = useCallback(async () => {
     if (!user) return;
 
-    // Try daily_metrics first
+    // Try daily_metrics first for weight and body fat
     const { data: dailyData } = await supabase
       .from('daily_metrics')
-      .select('weight')
+      .select('weight, body_fat_pct')
       .eq('user_id', user.id)
-      .not('weight', 'is', null)
       .order('date', { ascending: false })
       .limit(1)
       .single();
 
     if (dailyData?.weight) {
       setCurrentWeight(dailyData.weight);
-      return;
+    }
+    if (dailyData?.body_fat_pct) {
+      setCurrentBodyFat(dailyData.body_fat_pct);
     }
 
-    // Fallback to body_composition
+    // Fallback to body_composition for more detailed data
     const { data: bodyData } = await supabase
       .from('body_composition')
-      .select('weight_kg')
+      .select('weight_kg, body_fat_pct')
       .eq('user_id', user.id)
-      .not('weight_kg', 'is', null)
       .order('measured_at', { ascending: false })
       .limit(1)
       .single();
 
-    if (bodyData?.weight_kg) {
-      setCurrentWeight(bodyData.weight_kg);
+    if (bodyData) {
+      if (!dailyData?.weight && bodyData.weight_kg) {
+        setCurrentWeight(bodyData.weight_kg);
+      }
+      if (!dailyData?.body_fat_pct && bodyData.body_fat_pct) {
+        setCurrentBodyFat(bodyData.body_fat_pct);
+      }
+    }
+  }, [user]);
+
+  // Fetch today's protein intake
+  const fetchProteinIntake = useCallback(async () => {
+    if (!user) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const startOfDay = `${today}T00:00:00`;
+    const endOfDay = `${today}T23:59:59`;
+
+    const { data } = await supabase
+      .from('nutrition_logs')
+      .select('protein')
+      .eq('user_id', user.id)
+      .gte('logged_at', startOfDay)
+      .lte('logged_at', endOfDay);
+
+    if (data) {
+      const total = data.reduce((sum, log) => sum + (log.protein || 0), 0);
+      setProteinConsumed(Math.round(total));
     }
   }, [user]);
 
@@ -94,7 +123,8 @@ const HomePage = () => {
   useEffect(() => {
     fetchMetrics();
     fetchWeeklySessions();
-    fetchCurrentWeight();
+    fetchCurrentMetrics();
+    fetchProteinIntake();
 
     // Subscribe to real-time updates
     if (user) {
@@ -120,18 +150,37 @@ const HomePage = () => {
         )
         .subscribe();
 
+      // Subscribe to nutrition_logs changes for protein updates
+      const nutritionChannel = supabase
+        .channel('homepage_nutrition')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'nutrition_logs',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            fetchProteinIntake();
+          }
+        )
+        .subscribe();
+
       return () => {
         unsubscribe();
         supabase.removeChannel(activitiesChannel);
+        supabase.removeChannel(nutritionChannel);
       };
     }
-  }, [user, fetchMetrics, fetchWeeklySessions, fetchCurrentWeight]);
+  }, [user, fetchMetrics, fetchWeeklySessions, fetchCurrentMetrics, fetchProteinIntake]);
 
   const firstName = profile?.first_name || user?.email?.split('@')[0] || 'Athlète';
   const caloriesConsumed = metrics?.caloriesIn || 0;
   const caloriesPercentage = (caloriesConsumed / caloriesGoal) * 100;
   const waterConsumed = metrics?.waterMl || 0;
   const waterPercentage = (waterConsumed / waterGoal) * 100;
+  const proteinPercentage = (proteinConsumed / proteinGoal) * 100;
 
   const weeklySessionsTotal = profile?.activity_level === 'very_active' ? 6 
     : profile?.activity_level === 'active' ? 5
@@ -170,26 +219,27 @@ const HomePage = () => {
       {/* Goal Progress Card */}
       <GoalProgressCard 
         profile={profile} 
-        currentWeight={currentWeight} 
+        currentWeight={currentWeight}
+        currentBodyFat={currentBodyFat}
       />
 
-      {/* Nutrition summary - Calories consommées & Eau */}
-      <div className="mb-4 grid grid-cols-2 gap-3">
-        {/* Calories Card - Clarified as "consommées" */}
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <div className="mb-2 flex items-center gap-2">
-            <Flame className="h-4 w-4 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">Calories consommées</span>
+      {/* Nutrition summary - Calories, Protéines, Hydratation */}
+      <div className="mb-4 grid grid-cols-3 gap-2">
+        {/* Calories Card */}
+        <div className="rounded-2xl border border-border bg-card p-3">
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <Flame className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Calories</span>
           </div>
           {caloriesConsumed > 0 ? (
             <>
-              <p className="mb-2 text-2xl font-bold text-foreground">
+              <p className="mb-1.5 text-lg font-bold text-foreground">
                 {caloriesConsumed}
-                <span className="text-sm font-normal text-muted-foreground">
-                  / {caloriesGoal}
+                <span className="text-xs font-normal text-muted-foreground">
+                  /{caloriesGoal}
                 </span>
               </p>
-              <div className="h-2 overflow-hidden rounded-full bg-muted">
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                 <div 
                   className="h-full rounded-full bg-primary transition-all"
                   style={{ width: `${Math.min(caloriesPercentage, 100)}%` }}
@@ -197,28 +247,55 @@ const HomePage = () => {
               </div>
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center py-2">
-              <p className="text-sm text-muted-foreground">0 / {caloriesGoal}</p>
-              <p className="text-xs text-muted-foreground/70">Dis-le au coach !</p>
+            <div className="py-1">
+              <p className="text-sm text-muted-foreground">0/{caloriesGoal}</p>
             </div>
           )}
         </div>
 
-        {/* Water Card */}
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <div className="mb-2 flex items-center gap-2">
-            <Droplets className="h-4 w-4 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">Eau</span>
+        {/* Protein Card */}
+        <div className="rounded-2xl border border-border bg-card p-3">
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <Beef className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Protéines</span>
+          </div>
+          {proteinConsumed > 0 ? (
+            <>
+              <p className="mb-1.5 text-lg font-bold text-foreground">
+                {proteinConsumed}g
+                <span className="text-xs font-normal text-muted-foreground">
+                  /{proteinGoal}g
+                </span>
+              </p>
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                <div 
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{ width: `${Math.min(proteinPercentage, 100)}%` }}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="py-1">
+              <p className="text-sm text-muted-foreground">0/{proteinGoal}g</p>
+            </div>
+          )}
+        </div>
+
+        {/* Hydration Card */}
+        <div className="rounded-2xl border border-border bg-card p-3">
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <Droplets className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Hydratation</span>
           </div>
           {waterConsumed > 0 ? (
             <>
-              <p className="mb-2 text-2xl font-bold text-foreground">
+              <p className="mb-1.5 text-lg font-bold text-foreground">
                 {(waterConsumed / 1000).toFixed(1)}L
-                <span className="text-sm font-normal text-muted-foreground">
-                  / {(waterGoal / 1000).toFixed(1)}L
+                <span className="text-xs font-normal text-muted-foreground">
+                  /{(waterGoal / 1000).toFixed(1)}L
                 </span>
               </p>
-              <div className="h-2 overflow-hidden rounded-full bg-muted">
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                 <div 
                   className="h-full rounded-full bg-primary transition-all"
                   style={{ width: `${Math.min(waterPercentage, 100)}%` }}
@@ -226,9 +303,8 @@ const HomePage = () => {
               </div>
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center py-2">
-              <p className="text-sm text-muted-foreground">0L / {(waterGoal / 1000).toFixed(1)}L</p>
-              <p className="text-xs text-muted-foreground/70">Hydrate-toi !</p>
+            <div className="py-1">
+              <p className="text-sm text-muted-foreground">0/{(waterGoal / 1000).toFixed(1)}L</p>
             </div>
           )}
         </div>
@@ -263,7 +339,7 @@ const HomePage = () => {
           {weeklySessionsCompleted > 0 && (
             <div className="flex items-center gap-1 text-primary">
               <span className="text-2xl">🔥</span>
-              <span className="font-semibold">{weeklySessionsCompleted} jours</span>
+              <span className="font-semibold">{weeklySessionsCompleted} {weeklySessionsCompleted === 1 ? 'jour' : 'jours'}</span>
             </div>
           )}
         </div>
