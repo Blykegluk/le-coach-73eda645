@@ -1103,9 +1103,10 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { messages, userId } = (await req.json()) as {
+    const { messages, userId, imageUrl } = (await req.json()) as {
       messages: ChatMessage[];
       userId?: string;
+      imageUrl?: string; // URL of an uploaded image to analyze
     };
 
     if (!messages || !Array.isArray(messages)) {
@@ -1171,9 +1172,15 @@ RÈGLES IMPORTANTES:
 3. Si tu as un DOUTE sur si c'est un nouvel élément ou une correction → DEMANDE à l'utilisateur!
 4. Quand l'utilisateur veut supprimer quelque chose → utilise delete_meal ou delete_activity
 
+ANALYSE D'IMAGES:
+- Tu peux recevoir des photos de: repas, résultats d'impédancemètre/balance, corps de l'utilisateur, écran de suivi
+- Pour les REPAS: estime les calories et macros, puis utilise log_meal
+- Pour les MESURES D'IMPÉDANCEMÈTRE: lis TOUTES les valeurs visibles (poids, masse grasse %, masse musculaire, IMC, BMR, âge corporel, graisse viscérale, eau corporelle, masse osseuse, protéines, etc.) et utilise log_body_composition
+- Pour les PHOTOS DE CORPS: encourage l'utilisateur, commente la progression si tu as des données historiques
+- Sois précis dans la lecture des chiffres sur les écrans de balance
+
 MESURES D'IMPÉDANCEMÈTRE:
-- Quand l'utilisateur donne des mesures de sa balance connectée (poids, masse grasse, masse musculaire, IMC, BMR, âge corporel, graisse viscérale, eau corporelle, masse osseuse, protéines, etc.) → utilise log_body_composition avec TOUTES les valeurs fournies
-- Tu peux recevoir ces infos sous forme de texte ou d'une description d'une photo de l'écran de la balance
+- Quand l'utilisateur donne des mesures de sa balance connectée → utilise log_body_composition avec TOUTES les valeurs fournies
 - Compare avec les mesures précédentes (get_body_composition_history) pour montrer la progression
 - Encourage l'utilisateur en fonction de son objectif (ex: si objectif = recomposition, félicite la baisse de masse grasse ET la hausse de masse musculaire)
 
@@ -1182,7 +1189,22 @@ Utilise des emojis avec modération pour rendre la conversation plus vivante �
 
 Important: Après avoir utilisé un outil, confirme l'action de manière naturelle et encourage l'utilisateur.`;
 
-    console.log("Calling AI gateway with", messages.length, "messages");
+    console.log("Calling AI gateway with", messages.length, "messages", imageUrl ? "(with image)" : "");
+
+    // Prepare messages - if there's an image, add it to the last user message
+    const preparedMessages = messages.map((msg, index) => {
+      // If this is the last message and we have an image URL, make it multimodal
+      if (imageUrl && index === messages.length - 1 && msg.role === "user") {
+        return {
+          role: msg.role,
+          content: [
+            { type: "text", text: msg.content || "Analyse cette image" },
+            { type: "image_url", image_url: { url: imageUrl } },
+          ],
+        };
+      }
+      return msg;
+    });
 
     // First API call - may include tool calls
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -1193,7 +1215,7 @@ Important: Après avoir utilisé un outil, confirme l'action de manière naturel
       },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
-        messages: [{ role: "system", content: systemPrompt }, ...messages],
+        messages: [{ role: "system", content: systemPrompt }, ...preparedMessages],
         tools: userId ? tools : undefined, // Only enable tools if user is logged in
         tool_choice: userId ? "auto" : undefined,
       }),
