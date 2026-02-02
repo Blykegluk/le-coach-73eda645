@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Dumbbell, Clock, Flame, Calendar, Trash2, Bike, PersonStanding, Waves, Zap } from 'lucide-react';
+import { Dumbbell, Clock, Flame, Calendar, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, isToday, isYesterday, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { format, isToday, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
+import NextWorkoutCard from '@/components/training/NextWorkoutCard';
+import EquipmentSection from '@/components/training/EquipmentSection';
 
 interface Activity {
   id: string;
@@ -16,30 +17,6 @@ interface Activity {
   notes: string | null;
   performed_at: string;
 }
-
-// Equipment data - to be customized later
-const equipmentCategories = [
-  {
-    name: 'Cardio',
-    icon: <Bike className="h-5 w-5" />,
-    items: ['Tapis de course', 'Vélo elliptique', 'Rameur', 'Vélo stationnaire', 'Stepper'],
-  },
-  {
-    name: 'Musculation',
-    icon: <Dumbbell className="h-5 w-5" />,
-    items: ['Presse à cuisses', 'Machine à tirage', 'Banc de développé couché', 'Poulie haute/basse', 'Smith machine'],
-  },
-  {
-    name: 'Fonctionnel',
-    icon: <PersonStanding className="h-5 w-5" />,
-    items: ['TRX', 'Kettlebells', 'Battle ropes', 'Box jumps', 'Medecine balls'],
-  },
-  {
-    name: 'Récupération',
-    icon: <Waves className="h-5 w-5" />,
-    items: ['Rouleaux de massage', 'Tapis de stretching', 'Élastiques', 'Swiss ball'],
-  },
-];
 
 const TrainingPage = () => {
   const { user } = useAuth();
@@ -236,21 +213,34 @@ const TrainingPage = () => {
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">{weeklyStats.totalCalories}</p>
-              <p className="text-xs text-muted-foreground">kcal</p>
+              <p className="text-xs text-muted-foreground">kcal brûlées</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Activities list */}
-      {activities.length > 0 ? (
-        <>
-          <ActivitySection title="Aujourd'hui" items={todayActivities} />
-          <ActivitySection title="Cette semaine" items={thisWeekActivities} />
-          <ActivitySection title="Plus ancien" items={olderActivities} />
-        </>
-      ) : (
-        /* Empty state */
+      {/* Activities list - Today only */}
+      <ActivitySection title="Aujourd'hui" items={todayActivities} />
+
+      {/* Next Workout Preparation - AI generated */}
+      <div className="mb-6">
+        <h2 className="mb-3 text-lg font-bold text-foreground flex items-center gap-2">
+          <Dumbbell className="h-5 w-5 text-primary" />
+          Préparation de la prochaine séance
+        </h2>
+        <NextWorkoutCard />
+      </div>
+
+      {/* Rest of the activities */}
+      {thisWeekActivities.length > 0 && (
+        <ActivitySection title="Cette semaine" items={thisWeekActivities} />
+      )}
+      {olderActivities.length > 0 && (
+        <ActivitySection title="Plus ancien" items={olderActivities} />
+      )}
+
+      {/* Empty state when no activities */}
+      {activities.length === 0 && (
         <div className="mb-6 flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 px-6 py-12 text-center">
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
             <Dumbbell className="h-8 w-8 text-muted-foreground" />
@@ -265,45 +255,7 @@ const TrainingPage = () => {
       )}
 
       {/* Equipment Section */}
-      <div ref={equipmentRef} className="mb-6">
-        <div className="mb-4 flex items-center gap-2">
-          <Zap className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-bold text-foreground">Équipements disponibles</h2>
-        </div>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Découvre les machines et équipements de ta salle de sport
-        </p>
-        
-        <div className="space-y-3">
-          {equipmentCategories.map((category) => (
-            <div
-              key={category.name}
-              className="rounded-xl border border-border bg-card p-4"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  {category.icon}
-                </div>
-                <h3 className="font-semibold text-foreground">{category.name}</h3>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {category.items.map((item) => (
-                  <span
-                    key={item}
-                    className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground"
-                  >
-                    {item}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <p className="mt-4 text-xs text-muted-foreground/70 text-center">
-          💡 Cette section sera personnalisée selon ta salle de sport
-        </p>
-      </div>
+      <EquipmentSection scrollRef={equipmentRef} />
 
       {/* Tip */}
       <div className="rounded-2xl border border-border bg-card p-4">
