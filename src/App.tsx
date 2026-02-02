@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { WorkoutProvider } from "@/contexts/WorkoutContext";
 import ProtectedRoute from "@/components/layout/ProtectedRoute";
@@ -22,40 +23,42 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <AuthProvider>
-        <WorkoutProvider>
-          <BrowserRouter>
-            <Routes>
-              {/* Public route */}
-              <Route path="/auth" element={<AuthPage />} />
-              
-              {/* Protected routes - require authentication */}
-              <Route element={<ProtectedRoute />}>
-                {/* Onboarding - accessible after login but before profile completion */}
-                <Route path="/onboarding" element={<OnboardingPage />} />
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <AuthProvider>
+          <WorkoutProvider>
+            <BrowserRouter>
+              <Routes>
+                {/* Public route */}
+                <Route path="/auth" element={<AuthPage />} />
                 
-                {/* Main app routes - require completed profile */}
-                <Route element={<OnboardingGate />}>
-                  <Route element={<AppLayout />}>
-                    <Route path="/" element={<HomePage />} />
-                    <Route path="/training" element={<TrainingPage />} />
-                    <Route path="/coach" element={<CoachPage />} />
-                    <Route path="/nutrition" element={<NutritionPage />} />
-                    <Route path="/performance" element={<PerformancePage />} />
-                    <Route path="/profile" element={<ProfilePage />} />
+                {/* Protected routes - require authentication */}
+                <Route element={<ProtectedRoute />}>
+                  {/* Onboarding - accessible after login but before profile completion */}
+                  <Route path="/onboarding" element={<OnboardingPage />} />
+                  
+                  {/* Main app routes - require completed profile */}
+                  <Route element={<OnboardingGate />}>
+                    <Route element={<AppLayout />}>
+                      <Route path="/" element={<HomePage />} />
+                      <Route path="/training" element={<TrainingPage />} />
+                      <Route path="/coach" element={<CoachPage />} />
+                      <Route path="/nutrition" element={<NutritionPage />} />
+                      <Route path="/performance" element={<PerformancePage />} />
+                      <Route path="/profile" element={<ProfilePage />} />
+                    </Route>
                   </Route>
                 </Route>
-              </Route>
-              
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </WorkoutProvider>
-      </AuthProvider>
-    </TooltipProvider>
+                
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </WorkoutProvider>
+        </AuthProvider>
+      </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

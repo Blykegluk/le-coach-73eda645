@@ -173,9 +173,10 @@ const TrainingPage = () => {
     const isEstimated = activity.calories_burned === null || activity.calories_burned === 0;
     
     return (
-      <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-all hover:bg-muted/30">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+      <div className="flex items-center gap-3 card-premium p-4 group">
+        <div className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
           <Dumbbell className="h-6 w-6 text-primary" />
+          <div className="absolute inset-0 rounded-xl bg-primary/20 blur-sm -z-10 opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-medium text-foreground capitalize truncate">{activity.activity_type}</p>
@@ -185,7 +186,7 @@ const TrainingPage = () => {
               {activity.duration_min} min
             </span>
             <span className="flex items-center gap-1">
-              <Flame className="h-3 w-3" />
+              <Flame className="h-3 w-3 text-primary" />
               ~{calories} kcal{isEstimated ? '*' : ''}
             </span>
             {activity.distance_km && (
@@ -215,8 +216,10 @@ const TrainingPage = () => {
       <div className="mb-6">
         <h3 className="mb-3 text-sm font-medium text-muted-foreground">{title}</h3>
         <div className="space-y-2">
-          {items.map(activity => (
-            <ActivityCard key={activity.id} activity={activity} />
+          {items.map((activity, index) => (
+            <div key={activity.id} className="animate-slide-up" style={{ animationDelay: `${index * 0.05}s` }}>
+              <ActivityCard activity={activity} />
+            </div>
           ))}
         </div>
       </div>
@@ -241,21 +244,24 @@ const TrainingPage = () => {
   return (
     <div className="safe-top px-4 pb-4 pt-2">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-6 animate-fade-in">
         <h1 className="text-2xl font-bold text-foreground">Entraînement</h1>
         <p className="text-sm text-muted-foreground">Ton historique d'activités</p>
       </div>
 
       {/* Weekly stats */}
       {weeklyStats.sessions > 0 && (
-        <div className="mb-6 rounded-2xl border border-border bg-card p-4">
+        <div className="mb-6 card-premium p-4 animate-slide-up">
           <div className="flex items-center gap-2 mb-3">
-            <Calendar className="h-4 w-4 text-primary" />
+            <div className="relative">
+              <Calendar className="h-4 w-4 text-primary" />
+              <div className="absolute inset-0 bg-primary/30 blur-sm rounded-full" />
+            </div>
             <span className="text-sm font-medium text-foreground">Cette semaine</span>
           </div>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <p className="text-2xl font-bold text-primary">{weeklyStats.sessions}</p>
+              <p className="text-2xl font-bold text-gradient-primary">{weeklyStats.sessions}</p>
               <p className="text-xs text-muted-foreground">séances</p>
             </div>
             <div>
@@ -274,9 +280,12 @@ const TrainingPage = () => {
       <ActivitySection title="Aujourd'hui" items={todayActivities} />
 
       {/* Next Workout Preparation - AI generated */}
-      <div className="mb-6">
+      <div className="mb-6 animate-slide-up" style={{ animationDelay: '0.2s' }}>
         <h2 className="mb-3 text-lg font-bold text-foreground flex items-center gap-2">
-          <Dumbbell className="h-5 w-5 text-primary" />
+          <div className="relative">
+            <Dumbbell className="h-5 w-5 text-primary" />
+            <div className="absolute inset-0 bg-primary/30 blur-sm rounded-full" />
+          </div>
           Préparation de la prochaine séance
         </h2>
         <p className="text-xs text-muted-foreground mb-3">
@@ -298,8 +307,8 @@ const TrainingPage = () => {
 
       {/* Empty state when no activities */}
       {activities.length === 0 && (
-        <div className="mb-6 flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 px-6 py-12 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+        <div className="mb-6 flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 px-6 py-12 text-center animate-fade-in">
+          <div className="mb-4 relative flex h-16 w-16 items-center justify-center rounded-full bg-muted">
             <Dumbbell className="h-8 w-8 text-muted-foreground" />
           </div>
           <h3 className="mb-2 text-lg font-semibold text-foreground">
@@ -315,7 +324,7 @@ const TrainingPage = () => {
       <EquipmentSection scrollRef={equipmentRef} />
 
       {/* Tip */}
-      <div className="rounded-2xl border border-border bg-card p-4">
+      <div className="card-premium p-4 animate-slide-up" style={{ animationDelay: '0.3s' }}>
         <p className="text-xs text-muted-foreground">
           💡 Enregistre tes séances via le coach IA : "J'ai fait 1h de musculation" ou "30 min de course à 8 km/h"
         </p>
