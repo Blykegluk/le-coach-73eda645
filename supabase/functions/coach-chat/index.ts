@@ -52,7 +52,7 @@ const tools = [
           meal_type: {
             type: "string",
             enum: ["breakfast", "morning_snack", "lunch", "afternoon_snack", "dinner", "dessert"],
-            description: "Type de repas: breakfast (petit-déjeuner), morning_snack (collation du matin), lunch (déjeuner), afternoon_snack (goûter), dinner (dîner), dessert",
+            description: "Type de repas SELON LE CONTEXTE FRANÇAIS: breakfast (petit-déjeuner ~8h), morning_snack (collation du matin ~10h30), lunch (déjeuner ~12h30), afternoon_snack (goûter ~16h, entre déjeuner et dîner), dinner (dîner ~19h30), dessert (~20h30)",
           },
           food_name: {
             type: "string",
@@ -73,6 +73,10 @@ const tools = [
           fat: {
             type: "number",
             description: "Lipides estimés en grammes",
+          },
+          estimated_time: {
+            type: "string",
+            description: "Heure estimée du repas au format HH:MM (ex: '16:00' pour un goûter, '08:00' pour petit-déjeuner). Utilise l'heure typique du type de repas si non précisé.",
           },
         },
         required: ["meal_type", "food_name", "calories"],
@@ -535,6 +539,20 @@ async function executeToolCall(
       }
 
       case "log_meal": {
+        // Calculate logged_at based on meal type and estimated time
+        const mealDefaultTimes: Record<string, string> = {
+          breakfast: "08:00",
+          morning_snack: "10:30",
+          lunch: "12:30",
+          afternoon_snack: "16:00",
+          dinner: "19:30",
+          dessert: "20:30",
+        };
+        
+        // Use estimated_time if provided, otherwise use default for meal type
+        const timeToUse = args.estimated_time || mealDefaultTimes[args.meal_type] || "12:00";
+        const loggedAt = `${today}T${timeToUse}:00`;
+        
         const { error } = await supabase.from("nutrition_logs").insert({
           user_id: userId,
           meal_type: args.meal_type,
@@ -543,6 +561,7 @@ async function executeToolCall(
           protein: args.protein || 0,
           carbs: args.carbs || 0,
           fat: args.fat || 0,
+          logged_at: loggedAt,
         });
 
         if (error) throw error;
@@ -567,9 +586,18 @@ async function executeToolCall(
           { onConflict: "user_id,date" }
         );
 
+        const mealTypeLabels: Record<string, string> = {
+          breakfast: "petit-déjeuner",
+          morning_snack: "collation",
+          lunch: "déjeuner",
+          afternoon_snack: "goûter",
+          dinner: "dîner",
+          dessert: "dessert",
+        };
+
         return {
           success: true,
-          message: `🍽️ ${args.food_name} enregistré (${args.calories} kcal)`,
+          message: `🍽️ ${args.food_name} enregistré en ${mealTypeLabels[args.meal_type] || args.meal_type} (${args.calories} kcal)`,
           data: args,
         };
       }
@@ -1683,6 +1711,16 @@ Ton rôle:
 - Enregistrer les mesures d'impédancemètre/balance connectée (composition corporelle complète)
 - MODIFIER les données existantes quand l'utilisateur te corrige ou te donne plus de précisions
 - Donner des conseils personnalisés et motivants
+
+TYPES DE REPAS EN FRANCE (TRÈS IMPORTANT):
+- **breakfast** = petit-déjeuner (~8h du matin)
+- **morning_snack** = collation du matin (~10h30, AVANT le déjeuner)
+- **lunch** = déjeuner (~12h30, repas du midi)
+- **afternoon_snack** = goûter (~16h, APRÈS le déjeuner, AVANT le dîner) - utilisé quand l'utilisateur dit "goûter", "en-cas de l'après-midi", "4h"
+- **dinner** = dîner (~19h30, repas du soir)
+- **dessert** = dessert (~20h30, après le dîner)
+
+⚠️ ATTENTION: "goûter" = afternoon_snack (PAS morning_snack). La collation du matin (morning_snack) est AVANT le déjeuner.
 
 RÈGLES IMPORTANTES:
 1. Quand l'utilisateur mentionne un NOUVEAU repas/activité → utilise log_meal ou log_activity
