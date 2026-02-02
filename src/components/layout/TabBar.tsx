@@ -1,11 +1,11 @@
-import { Home, Dumbbell, Apple, TrendingUp, User } from 'lucide-react';
+import { Home, Dumbbell, Apple, MessageCircle, User } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 const tabs = [
   { id: 'home', path: '/', label: 'Accueil', icon: Home },
-  { id: 'training', path: '/training', label: 'Entraînement', icon: Dumbbell },
+  { id: 'training', path: '/training', label: 'Training', icon: Dumbbell },
+  { id: 'coach', path: '/coach', label: 'Coach', icon: MessageCircle },
   { id: 'nutrition', path: '/nutrition', label: 'Nutrition', icon: Apple },
-  { id: 'performance', path: '/performance', label: 'Performance', icon: TrendingUp },
   { id: 'profile', path: '/profile', label: 'Profil', icon: User },
 ];
 
@@ -18,6 +18,7 @@ const TabBar = () => {
       {tabs.map((tab) => {
         const isActive = location.pathname === tab.path;
         const Icon = tab.icon;
+        const isCoach = tab.id === 'coach';
         
         return (
           <button
@@ -29,7 +30,9 @@ const TabBar = () => {
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            <Icon className={`h-5 w-5 ${isActive ? 'stroke-[2.5]' : ''}`} />
+            <div className={`${isCoach && isActive ? 'rounded-full bg-primary p-1.5' : ''}`}>
+              <Icon className={`h-5 w-5 ${isActive ? 'stroke-[2.5]' : ''} ${isCoach && isActive ? 'text-primary-foreground h-4 w-4' : ''}`} />
+            </div>
             <span className={`text-[10px] font-medium ${isActive ? 'font-semibold' : ''}`}>
               {tab.label}
             </span>
