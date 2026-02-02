@@ -1,5 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
-import { Dumbbell, Plus, Clock, Flame, Calendar, ChevronRight, Trash2 } from 'lucide-react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Dumbbell, Clock, Flame, Calendar, Trash2, Bike, PersonStanding, Waves, Zap } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,10 +17,36 @@ interface Activity {
   performed_at: string;
 }
 
+// Equipment data - to be customized later
+const equipmentCategories = [
+  {
+    name: 'Cardio',
+    icon: <Bike className="h-5 w-5" />,
+    items: ['Tapis de course', 'Vélo elliptique', 'Rameur', 'Vélo stationnaire', 'Stepper'],
+  },
+  {
+    name: 'Musculation',
+    icon: <Dumbbell className="h-5 w-5" />,
+    items: ['Presse à cuisses', 'Machine à tirage', 'Banc de développé couché', 'Poulie haute/basse', 'Smith machine'],
+  },
+  {
+    name: 'Fonctionnel',
+    icon: <PersonStanding className="h-5 w-5" />,
+    items: ['TRX', 'Kettlebells', 'Battle ropes', 'Box jumps', 'Medecine balls'],
+  },
+  {
+    name: 'Récupération',
+    icon: <Waves className="h-5 w-5" />,
+    items: ['Rouleaux de massage', 'Tapis de stretching', 'Élastiques', 'Swiss ball'],
+  },
+];
+
 const TrainingPage = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const equipmentRef = useRef<HTMLDivElement>(null);
 
   const fetchActivities = useCallback(async () => {
     if (!user) return;
@@ -64,6 +91,15 @@ const TrainingPage = () => {
     }
   }, [user, fetchActivities]);
 
+  // Scroll to equipment section if query param present
+  useEffect(() => {
+    if (searchParams.get('section') === 'equipment' && equipmentRef.current && !isLoading) {
+      setTimeout(() => {
+        equipmentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [searchParams, isLoading]);
+
   const handleDeleteActivity = async (activityId: string) => {
     const { error } = await supabase
       .from('activities')
@@ -102,13 +138,6 @@ const TrainingPage = () => {
       }),
       { sessions: 0, totalMinutes: 0, totalCalories: 0 }
     );
-
-  const formatActivityDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    if (isToday(date)) return "Aujourd'hui";
-    if (isYesterday(date)) return "Hier";
-    return format(date, "EEEE d MMMM", { locale: fr });
-  };
 
   const formatTime = (dateStr: string) => {
     return format(new Date(dateStr), "HH:mm");
@@ -222,21 +251,62 @@ const TrainingPage = () => {
         </>
       ) : (
         /* Empty state */
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 px-6 py-16 text-center">
+        <div className="mb-6 flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 px-6 py-12 text-center">
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
             <Dumbbell className="h-8 w-8 text-muted-foreground" />
           </div>
           <h3 className="mb-2 text-lg font-semibold text-foreground">
             Aucune activité enregistrée
           </h3>
-          <p className="mb-6 max-w-xs text-sm text-muted-foreground">
+          <p className="max-w-xs text-sm text-muted-foreground">
             Dis au coach ce que tu as fait ! Ex: "J'ai fait 30 min de muscu ce matin"
           </p>
         </div>
       )}
 
+      {/* Equipment Section */}
+      <div ref={equipmentRef} className="mb-6">
+        <div className="mb-4 flex items-center gap-2">
+          <Zap className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-bold text-foreground">Équipements disponibles</h2>
+        </div>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Découvre les machines et équipements de ta salle de sport
+        </p>
+        
+        <div className="space-y-3">
+          {equipmentCategories.map((category) => (
+            <div
+              key={category.name}
+              className="rounded-xl border border-border bg-card p-4"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  {category.icon}
+                </div>
+                <h3 className="font-semibold text-foreground">{category.name}</h3>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {category.items.map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-4 text-xs text-muted-foreground/70 text-center">
+          💡 Cette section sera personnalisée selon ta salle de sport
+        </p>
+      </div>
+
       {/* Tip */}
-      <div className="mt-6 rounded-2xl border border-border bg-card p-4">
+      <div className="rounded-2xl border border-border bg-card p-4">
         <p className="text-xs text-muted-foreground">
           💡 Enregistre tes séances via le coach IA : "J'ai fait 1h de musculation" ou "30 min de course à 8 km/h"
         </p>
