@@ -290,9 +290,9 @@ const HomePage = () => {
             <ChevronRight className="h-5 w-5 text-muted-foreground" />
           </button>
 
-          {/* Explore exercises button */}
+          {/* Explore equipment button */}
           <button
-            onClick={() => navigate('/training')}
+            onClick={() => navigate('/training?section=equipment')}
             className="flex w-full items-center justify-between rounded-xl border border-border bg-card p-4 transition-all hover:bg-muted/50 active:scale-[0.99]"
           >
             <div className="flex items-center gap-3">
@@ -300,8 +300,8 @@ const HomePage = () => {
                 <Dumbbell className="h-5 w-5 text-primary" />
               </div>
               <div className="text-left">
-                <p className="font-medium text-foreground">Explorer les exercices</p>
-                <p className="text-sm text-muted-foreground">Découvre les machines Keep Cool</p>
+                <p className="font-medium text-foreground">Voir les équipements</p>
+                <p className="text-sm text-muted-foreground">Découvre les machines disponibles</p>
               </div>
             </div>
             <ChevronRight className="h-5 w-5 text-muted-foreground" />
