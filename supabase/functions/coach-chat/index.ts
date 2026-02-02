@@ -875,11 +875,54 @@ async function executeToolCall(
       }
 
       case "log_activity": {
+        // Estimate calories if not provided based on activity type and duration
+        let caloriesBurned = args.calories_burned;
+        if (!caloriesBurned) {
+          // Get user weight for better estimation
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("weight_kg")
+            .eq("user_id", userId)
+            .maybeSingle();
+          
+          const weight = profile?.weight_kg || 70; // default 70kg
+          const duration = args.duration_min;
+          const activityLower = args.activity_type.toLowerCase();
+          
+          // MET values for different activities (calories = MET * weight * hours)
+          let met = 4; // default moderate activity
+          if (activityLower.includes("course") || activityLower.includes("running") || activityLower.includes("jogging")) {
+            met = 8;
+          } else if (activityLower.includes("musculation") || activityLower.includes("muscu") || activityLower.includes("poids") || activityLower.includes("weight")) {
+            met = 5;
+          } else if (activityLower.includes("hiit") || activityLower.includes("crossfit") || activityLower.includes("hyrox")) {
+            met = 10;
+          } else if (activityLower.includes("vélo") || activityLower.includes("cycling") || activityLower.includes("bike")) {
+            met = 7;
+          } else if (activityLower.includes("natation") || activityLower.includes("swimming") || activityLower.includes("nage")) {
+            met = 7;
+          } else if (activityLower.includes("yoga") || activityLower.includes("stretching") || activityLower.includes("pilates")) {
+            met = 3;
+          } else if (activityLower.includes("marche") || activityLower.includes("walk")) {
+            met = 3.5;
+          } else if (activityLower.includes("rameur") || activityLower.includes("rowing")) {
+            met = 7;
+          } else if (activityLower.includes("boxe") || activityLower.includes("boxing") || activityLower.includes("combat")) {
+            met = 9;
+          } else if (activityLower.includes("escalade") || activityLower.includes("climbing")) {
+            met = 8;
+          } else if (activityLower.includes("elliptique") || activityLower.includes("elliptical")) {
+            met = 5;
+          }
+          
+          caloriesBurned = Math.round(met * weight * (duration / 60));
+        }
+
         const { error } = await supabase.from("activities").insert({
           user_id: userId,
           activity_type: args.activity_type,
           duration_min: args.duration_min,
-          calories_burned: args.calories_burned || null,
+          calories_burned: caloriesBurned,
           distance_km: args.distance_km || null,
           notes: args.notes || null,
           performed_at: new Date().toISOString(),
@@ -888,31 +931,29 @@ async function executeToolCall(
         if (error) throw error;
 
         // Also update daily calories burned
-        if (args.calories_burned) {
-          const { data: currentMetrics } = await supabase
-            .from("daily_metrics")
-            .select("calories_burned")
-            .eq("user_id", userId)
-            .eq("date", today)
-            .maybeSingle();
+        const { data: currentMetrics } = await supabase
+          .from("daily_metrics")
+          .select("calories_burned")
+          .eq("user_id", userId)
+          .eq("date", today)
+          .maybeSingle();
 
-          const currentBurned = currentMetrics?.calories_burned || 0;
-          const newBurned = currentBurned + args.calories_burned;
+        const currentBurned = currentMetrics?.calories_burned || 0;
+        const newBurned = currentBurned + caloriesBurned;
 
-          await supabase.from("daily_metrics").upsert(
-            {
-              user_id: userId,
-              date: today,
-              calories_burned: newBurned,
-            },
-            { onConflict: "user_id,date" }
-          );
-        }
+        await supabase.from("daily_metrics").upsert(
+          {
+            user_id: userId,
+            date: today,
+            calories_burned: newBurned,
+          },
+          { onConflict: "user_id,date" }
+        );
 
         return {
           success: true,
-          message: `🏋️ ${args.activity_type} enregistré (${args.duration_min} min${args.calories_burned ? `, ~${args.calories_burned} kcal brûlées` : ""})`,
-          data: args,
+          message: `🏋️ ${args.activity_type} enregistré (${args.duration_min} min, ~${caloriesBurned} kcal brûlées)`,
+          data: { ...args, calories_burned: caloriesBurned },
         };
       }
 
