@@ -394,6 +394,66 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "save_health_context",
+      description: "Enregistre une information de santé importante sur l'utilisateur (blessures, allergies, conditions médicales, préférences, contraintes physiques, etc.). Ces informations seront retenues pour personnaliser les conseils futurs.",
+      parameters: {
+        type: "object",
+        properties: {
+          category: {
+            type: "string",
+            enum: ["injury", "allergy", "medical_condition", "physical_limitation", "preference", "lifestyle", "other"],
+            description: "Catégorie de l'information: injury (blessure), allergy (allergie alimentaire), medical_condition (condition médicale), physical_limitation (limitation physique), preference (préférence), lifestyle (mode de vie), other (autre)",
+          },
+          key: {
+            type: "string",
+            description: "Identifiant court et clair pour cette information (ex: 'hernies_discales', 'allergie_gluten', 'vegetarien')",
+          },
+          value: {
+            type: "string",
+            description: "Description détaillée de l'information avec contexte (ex: '2 hernies discales L4-L5 il y a 3 ans, fragilité persistante lors d'exercices intenses type CrossFit/Hyrox')",
+          },
+          severity: {
+            type: "string",
+            enum: ["low", "medium", "high", "critical"],
+            description: "Niveau d'importance: low (à noter), medium (adapter les conseils), high (précautions importantes), critical (contre-indication stricte)",
+          },
+        },
+        required: ["category", "key", "value", "severity"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_health_context",
+      description: "Récupère toutes les informations de santé enregistrées sur l'utilisateur",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_health_context",
+      description: "Supprime une information de santé qui n'est plus d'actualité",
+      parameters: {
+        type: "object",
+        properties: {
+          key: {
+            type: "string",
+            description: "L'identifiant de l'information à supprimer",
+          },
+        },
+        required: ["key"],
+      },
+    },
+  },
 ];
 
 // Execute tool calls
@@ -1055,6 +1115,121 @@ async function executeToolCall(
         };
       }
 
+      case "save_health_context": {
+        // Check if this key already exists
+        const { data: existing } = await supabase
+          .from("user_context")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("key", `health_${args.category}_${args.key}`)
+          .maybeSingle();
+
+        const contextValue = JSON.stringify({
+          category: args.category,
+          description: args.value,
+          severity: args.severity,
+          recorded_at: new Date().toISOString(),
+        });
+
+        if (existing) {
+          // Update existing entry
+          const { error } = await supabase
+            .from("user_context")
+            .update({ value: contextValue, updated_at: new Date().toISOString() })
+            .eq("id", existing.id);
+          
+          if (error) throw error;
+          
+          return {
+            success: true,
+            message: `📋 Information mise à jour: ${args.key}`,
+            data: { key: args.key, category: args.category },
+          };
+        } else {
+          // Insert new entry
+          const { error } = await supabase.from("user_context").insert({
+            user_id: userId,
+            key: `health_${args.category}_${args.key}`,
+            value: contextValue,
+          });
+
+          if (error) throw error;
+
+          const severityEmojis: Record<string, string> = {
+            low: "📝",
+            medium: "⚠️",
+            high: "🔶",
+            critical: "🚨",
+          };
+
+          return {
+            success: true,
+            message: `${severityEmojis[args.severity] || "📋"} Information de santé enregistrée: ${args.key} (${args.category})`,
+            data: { key: args.key, category: args.category, severity: args.severity },
+          };
+        }
+      }
+
+      case "get_health_context": {
+        const { data: contexts, error } = await supabase
+          .from("user_context")
+          .select("key, value, updated_at")
+          .eq("user_id", userId)
+          .like("key", "health_%");
+
+        if (error) throw error;
+
+        const formatted = (contexts || []).map((c: { key: string; value: string; updated_at: string }) => {
+          try {
+            const parsed = JSON.parse(c.value);
+            return {
+              key: c.key.replace(/^health_[^_]+_/, ""),
+              category: parsed.category,
+              description: parsed.description,
+              severity: parsed.severity,
+              recorded_at: parsed.recorded_at,
+            };
+          } catch {
+            return {
+              key: c.key,
+              description: c.value,
+              category: "other",
+              severity: "medium",
+            };
+          }
+        });
+
+        return {
+          success: true,
+          message: `${formatted.length} information(s) de santé trouvée(s)`,
+          data: formatted,
+        };
+      }
+
+      case "delete_health_context": {
+        // Find and delete the context entry
+        const { data: deleted, error } = await supabase
+          .from("user_context")
+          .delete()
+          .eq("user_id", userId)
+          .like("key", `health_%_${args.key}`)
+          .select("key");
+
+        if (error) throw error;
+
+        if (!deleted || deleted.length === 0) {
+          return {
+            success: false,
+            message: `Information "${args.key}" non trouvée`,
+          };
+        }
+
+        return {
+          success: true,
+          message: `🗑️ Information supprimée: ${args.key}`,
+        };
+      }
+
       default:
         return { success: false, message: `Outil inconnu: ${name}` };
     }
@@ -1115,12 +1290,25 @@ serve(async (req) => {
 
     // Get user profile for context
     let userContext = "";
+    let healthContext = "";
+    
     if (userId) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("first_name, goal, weight_kg, target_weight_kg, height_cm, activity_level, current_body_fat_pct, target_body_fat_pct")
-        .eq("user_id", userId)
-        .maybeSingle();
+      // Fetch profile and health context in parallel
+      const [profileResult, healthContextResult] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("first_name, goal, weight_kg, target_weight_kg, height_cm, activity_level, current_body_fat_pct, target_body_fat_pct")
+          .eq("user_id", userId)
+          .maybeSingle(),
+        supabase
+          .from("user_context")
+          .select("key, value")
+          .eq("user_id", userId)
+          .like("key", "health_%"),
+      ]);
+
+      const profile = profileResult.data;
+      const healthContexts = healthContextResult.data;
 
       if (profile) {
         const goalLabels: Record<string, string> = {
@@ -1152,11 +1340,50 @@ ${profile.current_body_fat_pct ? `Masse grasse de départ: ${profile.current_bod
 ${profile.target_body_fat_pct ? `Masse grasse cible: ${profile.target_body_fat_pct}%` : ""}
 `;
       }
+
+      // Parse health context
+      if (healthContexts && healthContexts.length > 0) {
+        const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+        const parsedContexts = healthContexts
+          .map((c: { key: string; value: string }) => {
+            try {
+              const parsed = JSON.parse(c.value);
+              return {
+                key: c.key.replace(/^health_[^_]+_/, ""),
+                category: parsed.category,
+                description: parsed.description,
+                severity: parsed.severity,
+              };
+            } catch {
+              return null;
+            }
+          })
+          .filter(Boolean)
+          .sort((a: any, b: any) => (severityOrder[a.severity] || 3) - (severityOrder[b.severity] || 3));
+
+        if (parsedContexts.length > 0) {
+          const categoryLabels: Record<string, string> = {
+            injury: "🩹 Blessure",
+            allergy: "🚫 Allergie",
+            medical_condition: "🏥 Condition médicale",
+            physical_limitation: "⚠️ Limitation physique",
+            preference: "✅ Préférence",
+            lifestyle: "🏠 Mode de vie",
+            other: "📋 Autre",
+          };
+          
+          healthContext = `
+INFORMATIONS DE SANTÉ IMPORTANTES (à prendre en compte pour tous les conseils):
+${parsedContexts.map((c: any) => `- ${categoryLabels[c.category] || c.category}: ${c.description} [Importance: ${c.severity}]`).join("\n")}
+`;
+        }
+      }
     }
 
     const systemPrompt = `Tu es un coach santé et fitness bienveillant et motivant. Tu parles français de manière naturelle et encourageante.
 
 ${userContext}
+${healthContext}
 
 Ton rôle:
 - Aider l'utilisateur à atteindre ses objectifs de santé
@@ -1171,6 +1398,23 @@ RÈGLES IMPORTANTES:
 2. Quand l'utilisateur CORRIGE ou PRÉCISE une entrée précédente → utilise d'abord get_recent_meals ou get_recent_activities pour trouver l'entrée, puis update_meal ou update_activity
 3. Si tu as un DOUTE sur si c'est un nouvel élément ou une correction → DEMANDE à l'utilisateur!
 4. Quand l'utilisateur veut supprimer quelque chose → utilise delete_meal ou delete_activity
+
+DÉTECTION ET SAUVEGARDE DES INFORMATIONS DE SANTÉ:
+Quand l'utilisateur mentionne une information de santé importante, tu DOIS l'enregistrer avec save_health_context:
+- BLESSURES (injury): hernies discales, entorses, fractures passées, douleurs chroniques, etc.
+- ALLERGIES (allergy): allergies alimentaires, intolérances (lactose, gluten, etc.)
+- CONDITIONS MÉDICALES (medical_condition): diabète, hypertension, asthme, etc.
+- LIMITATIONS PHYSIQUES (physical_limitation): fragilité du dos, genoux sensibles, épaule instable, etc.
+- PRÉFÉRENCES (preference): végétarien, sans porc, régime particulier, etc.
+- MODE DE VIE (lifestyle): travail de nuit, beaucoup de déplacements, etc.
+
+Évalue la sévérité:
+- critical: contre-indication stricte (ex: allergie sévère aux arachides)
+- high: précautions importantes (ex: 2 hernies discales avec fragilité persistante)
+- medium: adapter les conseils (ex: préférence végétarienne)
+- low: à noter (ex: n'aime pas courir)
+
+IMPORTANT: Quand tu enregistres une info de santé, confirme à l'utilisateur que c'est noté et que tu en tiendras compte dans tes futurs conseils.
 
 ANALYSE D'IMAGES:
 - Tu peux recevoir des photos de: repas, résultats d'impédancemètre/balance, corps de l'utilisateur, écran de suivi
