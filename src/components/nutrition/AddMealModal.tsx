@@ -116,22 +116,25 @@ export default function AddMealModal({
         .from('chat-uploads')
         .getPublicUrl(uploadData.path);
 
-      // Call coach-chat to analyze the meal
-      const { data, error } = await supabase.functions.invoke('coach-chat', {
+      // Call analyze-meal edge function
+      const { data, error } = await supabase.functions.invoke('analyze-meal', {
         body: {
-          message: `Analyse cette photo de mon ${mealName.toLowerCase()} et enregistre-le. Type de repas: ${mealType}`,
+          description: null,
           imageUrl: urlData.publicUrl,
+          mealType,
+          userId,
         },
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      toast.success('Repas enregistré !');
+      toast.success(data.message || 'Repas enregistré !');
       onMealAdded();
       handleClose();
     } catch (error) {
       console.error('Error:', error);
-      toast.error('Erreur lors de l\'analyse');
+      toast.error(error instanceof Error ? error.message : 'Erreur lors de l\'analyse');
     } finally {
       setIsProcessing(false);
     }
@@ -142,20 +145,23 @@ export default function AddMealModal({
 
     setIsProcessing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('coach-chat', {
+      const { data, error } = await supabase.functions.invoke('analyze-meal', {
         body: {
-          message: `J'ai pris mon ${mealName.toLowerCase()}: ${textInput}. Type de repas: ${mealType}. Enregistre ce repas.`,
+          description: textInput.trim(),
+          mealType,
+          userId,
         },
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      toast.success('Repas enregistré !');
+      toast.success(data.message || 'Repas enregistré !');
       onMealAdded();
       handleClose();
     } catch (error) {
       console.error('Error:', error);
-      toast.error('Erreur lors de l\'enregistrement');
+      toast.error(error instanceof Error ? error.message : 'Erreur lors de l\'enregistrement');
     } finally {
       setIsProcessing(false);
     }
