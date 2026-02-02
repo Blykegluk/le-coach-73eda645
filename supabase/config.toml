@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.next-workout]
 verify_jwt = false
+
+[functions.analyze-meal]
+verify_jwt = false
