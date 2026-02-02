@@ -877,31 +877,41 @@ Important: Après avoir utilisé un outil, confirme l'action de manière naturel
     const data = await response.json();
     console.log("AI response received");
 
-    const assistantMessage = data.choices[0].message;
+    let assistantMessage = data.choices[0].message;
     const executedActions: { name: string; result: { success: boolean; message: string } }[] = [];
+    let conversationHistory: any[] = [
+      { role: "system", content: systemPrompt },
+      ...messages,
+    ];
+    
+    // Maximum iterations to prevent infinite loops
+    const MAX_ITERATIONS = 5;
+    let iteration = 0;
 
-    // Check if there are tool calls to execute
-    if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0 && userId) {
-      console.log("Tool calls detected:", assistantMessage.tool_calls.length);
+    // Loop to handle chained tool calls (e.g., get_recent_meals -> delete_meal)
+    while (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0 && userId && iteration < MAX_ITERATIONS) {
+      iteration++;
+      console.log(`Tool calls iteration ${iteration}:`, assistantMessage.tool_calls.length);
 
       // Execute each tool call
+      const currentToolResults: any[] = [];
       for (const toolCall of assistantMessage.tool_calls) {
         const result = await executeToolCall(supabase, userId, toolCall);
         executedActions.push({ name: toolCall.function.name, result });
+        currentToolResults.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          content: JSON.stringify(result),
+        });
       }
 
-      // Build tool results for follow-up
-      const toolResults = assistantMessage.tool_calls.map(
-        (tc: ToolCall, idx: number) => ({
-          role: "tool",
-          tool_call_id: tc.id,
-          content: JSON.stringify(executedActions[idx].result),
-        })
-      );
+      // Update conversation history with assistant message and tool results
+      conversationHistory.push(assistantMessage);
+      conversationHistory.push(...currentToolResults);
 
-      console.log("Calling AI for follow-up after tool execution");
+      console.log(`Calling AI for follow-up (iteration ${iteration})`);
 
-      // Second API call with tool results
+      // Call AI again with updated history
       const followUpResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -910,12 +920,9 @@ Important: Après avoir utilisé un outil, confirme l'action de manière naturel
         },
         body: JSON.stringify({
           model: "google/gemini-3-flash-preview",
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...messages,
-            assistantMessage,
-            ...toolResults,
-          ],
+          messages: conversationHistory,
+          tools: tools,
+          tool_choice: "auto",
         }),
       });
 
@@ -933,20 +940,14 @@ Important: Après avoir utilisé un outil, confirme l'action de manière naturel
       }
 
       const followUpData = await followUpResponse.json();
-      return new Response(
-        JSON.stringify({
-          content: followUpData.choices[0].message.content,
-          actions: executedActions,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      assistantMessage = followUpData.choices[0].message;
     }
 
-    // No tool calls - return direct response
+    // Return final response (either after tool chain completed or no tool calls)
     return new Response(
       JSON.stringify({
-        content: assistantMessage.content,
-        actions: [],
+        content: assistantMessage.content || executedActions.map((a) => a.result.message).join("\n"),
+        actions: executedActions,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
