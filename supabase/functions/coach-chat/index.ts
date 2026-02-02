@@ -287,7 +287,7 @@ const tools = [
     type: "function",
     function: {
       name: "log_body_fat",
-      description: "Enregistre le pourcentage de masse grasse de l'utilisateur",
+      description: "Enregistre le pourcentage de masse grasse simple (utiliser log_body_composition pour des mesures complètes d'impédancemètre)",
       parameters: {
         type: "object",
         properties: {
@@ -297,6 +297,100 @@ const tools = [
           },
         },
         required: ["body_fat_pct"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "log_body_composition",
+      description: "Enregistre une mesure complète d'impédancemètre/balance connectée avec toutes les métriques corporelles. Utiliser quand l'utilisateur donne plusieurs valeurs (poids, masse grasse, masse musculaire, etc.)",
+      parameters: {
+        type: "object",
+        properties: {
+          weight_kg: {
+            type: "number",
+            description: "Poids en kg",
+          },
+          body_fat_pct: {
+            type: "number",
+            description: "Pourcentage de masse grasse (%)",
+          },
+          muscle_mass_kg: {
+            type: "number",
+            description: "Masse musculaire en kg",
+          },
+          lean_mass_kg: {
+            type: "number",
+            description: "Masse maigre (sans graisse) en kg",
+          },
+          bone_mass_kg: {
+            type: "number",
+            description: "Masse osseuse en kg",
+          },
+          water_pct: {
+            type: "number",
+            description: "Pourcentage d'eau corporelle (%)",
+          },
+          bmi: {
+            type: "number",
+            description: "Indice de masse corporelle (IMC)",
+          },
+          bmr_kcal: {
+            type: "number",
+            description: "Métabolisme de base en kcal",
+          },
+          visceral_fat_index: {
+            type: "number",
+            description: "Indice de graisse viscérale (1-59)",
+          },
+          body_age: {
+            type: "number",
+            description: "Âge métabolique/corporel",
+          },
+          protein_pct: {
+            type: "number",
+            description: "Taux de protéines (%)",
+          },
+          protein_kg: {
+            type: "number",
+            description: "Masse de protéines en kg",
+          },
+          subcutaneous_fat_pct: {
+            type: "number",
+            description: "Graisse sous-cutanée (%)",
+          },
+          fat_mass_kg: {
+            type: "number",
+            description: "Masse grasse en kg",
+          },
+          skeletal_muscle_pct: {
+            type: "number",
+            description: "Taux de muscle squelettique (%)",
+          },
+          standard_weight_kg: {
+            type: "number",
+            description: "Poids idéal/standard selon la balance",
+          },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_body_composition_history",
+      description: "Récupère l'historique des mesures d'impédancemètre pour voir l'évolution",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: {
+            type: "number",
+            description: "Nombre de mesures à récupérer (défaut: 5)",
+          },
+        },
+        required: [],
       },
     },
   },
@@ -804,6 +898,163 @@ async function executeToolCall(
         };
       }
 
+      case "log_body_composition": {
+        // Build the record with all provided values
+        const record: Record<string, unknown> = {
+          user_id: userId,
+          measured_at: new Date().toISOString(),
+        };
+        
+        // Map all possible fields
+        const fieldMappings: Record<string, string> = {
+          weight_kg: "weight_kg",
+          body_fat_pct: "body_fat_pct",
+          muscle_mass_kg: "muscle_mass_kg",
+          lean_mass_kg: "lean_mass_kg",
+          bone_mass_kg: "bone_mass_kg",
+          water_pct: "water_pct",
+          bmi: "bmi",
+          bmr_kcal: "bmr_kcal",
+          visceral_fat_index: "visceral_fat_index",
+          body_age: "body_age",
+          protein_pct: "protein_pct",
+          protein_kg: "protein_kg",
+          subcutaneous_fat_pct: "subcutaneous_fat_pct",
+          fat_mass_kg: "fat_mass_kg",
+          skeletal_muscle_pct: "skeletal_muscle_pct",
+          standard_weight_kg: "standard_weight_kg",
+        };
+        
+        let metricsCount = 0;
+        for (const [argKey, dbKey] of Object.entries(fieldMappings)) {
+          if (args[argKey] !== undefined && args[argKey] !== null) {
+            record[dbKey] = args[argKey];
+            metricsCount++;
+          }
+        }
+        
+        if (metricsCount === 0) {
+          return { success: false, message: "Aucune métrique fournie" };
+        }
+
+        const { error } = await supabase.from("body_composition").insert(record);
+        if (error) throw error;
+
+        // Also update daily_metrics with weight and body fat if provided
+        if (args.weight_kg || args.body_fat_pct) {
+          const dailyUpdate: Record<string, unknown> = {
+            user_id: userId,
+            date: today,
+          };
+          if (args.weight_kg) dailyUpdate.weight = args.weight_kg;
+          if (args.body_fat_pct) dailyUpdate.body_fat_pct = args.body_fat_pct;
+          
+          await supabase.from("daily_metrics").upsert(dailyUpdate, { onConflict: "user_id,date" });
+        }
+
+        // Update profile weight if provided
+        if (args.weight_kg) {
+          await supabase.from("profiles").update({ weight_kg: args.weight_kg }).eq("user_id", userId);
+        }
+
+        // Get last measurement for comparison
+        const { data: previous } = await supabase
+          .from("body_composition")
+          .select("weight_kg, body_fat_pct, muscle_mass_kg, measured_at")
+          .eq("user_id", userId)
+          .order("measured_at", { ascending: false })
+          .range(1, 1)
+          .maybeSingle();
+
+        let comparisonMsg = "";
+        if (previous) {
+          const changes: string[] = [];
+          if (args.weight_kg && previous.weight_kg) {
+            const diff = args.weight_kg - previous.weight_kg;
+            if (Math.abs(diff) >= 0.1) {
+              changes.push(`poids ${diff > 0 ? "+" : ""}${diff.toFixed(1)}kg`);
+            }
+          }
+          if (args.body_fat_pct && previous.body_fat_pct) {
+            const diff = args.body_fat_pct - previous.body_fat_pct;
+            if (Math.abs(diff) >= 0.1) {
+              changes.push(`masse grasse ${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`);
+            }
+          }
+          if (args.muscle_mass_kg && previous.muscle_mass_kg) {
+            const diff = args.muscle_mass_kg - previous.muscle_mass_kg;
+            if (Math.abs(diff) >= 0.1) {
+              changes.push(`muscle ${diff > 0 ? "+" : ""}${diff.toFixed(1)}kg`);
+            }
+          }
+          if (changes.length > 0) {
+            comparisonMsg = ` Évolution: ${changes.join(", ")}`;
+          }
+        }
+
+        // Build summary of what was recorded
+        const recorded: string[] = [];
+        if (args.weight_kg) recorded.push(`${args.weight_kg}kg`);
+        if (args.body_fat_pct) recorded.push(`${args.body_fat_pct}% gras`);
+        if (args.muscle_mass_kg) recorded.push(`${args.muscle_mass_kg}kg muscle`);
+        if (args.lean_mass_kg) recorded.push(`${args.lean_mass_kg}kg maigre`);
+        if (args.bmi) recorded.push(`IMC ${args.bmi}`);
+        if (args.bmr_kcal) recorded.push(`BMR ${args.bmr_kcal}kcal`);
+        if (args.visceral_fat_index) recorded.push(`graisse viscérale ${args.visceral_fat_index}`);
+        if (args.body_age) recorded.push(`âge corporel ${args.body_age}`);
+
+        return {
+          success: true,
+          message: `📊 Mesure complète enregistrée (${metricsCount} métriques): ${recorded.slice(0, 4).join(", ")}${recorded.length > 4 ? "..." : ""}${comparisonMsg}`,
+          data: record,
+        };
+      }
+
+      case "get_body_composition_history": {
+        const limit = args.limit || 5;
+        const { data: measurements, error } = await supabase
+          .from("body_composition")
+          .select("*")
+          .eq("user_id", userId)
+          .order("measured_at", { ascending: false })
+          .limit(limit);
+
+        if (error) throw error;
+
+        // Get profile targets for context
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("target_weight_kg, target_body_fat_pct, target_muscle_mass_kg, current_body_fat_pct")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        const formatted = (measurements || []).map((m: Record<string, unknown>) => ({
+          date: new Date(m.measured_at as string).toLocaleDateString("fr-FR"),
+          weight_kg: m.weight_kg,
+          body_fat_pct: m.body_fat_pct,
+          muscle_mass_kg: m.muscle_mass_kg,
+          lean_mass_kg: m.lean_mass_kg,
+          bmi: m.bmi,
+          bmr_kcal: m.bmr_kcal,
+          visceral_fat_index: m.visceral_fat_index,
+          body_age: m.body_age,
+        }));
+
+        return {
+          success: true,
+          message: `${formatted.length} mesure(s) trouvée(s)`,
+          data: {
+            measurements: formatted,
+            targets: profile ? {
+              target_weight_kg: profile.target_weight_kg,
+              target_body_fat_pct: profile.target_body_fat_pct,
+              starting_body_fat_pct: profile.current_body_fat_pct,
+              target_muscle_mass_kg: profile.target_muscle_mass_kg,
+            } : null,
+          },
+        };
+      }
+
       default:
         return { success: false, message: `Outil inconnu: ${name}` };
     }
@@ -909,15 +1160,22 @@ ${userContext}
 Ton rôle:
 - Aider l'utilisateur à atteindre ses objectifs de santé
 - Enregistrer ses repas, son hydratation, son poids ET ses séances de sport via les outils disponibles
+- Enregistrer les mesures d'impédancemètre/balance connectée (composition corporelle complète)
 - MODIFIER les données existantes quand l'utilisateur te corrige ou te donne plus de précisions
 - Donner des conseils personnalisés et motivants
 - Être concis mais chaleureux (max 2-3 paragraphes)
 
 RÈGLES IMPORTANTES:
 1. Quand l'utilisateur mentionne un NOUVEAU repas/activité → utilise log_meal ou log_activity
-2. Quand l'utilisateur CORRIGE ou PRÉCISE une entrée précédente (ex: "en fait c'était 45g de protéines", "j'avais oublié de préciser...") → utilise d'abord get_recent_meals ou get_recent_activities pour trouver l'entrée, puis update_meal ou update_activity
-3. Si tu as un DOUTE sur si c'est un nouvel élément ou une correction → DEMANDE à l'utilisateur! Ex: "Tu parles du shaker de ce matin ou c'est un nouveau shaker ?"
+2. Quand l'utilisateur CORRIGE ou PRÉCISE une entrée précédente → utilise d'abord get_recent_meals ou get_recent_activities pour trouver l'entrée, puis update_meal ou update_activity
+3. Si tu as un DOUTE sur si c'est un nouvel élément ou une correction → DEMANDE à l'utilisateur!
 4. Quand l'utilisateur veut supprimer quelque chose → utilise delete_meal ou delete_activity
+
+MESURES D'IMPÉDANCEMÈTRE:
+- Quand l'utilisateur donne des mesures de sa balance connectée (poids, masse grasse, masse musculaire, IMC, BMR, âge corporel, graisse viscérale, eau corporelle, masse osseuse, protéines, etc.) → utilise log_body_composition avec TOUTES les valeurs fournies
+- Tu peux recevoir ces infos sous forme de texte ou d'une description d'une photo de l'écran de la balance
+- Compare avec les mesures précédentes (get_body_composition_history) pour montrer la progression
+- Encourage l'utilisateur en fonction de son objectif (ex: si objectif = recomposition, félicite la baisse de masse grasse ET la hausse de masse musculaire)
 
 Quand il demande son bilan, utilise get_daily_summary puis commente les résultats.
 Utilise des emojis avec modération pour rendre la conversation plus vivante 🎯
