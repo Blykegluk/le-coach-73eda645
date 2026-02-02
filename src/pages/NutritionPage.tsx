@@ -1,9 +1,10 @@
-import { Plus, ChevronRight, Droplets, Coffee, UtensilsCrossed, Moon, Apple, Utensils } from 'lucide-react';
+import { Plus, ChevronRight, Droplets, Coffee, UtensilsCrossed, Moon, Apple, Utensils, Cake } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { Skeleton } from '@/components/ui/skeleton';
+import AddMealModal from '@/components/nutrition/AddMealModal';
 
 interface NutritionLog {
   id: string;
@@ -25,13 +26,19 @@ interface NutritionSummary {
 }
 
 const MEAL_TYPES = [
-  { type: 'breakfast', name: 'Petit-déjeuner', time: '08:00', icon: Coffee },
-  { type: 'morning_snack', name: 'Collation', time: '10:30', icon: Apple },
-  { type: 'lunch', name: 'Déjeuner', time: '12:30', icon: UtensilsCrossed },
-  { type: 'afternoon_snack', name: 'Goûter', time: '16:00', icon: Apple },
-  { type: 'dinner', name: 'Dîner', time: '19:30', icon: Moon },
-  { type: 'dessert', name: 'Dessert', time: '20:30', icon: Apple },
+  { type: 'breakfast', name: 'Petit-déjeuner', defaultTime: '08:00', icon: Coffee },
+  { type: 'morning_snack', name: 'Collation', defaultTime: '10:30', icon: Apple },
+  { type: 'lunch', name: 'Déjeuner', defaultTime: '12:30', icon: UtensilsCrossed },
+  { type: 'afternoon_snack', name: 'Goûter', defaultTime: '16:00', icon: Apple },
+  { type: 'dinner', name: 'Dîner', defaultTime: '19:30', icon: Moon },
+  { type: 'dessert', name: 'Dessert', defaultTime: '20:30', icon: Cake },
 ];
+
+// Map old 'snack' type to new types (for backward compatibility)
+function mapMealType(type: string): string {
+  if (type === 'snack') return 'morning_snack';
+  return type;
+}
 
 // Calculate daily goals based on profile (simplified Harris-Benedict + activity multiplier)
 function calculateDailyGoals(profile: { weight_kg?: number | null; height_cm?: number | null; birth_date?: string | null; gender?: string | null; activity_level?: string | null; goal?: string | null } | null): NutritionSummary {
@@ -102,36 +109,42 @@ const NutritionPage = () => {
   const [nutritionLogs, setNutritionLogs] = useState<NutritionLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [waterMl, setWaterMl] = useState(0);
+  const [addMealModal, setAddMealModal] = useState<{ isOpen: boolean; mealType: string; mealName: string }>({
+    isOpen: false,
+    mealType: '',
+    mealName: '',
+  });
 
   const baseGoals = calculateDailyGoals(profile);
 
+  const fetchTodayNutrition = async () => {
+    if (!user) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Fetch nutrition logs
+    const { data: logs } = await supabase
+      .from('nutrition_logs')
+      .select('*')
+      .eq('user_id', user.id)
+      .gte('logged_at', `${today}T00:00:00`)
+      .lte('logged_at', `${today}T23:59:59`)
+      .order('logged_at', { ascending: true });
+
+    // Fetch water from daily_metrics
+    const { data: metrics } = await supabase
+      .from('daily_metrics')
+      .select('water_ml')
+      .eq('user_id', user.id)
+      .eq('date', today)
+      .maybeSingle();
+
+    setNutritionLogs(logs || []);
+    setWaterMl(metrics?.water_ml || 0);
+    setIsLoading(false);
+  };
+
   useEffect(() => {
-    const fetchTodayNutrition = async () => {
-      if (!user) return;
-
-      const today = new Date().toISOString().split('T')[0];
-      
-      // Fetch nutrition logs
-      const { data: logs } = await supabase
-        .from('nutrition_logs')
-        .select('*')
-        .eq('user_id', user.id)
-        .gte('logged_at', `${today}T00:00:00`)
-        .lte('logged_at', `${today}T23:59:59`);
-
-      // Fetch water from daily_metrics
-      const { data: metrics } = await supabase
-        .from('daily_metrics')
-        .select('water_ml')
-        .eq('user_id', user.id)
-        .eq('date', today)
-        .maybeSingle();
-
-      setNutritionLogs(logs || []);
-      setWaterMl(metrics?.water_ml || 0);
-      setIsLoading(false);
-    };
-
     fetchTodayNutrition();
   }, [user]);
 
@@ -173,17 +186,28 @@ const NutritionPage = () => {
     }
   };
 
-  // Group logs by meal type
+  // Group logs by meal type and get actual logged time
   const mealsByType = MEAL_TYPES.map(mealType => {
-    const logs = nutritionLogs.filter(log => log.meal_type === mealType.type);
+    // Handle backward compatibility for old 'snack' type
+    const matchingTypes = mealType.type === 'morning_snack' 
+      ? ['morning_snack', 'snack'] 
+      : [mealType.type];
+    
+    const logs = nutritionLogs.filter(log => matchingTypes.includes(log.meal_type));
     const totalCalories = logs.reduce((sum, log) => sum + (log.calories || 0), 0);
     const description = logs.map(log => log.food_name).join(', ');
+    
+    // Get actual time from first log, or use default
+    const actualTime = logs.length > 0 
+      ? new Date(logs[0].logged_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+      : mealType.defaultTime;
     
     return {
       ...mealType,
       logs,
       totalCalories,
       description: description || null,
+      displayTime: actualTime,
     };
   });
 
@@ -342,7 +366,7 @@ const NutritionPage = () => {
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-foreground">{meal.name}</p>
-                        {meal.time && <span className="text-xs text-muted-foreground">{meal.time}</span>}
+                        <span className="text-xs text-muted-foreground">{meal.displayTime}</span>
                       </div>
                       <p className="text-sm text-muted-foreground line-clamp-1">
                         {meal.description || 'Aucun repas enregistré'}
@@ -350,7 +374,10 @@ const NutritionPage = () => {
                     </div>
                   </div>
                   {isEmpty ? (
-                    <button className="flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-all hover:bg-muted active:scale-95">
+                    <button 
+                      onClick={() => setAddMealModal({ isOpen: true, mealType: meal.type, mealName: meal.name })}
+                      className="flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-all hover:bg-muted active:scale-95"
+                    >
                       <Plus className="h-4 w-4" />
                       Ajouter
                     </button>
@@ -363,6 +390,16 @@ const NutritionPage = () => {
           })}
         </div>
       </div>
+
+      {/* Add Meal Modal */}
+      <AddMealModal
+        isOpen={addMealModal.isOpen}
+        onClose={() => setAddMealModal({ isOpen: false, mealType: '', mealName: '' })}
+        onMealAdded={fetchTodayNutrition}
+        userId={user?.id || null}
+        mealType={addMealModal.mealType}
+        mealName={addMealModal.mealName}
+      />
     </div>
   );
 };
