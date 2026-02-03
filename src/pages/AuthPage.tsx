@@ -141,7 +141,7 @@ const AuthPage = () => {
         {/* Hero Section */}
         <div className="relative flex flex-1 flex-col items-center justify-center px-6">
           {/* Logo */}
-          <div className="mb-8 relative animate-fade-in">
+          <div className="mb-8 relative">
             <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-primary to-primary-glow shadow-glow-lg">
               <Activity className="h-10 w-10 text-primary-foreground" />
             </div>
@@ -149,15 +149,15 @@ const AuthPage = () => {
           </div>
           
           {/* Title & Slogan */}
-          <h1 className="mb-2 text-center text-3xl font-bold text-foreground animate-slide-up" style={{ animationDelay: '0.1s' }}>
+          <h1 className="mb-2 text-center text-3xl font-bold text-foreground">
             Votre Coach Santé
           </h1>
-          <p className="mb-12 max-w-xs text-center text-muted-foreground animate-slide-up" style={{ animationDelay: '0.2s' }}>
+          <p className="mb-12 max-w-xs text-center text-muted-foreground">
             Nutrition, entraînement et récupération. Tout piloté par IA.
           </p>
 
           {/* Auth Buttons */}
-          <div className="w-full max-w-sm space-y-4 animate-slide-up" style={{ animationDelay: '0.3s' }}>
+          <div className="w-full max-w-sm space-y-4">
             {/* Google Button */}
             <Button
               onClick={handleGoogleSignIn}
@@ -247,14 +247,14 @@ const AuthPage = () => {
           </div>
         </div>
 
-        <h2 className="mb-2 text-2xl font-bold text-foreground animate-slide-up">
+        <h2 className="mb-2 text-2xl font-bold text-foreground">
           {mode === 'login' ? 'Bon retour !' : 'Créer un compte'}
         </h2>
-        <p className="mb-8 text-muted-foreground animate-slide-up" style={{ animationDelay: '0.1s' }}>
+        <p className="mb-8 text-muted-foreground">
           {mode === 'login' ? 'Connectez-vous pour continuer' : 'Inscrivez-vous pour commencer'}
         </p>
 
-        <div className="w-full max-w-sm animate-slide-up" style={{ animationDelay: '0.2s' }}>
+        <div className="w-full max-w-sm">
           <form onSubmit={handleEmailAuth} className="space-y-4">
             <div className="relative group">
               <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />

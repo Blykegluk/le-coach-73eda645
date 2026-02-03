@@ -247,13 +247,13 @@ const NutritionPage = () => {
   return (
     <div className="safe-top px-4 pb-4 pt-2">
       {/* Header */}
-      <div className="mb-6 animate-fade-in">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Nutrition</h1>
         <p className="text-sm text-muted-foreground">Suivi alimentaire du jour</p>
       </div>
 
       {/* Calories ring */}
-      <div className="mb-4 card-premium p-4 animate-slide-up">
+      <div className="mb-4 card-premium p-4">
         <p className="mb-2 text-xs text-muted-foreground">Calories consommées</p>
         <div className="flex items-center justify-between">
           <div>
@@ -312,7 +312,7 @@ const NutritionPage = () => {
       </div>
 
       {/* Macros */}
-      <div className="mb-4 grid grid-cols-3 gap-3 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+      <div className="mb-4 grid grid-cols-3 gap-3">
         {[
           { name: 'Protéines', value: nutritionData.protein, gradient: 'from-primary to-primary-glow' },
           { name: 'Glucides', value: nutritionData.carbs, gradient: 'from-primary to-primary-glow' },
@@ -337,7 +337,7 @@ const NutritionPage = () => {
       </div>
 
       {/* Hydration */}
-      <div className="mb-4 card-premium p-4 animate-slide-up" style={{ animationDelay: '0.2s' }}>
+      <div className="mb-4 card-premium p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-water/10">
@@ -364,7 +364,7 @@ const NutritionPage = () => {
       </div>
 
       {/* Meals */}
-      <div className="animate-slide-up" style={{ animationDelay: '0.3s' }}>
+      <div>
         <div className="mb-3 flex items-center justify-between">
           <p className="text-sm font-medium text-foreground">Repas du jour</p>
           <button className="flex items-center gap-1 text-sm font-medium text-primary hover:text-primary-glow transition-colors">
@@ -385,10 +385,9 @@ const NutritionPage = () => {
                     setMealDetail({ isOpen: true, mealName: meal.name, logs: meal.logs });
                   }
                 }}
-                className={`card-premium p-4 animate-slide-up ${
+                className={`card-premium p-4 ${
                   isEmpty ? 'border-dashed' : 'cursor-pointer'
                 }`}
-                style={{ animationDelay: `${0.3 + index * 0.05}s` }}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">

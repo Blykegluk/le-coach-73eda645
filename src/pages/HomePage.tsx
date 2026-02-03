@@ -210,7 +210,7 @@ const HomePage = () => {
   return (
     <div className="safe-top px-4 pb-4 pt-2">
       {/* Header */}
-      <div className="mb-6 animate-fade-in">
+      <div className="mb-6">
         <span className="text-sm text-muted-foreground">Bonjour 👋</span>
         <h1 className="text-2xl font-bold text-foreground">
           {firstName}, <span className="text-gradient-primary">prêt à transpirer ?</span>
@@ -218,7 +218,7 @@ const HomePage = () => {
       </div>
 
       {/* Goal Progress Card */}
-      <div className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
+      <div>
         <GoalProgressCard 
           profile={profile} 
           currentWeight={currentWeight}
@@ -227,7 +227,7 @@ const HomePage = () => {
       </div>
 
       {/* Nutrition summary - Calories, Protéines, Hydratation */}
-      <div className="mb-4 grid grid-cols-3 gap-2 animate-slide-up" style={{ animationDelay: '0.2s' }}>
+      <div className="mb-4 grid grid-cols-3 gap-2">
         {/* Calories Card */}
         <div className="card-premium p-3 group">
           <div className="mb-1.5 flex items-center gap-1.5">
@@ -323,12 +323,12 @@ const HomePage = () => {
       </div>
 
       {/* Daily Tips */}
-      <div className="animate-slide-up" style={{ animationDelay: '0.3s' }}>
+      <div>
         <DailyTipsCard />
       </div>
 
       {/* Weekly progress */}
-      <div className="mb-4 card-premium p-4 animate-slide-up" style={{ animationDelay: '0.4s' }}>
+      <div className="mb-4 card-premium p-4">
         <p className="mb-2 text-sm font-medium text-foreground">Cette semaine</p>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -357,7 +357,7 @@ const HomePage = () => {
       </div>
 
       {/* Quick actions */}
-      <div className="mb-4 animate-slide-up" style={{ animationDelay: '0.5s' }}>
+      <div className="mb-4">
         <p className="mb-3 text-sm font-medium text-foreground">Accès rapide</p>
         <div className="space-y-2">
           {/* Add meal button */}
