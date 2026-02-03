@@ -35,8 +35,9 @@ const GoalProgressCard = ({ profile, currentWeight, currentBodyFat }: GoalProgre
   }
 
   // Determine what metrics to track based on goal
+  // For "maintain" goal, we should still track body fat if a target is set
   const trackWeight = goal !== 'maintain' && targetWeight && targetWeight !== startWeight;
-  const trackBodyFat = targetBodyFat && startBodyFat && targetBodyFat !== startBodyFat;
+  const trackBodyFat = targetBodyFat != null && startBodyFat != null;
 
   // Calculate weight progress
   const actualWeight = currentWeight ?? startWeight;
@@ -49,7 +50,7 @@ const GoalProgressCard = ({ profile, currentWeight, currentBodyFat }: GoalProgre
     ? Math.min(Math.max((weightCurrentChange / weightTotalChange) * 100, 0), 100)
     : 0;
   const weightRemaining = targetWeight ? Math.abs(targetWeight - actualWeight) : 0;
-  const weightReached = weightRemaining < 0.5;
+  const weightReached = trackWeight && weightRemaining < 0.5;
 
   // Calculate body fat progress
   const actualBodyFat = currentBodyFat ?? startBodyFat ?? 0;
@@ -62,13 +63,14 @@ const GoalProgressCard = ({ profile, currentWeight, currentBodyFat }: GoalProgre
     ? Math.min(Math.max((fatCurrentChange / fatTotalChange) * 100, 0), 100)
     : 0;
   const fatRemaining = targetBodyFat ? Math.abs(targetBodyFat - actualBodyFat) : 0;
-  const fatReached = fatRemaining < 0.5;
+  const fatReached = trackBodyFat && fatRemaining < 0.5;
 
   // Overall goal reached only if ALL tracked metrics are reached
-  const hasReachedGoal = 
+  // Must have at least one metric being tracked
+  const hasAnyTrackedMetric = trackWeight || trackBodyFat;
+  const hasReachedGoal = hasAnyTrackedMetric && 
     (!trackWeight || weightReached) && 
-    (!trackBodyFat || fatReached) &&
-    (trackWeight || trackBodyFat); // At least one metric must be tracked
+    (!trackBodyFat || fatReached);
 
   // Goal label
   const getGoalLabel = () => {
