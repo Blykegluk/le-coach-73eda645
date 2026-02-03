@@ -150,7 +150,7 @@ const HomePage = () => {
         )
         .subscribe();
 
-      // Subscribe to nutrition_logs changes for protein updates
+      // Subscribe to nutrition_logs changes for protein and calories updates
       const nutritionChannel = supabase
         .channel('homepage_nutrition')
         .on(
@@ -163,6 +163,7 @@ const HomePage = () => {
           },
           () => {
             fetchProteinIntake();
+            fetchMetrics(); // Re-fetch metrics to update calories
           }
         )
         .subscribe();
