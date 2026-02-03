@@ -23,6 +23,38 @@ const TabBar = () => {
         const Icon = tab.icon;
         const isCoach = tab.id === 'coach';
         
+        // Coach button - dominant central button
+        if (isCoach) {
+          return (
+            <button
+              key={tab.id}
+              onClick={() => navigate(tab.path)}
+              className="relative flex flex-col items-center gap-0.5 -mt-5 transition-all duration-200"
+            >
+              {/* Floating circle button */}
+              <div className={`relative flex h-14 w-14 items-center justify-center rounded-full transition-all duration-300 ${
+                isActive 
+                  ? 'bg-gradient-to-br from-primary via-primary to-primary-glow shadow-glow-lg scale-105' 
+                  : 'bg-gradient-to-br from-primary/80 to-primary shadow-glow-md hover:shadow-glow-lg hover:scale-105'
+              }`}>
+                {/* Inner glow effect */}
+                <div className="absolute inset-0 rounded-full bg-gradient-to-t from-transparent to-white/20" />
+                {/* Pulsing ring when active */}
+                {isActive && (
+                  <div className="absolute -inset-1 rounded-full bg-primary/30 animate-glow-pulse -z-10" />
+                )}
+                <Icon className={`h-7 w-7 text-primary-foreground ${isActive ? 'stroke-[2.5]' : 'stroke-2'}`} />
+              </div>
+              <span className={`text-xs font-semibold mt-0.5 ${
+                isActive ? 'text-primary' : 'text-muted-foreground'
+              }`}>
+                {tab.label}
+              </span>
+            </button>
+          );
+        }
+        
+        // Regular tabs
         return (
           <button
             key={tab.id}
@@ -33,9 +65,9 @@ const TabBar = () => {
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            <div className={`relative ${isCoach && isActive ? 'rounded-full bg-primary p-1.5 shadow-glow-sm' : ''}`}>
-              <Icon className={`h-5 w-5 ${isActive ? 'stroke-[2.5]' : ''} ${isCoach && isActive ? 'text-primary-foreground h-4 w-4' : ''}`} />
-              {isActive && !isCoach && (
+            <div className="relative">
+              <Icon className={`h-5 w-5 ${isActive ? 'stroke-[2.5]' : ''}`} />
+              {isActive && (
                 <div className="absolute -inset-1 rounded-full bg-primary/20 blur-sm -z-10" />
               )}
             </div>
