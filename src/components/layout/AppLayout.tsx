@@ -3,13 +3,13 @@ import TabBar from './TabBar';
 
 const AppLayout = () => {
   return (
-    <div className="flex h-[100dvh] h-screen w-screen flex-col overflow-hidden bg-gradient-glow">
-      <main className="flex-1 overflow-y-auto pb-24 sm:pb-20">
+    <div className="grid min-h-screen h-[100dvh] w-screen grid-rows-[1fr_auto] overflow-hidden bg-gradient-glow">
+      <main className="overflow-y-auto">
         <Outlet />
       </main>
       
-      {/* Fixed bottom TabBar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50">
+      {/* Bottom TabBar (separate row so it never overlays content) */}
+      <div className="z-50">
         <TabBar />
       </div>
     </div>
