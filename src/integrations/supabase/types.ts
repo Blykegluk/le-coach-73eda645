@@ -157,11 +157,16 @@ export type Database = {
       }
       daily_metrics: {
         Row: {
+          active_minutes: number | null
           body_fat_pct: number | null
           calories_burned: number | null
           calories_in: number | null
           created_at: string
           date: string
+          floors_climbed: number | null
+          heart_rate_avg: number | null
+          heart_rate_max: number | null
+          heart_rate_resting: number | null
           id: string
           sleep_hours: number | null
           steps: number | null
@@ -171,11 +176,16 @@ export type Database = {
           weight: number | null
         }
         Insert: {
+          active_minutes?: number | null
           body_fat_pct?: number | null
           calories_burned?: number | null
           calories_in?: number | null
           created_at?: string
           date?: string
+          floors_climbed?: number | null
+          heart_rate_avg?: number | null
+          heart_rate_max?: number | null
+          heart_rate_resting?: number | null
           id?: string
           sleep_hours?: number | null
           steps?: number | null
@@ -185,11 +195,16 @@ export type Database = {
           weight?: number | null
         }
         Update: {
+          active_minutes?: number | null
           body_fat_pct?: number | null
           calories_burned?: number | null
           calories_in?: number | null
           created_at?: string
           date?: string
+          floors_climbed?: number | null
+          heart_rate_avg?: number | null
+          heart_rate_max?: number | null
+          heart_rate_resting?: number | null
           id?: string
           sleep_hours?: number | null
           steps?: number | null
