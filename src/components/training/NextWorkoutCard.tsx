@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Dumbbell, Clock, RefreshCw, AlertCircle, ChevronDown, ChevronUp, Play } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -25,27 +26,87 @@ export interface Workout {
   coach_advice: string;
 }
 
+const WORKOUT_STORAGE_KEY = 'prepared_workout';
+
 interface NextWorkoutCardProps {
   externalWorkout?: Workout | null;
   onWorkoutGenerated?: (workout: Workout) => void;
 }
 
 export const NextWorkoutCard = ({ externalWorkout, onWorkoutGenerated }: NextWorkoutCardProps) => {
+  const { user } = useAuth();
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const fetchWorkout = useCallback(async () => {
-    setIsLoading(true);
+  // Load saved workout from database
+  const loadSavedWorkout = useCallback(async () => {
+    if (!user) return null;
+
+    try {
+      const { data } = await supabase
+        .from('user_context')
+        .select('value')
+        .eq('user_id', user.id)
+        .eq('key', WORKOUT_STORAGE_KEY)
+        .maybeSingle();
+
+      if (data?.value) {
+        const parsed = JSON.parse(data.value);
+        return parsed as Workout;
+      }
+    } catch (err) {
+      console.error('Error loading saved workout:', err);
+    }
+    return null;
+  }, [user]);
+
+  // Save workout to database
+  const saveWorkout = useCallback(async (workoutData: Workout) => {
+    if (!user) return;
+
+    try {
+      await supabase
+        .from('user_context')
+        .upsert({
+          user_id: user.id,
+          key: WORKOUT_STORAGE_KEY,
+          value: JSON.stringify(workoutData),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,key' });
+    } catch (err) {
+      console.error('Error saving workout:', err);
+    }
+  }, [user]);
+
+  // Clear saved workout (after completing a session)
+  const clearSavedWorkout = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      await supabase
+        .from('user_context')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('key', WORKOUT_STORAGE_KEY);
+    } catch (err) {
+      console.error('Error clearing saved workout:', err);
+    }
+  }, [user]);
+
+  // Generate new workout from API
+  const generateNewWorkout = useCallback(async () => {
+    setIsRefreshing(true);
     setError(null);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         setError("Non connecté");
-        setIsLoading(false);
+        setIsRefreshing(false);
         return;
       }
 
@@ -59,30 +120,54 @@ export const NextWorkoutCard = ({ externalWorkout, onWorkoutGenerated }: NextWor
       if (data?.error) throw new Error(data.error);
 
       setWorkout(data);
+      await saveWorkout(data);
       onWorkoutGenerated?.(data);
     } catch (err) {
       console.error("Error fetching workout:", err);
       setError("Impossible de générer la séance");
     } finally {
-      setIsLoading(false);
+      setIsRefreshing(false);
     }
-  }, [onWorkoutGenerated]);
+  }, [onWorkoutGenerated, saveWorkout]);
 
-  // Use external workout if provided
+  // Use external workout if provided (from coach)
   useEffect(() => {
     if (externalWorkout) {
       setWorkout(externalWorkout);
+      saveWorkout(externalWorkout);
       setIsLoading(false);
       setError(null);
     }
-  }, [externalWorkout]);
+  }, [externalWorkout, saveWorkout]);
 
-  // Fetch workout on mount if no external workout
+  // On mount: try to load saved workout first, only generate if none exists
   useEffect(() => {
-    if (!externalWorkout) {
-      fetchWorkout();
+    const initWorkout = async () => {
+      if (externalWorkout) return; // Skip if external workout provided
+      
+      setIsLoading(true);
+      
+      // First, try to load saved workout
+      const saved = await loadSavedWorkout();
+      
+      if (saved) {
+        setWorkout(saved);
+        setIsLoading(false);
+      } else {
+        // No saved workout, generate a new one
+        await generateNewWorkout();
+        setIsLoading(false);
+      }
+    };
+
+    if (user) {
+      initWorkout();
     }
-  }, [externalWorkout, fetchWorkout]);
+  }, [user, externalWorkout, loadSavedWorkout, generateNewWorkout]);
+
+  const handleRefresh = async () => {
+    await generateNewWorkout();
+  };
 
   const handleStartSession = () => {
     if (workout) {
@@ -90,10 +175,12 @@ export const NextWorkoutCard = ({ externalWorkout, onWorkoutGenerated }: NextWor
     }
   };
 
-  const handleSessionComplete = () => {
+  const handleSessionComplete = async () => {
     setIsSessionActive(false);
-    // Optionally refresh workout for next time
-    fetchWorkout();
+    // Clear the saved workout after completing a session
+    await clearSavedWorkout();
+    // Generate a new workout for next time
+    await generateNewWorkout();
   };
 
   // Show active session
@@ -137,8 +224,8 @@ export const NextWorkoutCard = ({ externalWorkout, onWorkoutGenerated }: NextWor
             <AlertCircle className="h-5 w-5 text-destructive" />
             <h3 className="font-semibold text-foreground">Prochaine séance</h3>
           </div>
-          <Button variant="ghost" size="sm" onClick={fetchWorkout}>
-            <RefreshCw className="h-4 w-4" />
+          <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">{error}</p>
@@ -159,8 +246,14 @@ export const NextWorkoutCard = ({ externalWorkout, onWorkoutGenerated }: NextWor
             </div>
             <h3 className="font-semibold text-foreground">{workout.workout_name}</h3>
           </div>
-          <Button variant="ghost" size="icon" onClick={fetchWorkout} className="h-8 w-8">
-            <RefreshCw className="h-4 w-4" />
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={handleRefresh} 
+            className="h-8 w-8"
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </Button>
         </div>
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
