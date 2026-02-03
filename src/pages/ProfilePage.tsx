@@ -78,7 +78,7 @@ const ProfilePage = () => {
   return (
     <div className="safe-top px-4 pb-4 pt-2">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between animate-fade-in">
+      <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">Profil</h1>
         <button className="flex h-10 w-10 items-center justify-center rounded-full bg-muted/50 text-muted-foreground transition-all hover:bg-muted hover:text-foreground">
           <Settings className="h-5 w-5" />
@@ -86,7 +86,7 @@ const ProfilePage = () => {
       </div>
 
       {/* User info - REAL DATA */}
-      <div className="mb-4 card-premium p-4 animate-slide-up">
+      <div className="mb-4 card-premium p-4">
         <div className="flex items-center gap-4">
           <div className="relative">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow shadow-glow-md">
@@ -113,7 +113,7 @@ const ProfilePage = () => {
       </div>
 
       {/* Stats - REAL DATA */}
-      <div className="mb-4 grid grid-cols-4 gap-2 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+      <div className="mb-4 grid grid-cols-4 gap-2">
         {[
           { label: 'Taille', value: profile?.height_cm ? `${profile.height_cm}cm` : '-' },
           { label: 'Poids', value: profile?.weight_kg ? `${profile.weight_kg}kg` : '-' },
@@ -123,7 +123,6 @@ const ProfilePage = () => {
           <div
             key={stat.label}
             className="card-premium p-3 text-center group"
-            style={{ animationDelay: `${0.1 + index * 0.05}s` }}
           >
             <p className="text-xs text-muted-foreground">{stat.label}</p>
             <p className="font-bold text-foreground group-hover:text-gradient-primary transition-all">{stat.value}</p>
@@ -134,8 +133,7 @@ const ProfilePage = () => {
       {/* Main goal - REAL DATA with edit capability */}
       <button 
         onClick={() => setIsGoalModalOpen(true)}
-        className="mb-4 flex w-full items-center justify-between card-premium p-4 animate-slide-up"
-        style={{ animationDelay: '0.2s' }}
+        className="mb-4 flex w-full items-center justify-between card-premium p-4"
       >
         <div className="flex items-center gap-3">
           <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
@@ -161,7 +159,7 @@ const ProfilePage = () => {
       />
 
       {/* Theme Toggle */}
-      <div className="mb-4 card-premium p-4 animate-slide-up" style={{ animationDelay: '0.25s' }}>
+      <div className="mb-4 card-premium p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
@@ -197,7 +195,7 @@ const ProfilePage = () => {
       </div>
 
       {/* Settings */}
-      <div className="mb-4 animate-slide-up" style={{ animationDelay: '0.3s' }}>
+      <div className="mb-4">
         <p className="mb-3 text-sm font-medium text-foreground">Paramètres</p>
         <div className="space-y-1">
           {settingsItems.map((item, index) => (
@@ -220,15 +218,14 @@ const ProfilePage = () => {
       {/* Logout - FUNCTIONAL */}
       <button 
         onClick={signOut}
-        className="flex w-full items-center justify-center gap-2 card-premium py-4 text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 active:scale-[0.99] animate-slide-up"
-        style={{ animationDelay: '0.4s' }}
+        className="flex w-full items-center justify-center gap-2 card-premium py-4 text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 active:scale-[0.99]"
       >
         <LogOut className="h-5 w-5" />
         <span className="font-medium">Se déconnecter</span>
       </button>
 
       {/* Version */}
-      <p className="mt-4 text-center text-xs text-muted-foreground animate-fade-in" style={{ animationDelay: '0.5s' }}>
+      <p className="mt-4 text-center text-xs text-muted-foreground">
         HealthLab Coach v1.0.0
       </p>
     </div>

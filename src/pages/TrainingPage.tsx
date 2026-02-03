@@ -216,8 +216,8 @@ const TrainingPage = () => {
       <div className="mb-6">
         <h3 className="mb-3 text-sm font-medium text-muted-foreground">{title}</h3>
         <div className="space-y-2">
-          {items.map((activity, index) => (
-            <div key={activity.id} className="animate-slide-up" style={{ animationDelay: `${index * 0.05}s` }}>
+          {items.map((activity) => (
+            <div key={activity.id}>
               <ActivityCard activity={activity} />
             </div>
           ))}
@@ -244,14 +244,14 @@ const TrainingPage = () => {
   return (
     <div className="safe-top px-4 pb-4 pt-2">
       {/* Header */}
-      <div className="mb-6 animate-fade-in">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Entraînement</h1>
         <p className="text-sm text-muted-foreground">Ton historique d'activités</p>
       </div>
 
       {/* Weekly stats */}
       {weeklyStats.sessions > 0 && (
-        <div className="mb-6 card-premium p-4 animate-slide-up">
+        <div className="mb-6 card-premium p-4">
           <div className="flex items-center gap-2 mb-3">
             <div className="relative">
               <Calendar className="h-4 w-4 text-primary" />
@@ -280,7 +280,7 @@ const TrainingPage = () => {
       <ActivitySection title="Aujourd'hui" items={todayActivities} />
 
       {/* Next Workout Preparation - AI generated */}
-      <div className="mb-6 animate-slide-up" style={{ animationDelay: '0.2s' }}>
+      <div className="mb-6">
         <h2 className="mb-3 text-lg font-bold text-foreground flex items-center gap-2">
           <div className="relative">
             <Dumbbell className="h-5 w-5 text-primary" />
@@ -307,7 +307,7 @@ const TrainingPage = () => {
 
       {/* Empty state when no activities */}
       {activities.length === 0 && (
-        <div className="mb-6 flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 px-6 py-12 text-center animate-fade-in">
+        <div className="mb-6 flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 px-6 py-12 text-center">
           <div className="mb-4 relative flex h-16 w-16 items-center justify-center rounded-full bg-muted">
             <Dumbbell className="h-8 w-8 text-muted-foreground" />
           </div>
@@ -324,7 +324,7 @@ const TrainingPage = () => {
       <EquipmentSection scrollRef={equipmentRef} />
 
       {/* Tip */}
-      <div className="card-premium p-4 animate-slide-up" style={{ animationDelay: '0.3s' }}>
+      <div className="card-premium p-4">
         <p className="text-xs text-muted-foreground">
           💡 Enregistre tes séances via le coach IA : "J'ai fait 1h de musculation" ou "30 min de course à 8 km/h"
         </p>
