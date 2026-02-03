@@ -289,7 +289,7 @@ const HomePage = () => {
               <Flame className="h-3.5 w-3.5 text-primary" />
               <div className="absolute inset-0 bg-primary/30 blur-sm rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
-            <span className="text-xs text-muted-foreground">Calories</span>
+            <span className="text-xs text-muted-foreground">Consommées</span>
           </div>
           {caloriesConsumed > 0 ? (
             <>
