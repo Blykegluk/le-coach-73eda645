@@ -284,10 +284,15 @@ const tools = [
     type: "function",
     function: {
       name: "get_daily_summary",
-      description: "Récupère le résumé de la journée de l'utilisateur (calories, eau, poids, repas, activités)",
+      description: "Récupère le résumé de la journée en cours (AUJOURD'HUI) de l'utilisateur (calories, protéines, eau, poids, repas, activités). Utilise cet outil quand l'utilisateur demande son bilan, ses stats du jour, où il en est, combien de protéines/calories il a consommé aujourd'hui.",
       parameters: {
         type: "object",
-        properties: {},
+        properties: {
+          date: {
+            type: "string",
+            description: "Date au format YYYY-MM-DD. Par défaut: aujourd'hui. Utiliser uniquement si l'utilisateur demande explicitement une autre date (ex: 'hier', 'lundi dernier').",
+          },
+        },
         required: [],
       },
     },
@@ -929,26 +934,30 @@ async function executeToolCall(
       }
 
       case "get_daily_summary": {
+        // Support custom date or default to today
+        const queryDate = args.date || today;
+        
         const { data: metrics } = await supabase
           .from("daily_metrics")
           .select("*")
           .eq("user_id", userId)
-          .eq("date", today)
+          .eq("date", queryDate)
           .maybeSingle();
 
         const { data: meals } = await supabase
           .from("nutrition_logs")
           .select("*")
           .eq("user_id", userId)
-          .gte("logged_at", `${today}T00:00:00`)
-          .lte("logged_at", `${today}T23:59:59`);
+          .gte("logged_at", `${queryDate}T00:00:00`)
+          .lte("logged_at", `${queryDate}T23:59:59`)
+          .order("logged_at", { ascending: true });
 
         const { data: activities } = await supabase
           .from("activities")
           .select("*")
           .eq("user_id", userId)
-          .gte("performed_at", `${today}T00:00:00`)
-          .lte("performed_at", `${today}T23:59:59`);
+          .gte("performed_at", `${queryDate}T00:00:00`)
+          .lte("performed_at", `${queryDate}T23:59:59`);
 
         const { data: profile } = await supabase
           .from("profiles")
@@ -966,16 +975,39 @@ async function executeToolCall(
           .limit(1)
           .maybeSingle();
 
+        // Calculate totals directly from nutrition_logs (more accurate than daily_metrics.calories_in)
+        const totalCalories = (meals || []).reduce((sum: number, m: any) => sum + (m.calories || 0), 0);
+        const totalProtein = (meals || []).reduce((sum: number, m: any) => sum + (m.protein || 0), 0);
+        const totalCarbs = (meals || []).reduce((sum: number, m: any) => sum + (m.carbs || 0), 0);
+        const totalFat = (meals || []).reduce((sum: number, m: any) => sum + (m.fat || 0), 0);
+        const totalCaloriesBurned = (activities || []).reduce((sum: number, a: any) => sum + (a.calories_burned || 0), 0);
+
+        // Compute protein goal (2g per kg body weight)
+        const weight = profile?.weight_kg || 70;
+        const proteinGoal = Math.round(weight * 2);
+
+        const isToday = queryDate === today;
+        const dateLabel = isToday ? "aujourd'hui" : queryDate;
+
         return {
           success: true,
-          message: "Résumé récupéré",
+          message: `Résumé du ${dateLabel} récupéré`,
           data: {
-            date: today,
-            calories_in: metrics?.calories_in || 0,
-            calories_burned: metrics?.calories_burned || 0,
+            date: queryDate,
+            is_today: isToday,
+            // Nutrition from actual logs
+            calories_consumed: totalCalories,
+            protein_consumed: totalProtein,
+            carbs_consumed: totalCarbs,
+            fat_consumed: totalFat,
             target_calories: profile?.target_calories || 2000,
+            protein_goal: proteinGoal,
+            // Activity
+            calories_burned: totalCaloriesBurned,
+            // Hydration
             water_ml: metrics?.water_ml || 0,
             target_water_ml: profile?.target_water_ml || 2000,
+            // Weight & body composition
             weight: metrics?.weight || profile?.weight_kg,
             target_weight: profile?.target_weight_kg,
             goal: profile?.goal,
@@ -983,8 +1015,18 @@ async function executeToolCall(
             target_body_fat_pct: profile?.target_body_fat_pct,
             latest_body_fat: latestBodyFat?.body_fat_pct,
             latest_body_fat_date: latestBodyFat?.date,
+            // Details
             meals_count: meals?.length || 0,
-            meals: meals || [],
+            meals: (meals || []).map((m: any) => ({
+              id: m.id,
+              meal_type: m.meal_type,
+              food_name: m.food_name,
+              calories: m.calories,
+              protein: m.protein,
+              carbs: m.carbs,
+              fat: m.fat,
+              logged_at: m.logged_at,
+            })),
             activities_count: activities?.length || 0,
             activities: activities || [],
           },
@@ -1751,7 +1793,27 @@ ${parsedContexts.map((c: any) => `- ${categoryLabels[c.category] || c.category}:
       }
     }
 
+    // Build current date/time context for the AI
+    const now = new Date();
+    const parisTime = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Paris" }));
+    const currentDate = parisTime.toISOString().split("T")[0];
+    const currentTime = parisTime.toTimeString().slice(0, 5);
+    const dayNames = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+    const monthNames = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+    const dayName = dayNames[parisTime.getDay()];
+    const dayOfMonth = parisTime.getDate();
+    const monthName = monthNames[parisTime.getMonth()];
+    const year = parisTime.getFullYear();
+    const formattedDate = `${dayName} ${dayOfMonth} ${monthName} ${year}`;
+
     const systemPrompt = `Tu es un coach santé et fitness bienveillant et motivant. Tu parles français de manière naturelle et encourageante.
+
+⏰ **DATE ET HEURE ACTUELLES (fuseau Paris):**
+- **Aujourd'hui:** ${formattedDate}
+- **Date:** ${currentDate}
+- **Heure:** ${currentTime}
+
+IMPORTANT: Quand l'utilisateur te demande des informations sur "aujourd'hui", "ce jour", "maintenant", utilise TOUJOURS la date ci-dessus (${currentDate}). Les données sont stockées avec des timestamps, tu dois TOUJOURS utiliser l'outil get_daily_summary pour récupérer les données du jour en cours.
 
 ${userContext}
 ${healthContext}
