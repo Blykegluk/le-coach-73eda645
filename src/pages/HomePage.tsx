@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import GoalEditorModal from '@/components/profile/GoalEditorModal';
 import GoalProgressCard from '@/components/home/GoalProgressCard';
 import DailyTipsCard from '@/components/home/DailyTipsCard';
+import HealthStatsCard from '@/components/home/HealthStatsCard';
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -22,6 +23,14 @@ const HomePage = () => {
   const [currentWeight, setCurrentWeight] = useState<number | null>(null);
   const [currentBodyFat, setCurrentBodyFat] = useState<number | null>(null);
   const [proteinConsumed, setProteinConsumed] = useState<number>(0);
+  const [healthStats, setHealthStats] = useState({
+    sleepHours: null as number | null,
+    steps: null as number | null,
+    heartRateAvg: null as number | null,
+    heartRateResting: null as number | null,
+    activeMinutes: null as number | null,
+    floorsClimbed: null as number | null,
+  });
 
   // Goals from profile or defaults
   const caloriesGoal = profile?.target_calories ?? 2000;
@@ -120,11 +129,37 @@ const HomePage = () => {
     }
   }, [user]);
 
+  // Fetch health stats (sleep, heart rate, steps, etc.)
+  const fetchHealthStats = useCallback(async () => {
+    if (!user) return;
+
+    const today = new Date().toISOString().split('T')[0];
+
+    const { data } = await supabase
+      .from('daily_metrics')
+      .select('sleep_hours, steps, heart_rate_avg, heart_rate_resting, active_minutes, floors_climbed')
+      .eq('user_id', user.id)
+      .eq('date', today)
+      .single();
+
+    if (data) {
+      setHealthStats({
+        sleepHours: data.sleep_hours,
+        steps: data.steps,
+        heartRateAvg: data.heart_rate_avg,
+        heartRateResting: data.heart_rate_resting,
+        activeMinutes: data.active_minutes,
+        floorsClimbed: data.floors_climbed,
+      });
+    }
+  }, [user]);
+
   useEffect(() => {
     fetchMetrics();
     fetchWeeklySessions();
     fetchCurrentMetrics();
     fetchProteinIntake();
+    fetchHealthStats();
 
     // Subscribe to real-time updates
     if (user) {
@@ -168,13 +203,32 @@ const HomePage = () => {
         )
         .subscribe();
 
+      // Subscribe to daily_metrics changes for health stats updates
+      const metricsChannel = supabase
+        .channel('homepage_daily_metrics')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'daily_metrics',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            fetchHealthStats();
+            fetchMetrics();
+          }
+        )
+        .subscribe();
+
       return () => {
         unsubscribe();
         supabase.removeChannel(activitiesChannel);
         supabase.removeChannel(nutritionChannel);
+        supabase.removeChannel(metricsChannel);
       };
     }
-  }, [user, fetchMetrics, fetchWeeklySessions, fetchCurrentMetrics, fetchProteinIntake]);
+  }, [user, fetchMetrics, fetchWeeklySessions, fetchCurrentMetrics, fetchProteinIntake, fetchHealthStats]);
 
   const firstName = profile?.first_name || user?.email?.split('@')[0] || 'Athlète';
   const caloriesConsumed = metrics?.caloriesIn || 0;
@@ -417,6 +471,14 @@ const HomePage = () => {
           </button>
         </div>
       </div>
+
+      {/* Health Stats Section */}
+      <HealthStatsCard 
+        stats={healthStats}
+        isLoading={isLoading}
+        targetSteps={profile?.target_steps ?? 10000}
+        targetSleepHours={profile?.target_sleep_hours ?? 8}
+      />
 
       {/* Goal Editor Modal */}
       <GoalEditorModal
