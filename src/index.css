@@ -64,9 +64,9 @@
     --ring-progress: 174 75% 42%;
     --ring-background: 220 14% 93%;
 
-    /* Safe areas */
-    --safe-area-top: env(safe-area-inset-top, 44px);
-    --safe-area-bottom: env(safe-area-inset-bottom, 34px);
+    /* Safe areas - fallback values for browsers without notch */
+    --safe-area-top: env(safe-area-inset-top, 0px);
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
 
     /* Sidebar */
     --sidebar-background: 0 0% 98%;
@@ -208,7 +208,7 @@
   }
 
   .safe-bottom {
-    padding-bottom: var(--safe-area-bottom);
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
   }
 
   /* Glass morphism effects */
