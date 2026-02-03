@@ -3,7 +3,7 @@ import TabBar from './TabBar';
 
 const AppLayout = () => {
   return (
-    <div className="flex min-h-screen min-h-[100dvh] w-screen flex-col bg-gradient-glow">
+    <div className="flex h-[100dvh] h-screen w-screen flex-col overflow-hidden bg-gradient-glow">
       <main className="flex-1 overflow-y-auto pb-20">
         <Outlet />
       </main>
