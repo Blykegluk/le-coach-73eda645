@@ -11,6 +11,7 @@ import GoalEditorModal from '@/components/profile/GoalEditorModal';
 import GoalProgressCard from '@/components/home/GoalProgressCard';
 import DailyTipsCard from '@/components/home/DailyTipsCard';
 import HealthStatsCard from '@/components/home/HealthStatsCard';
+import { useNutritionGoals } from '@/hooks/useNutritionGoals';
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -23,6 +24,7 @@ const HomePage = () => {
   const [currentWeight, setCurrentWeight] = useState<number | null>(null);
   const [currentBodyFat, setCurrentBodyFat] = useState<number | null>(null);
   const [proteinConsumed, setProteinConsumed] = useState<number>(0);
+  const [caloriesConsumed, setCaloriesConsumed] = useState<number>(0);
   const [healthStats, setHealthStats] = useState({
     sleepHours: null as number | null,
     steps: null as number | null,
@@ -32,11 +34,11 @@ const HomePage = () => {
     floorsClimbed: null as number | null,
   });
 
-  // Goals from profile or defaults
-  const caloriesGoal = profile?.target_calories ?? 2000;
-  const waterGoal = profile?.target_water_ml ?? 2500;
-  // Protein goal: default to 2g per kg of body weight
-  const proteinGoal = profile?.weight_kg ? Math.round(profile.weight_kg * 2) : 120;
+  // Use shared nutrition goals calculation (same as NutritionPage)
+  const nutritionGoals = useNutritionGoals(profile);
+  const caloriesGoal = nutritionGoals.calories;
+  const proteinGoal = nutritionGoals.protein;
+  const waterGoal = profile?.target_water_ml ?? Math.round(nutritionGoals.hydrationLiters * 1000);
 
   const fetchMetrics = useCallback(async () => {
     if (!user) return;
@@ -85,8 +87,8 @@ const HomePage = () => {
     }
   }, [user]);
 
-  // Fetch today's protein intake
-  const fetchProteinIntake = useCallback(async () => {
+  // Fetch today's nutrition intake (calories + protein from nutrition_logs)
+  const fetchNutritionIntake = useCallback(async () => {
     if (!user) return;
 
     const today = new Date().toISOString().split('T')[0];
@@ -95,14 +97,16 @@ const HomePage = () => {
 
     const { data } = await supabase
       .from('nutrition_logs')
-      .select('protein')
+      .select('calories, protein')
       .eq('user_id', user.id)
       .gte('logged_at', startOfDay)
       .lte('logged_at', endOfDay);
 
     if (data) {
-      const total = data.reduce((sum, log) => sum + (log.protein || 0), 0);
-      setProteinConsumed(Math.round(total));
+      const totalCalories = data.reduce((sum, log) => sum + (log.calories || 0), 0);
+      const totalProtein = data.reduce((sum, log) => sum + (log.protein || 0), 0);
+      setCaloriesConsumed(Math.round(totalCalories));
+      setProteinConsumed(Math.round(totalProtein));
     }
   }, [user]);
 
@@ -158,7 +162,7 @@ const HomePage = () => {
     fetchMetrics();
     fetchWeeklySessions();
     fetchCurrentMetrics();
-    fetchProteinIntake();
+    fetchNutritionIntake();
     fetchHealthStats();
 
     // Subscribe to real-time updates
@@ -197,8 +201,7 @@ const HomePage = () => {
             filter: `user_id=eq.${user.id}`,
           },
           () => {
-            fetchProteinIntake();
-            fetchMetrics(); // Re-fetch metrics to update calories
+            fetchNutritionIntake();
           }
         )
         .subscribe();
@@ -228,10 +231,9 @@ const HomePage = () => {
         supabase.removeChannel(metricsChannel);
       };
     }
-  }, [user, fetchMetrics, fetchWeeklySessions, fetchCurrentMetrics, fetchProteinIntake, fetchHealthStats]);
+  }, [user, fetchMetrics, fetchWeeklySessions, fetchCurrentMetrics, fetchNutritionIntake, fetchHealthStats]);
 
   const firstName = profile?.first_name || user?.email?.split('@')[0] || 'Athlète';
-  const caloriesConsumed = metrics?.caloriesIn || 0;
   const caloriesPercentage = (caloriesConsumed / caloriesGoal) * 100;
   const waterConsumed = metrics?.waterMl || 0;
   const waterPercentage = (waterConsumed / waterGoal) * 100;
@@ -289,7 +291,7 @@ const HomePage = () => {
               <Flame className="h-3.5 w-3.5 text-primary" />
               <div className="absolute inset-0 bg-primary/30 blur-sm rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
-            <span className="text-xs text-muted-foreground">Consommées</span>
+            <span className="text-xs text-muted-foreground leading-tight">Calories<br/>consommées</span>
           </div>
           {caloriesConsumed > 0 ? (
             <>
