@@ -1,13 +1,14 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Dumbbell, Clock, Flame, Calendar, Trash2 } from 'lucide-react';
+import { Dumbbell, Clock, Flame, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkout } from '@/contexts/WorkoutContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, isToday, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
+import { format, isToday } from 'date-fns';
 import NextWorkoutCard from '@/components/training/NextWorkoutCard';
 import EquipmentSection from '@/components/training/EquipmentSection';
+import WeeklyCarousel from '@/components/training/WeeklyCarousel';
 
 interface Activity {
   id: string;
@@ -137,32 +138,8 @@ const TrainingPage = () => {
     }
   };
 
-  // Group activities
-  const now = new Date();
-  const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-  const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-
+  // Filter today's activities only
   const todayActivities = activities.filter(a => isToday(new Date(a.performed_at)));
-  const thisWeekActivities = activities.filter(a => {
-    const date = new Date(a.performed_at);
-    return !isToday(date) && isWithinInterval(date, { start: weekStart, end: weekEnd });
-  });
-  const olderActivities = activities.filter(a => {
-    const date = new Date(a.performed_at);
-    return !isWithinInterval(date, { start: weekStart, end: weekEnd });
-  });
-
-  // Stats for the week (use estimated calories if not stored)
-  const weeklyStats = activities
-    .filter(a => isWithinInterval(new Date(a.performed_at), { start: weekStart, end: weekEnd }))
-    .reduce(
-      (acc, a) => ({
-        sessions: acc.sessions + 1,
-        totalMinutes: acc.totalMinutes + a.duration_min,
-        totalCalories: acc.totalCalories + estimateCalories(a, userWeight),
-      }),
-      { sessions: 0, totalMinutes: 0, totalCalories: 0 }
-    );
 
   const formatTime = (dateStr: string) => {
     return format(new Date(dateStr), "HH:mm");
@@ -249,32 +226,8 @@ const TrainingPage = () => {
         <p className="text-sm text-muted-foreground">Ton historique d'activités</p>
       </div>
 
-      {/* Weekly stats */}
-      {weeklyStats.sessions > 0 && (
-        <div className="mb-6 card-premium p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="relative">
-              <Calendar className="h-4 w-4 text-primary" />
-              <div className="absolute inset-0 bg-primary/30 blur-sm rounded-full" />
-            </div>
-            <span className="text-sm font-medium text-foreground">Cette semaine</span>
-          </div>
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-bold text-gradient-primary">{weeklyStats.sessions}</p>
-              <p className="text-xs text-muted-foreground">séances</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-foreground">{weeklyStats.totalMinutes}</p>
-              <p className="text-xs text-muted-foreground">minutes</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-foreground">{weeklyStats.totalCalories}</p>
-              <p className="text-xs text-muted-foreground">kcal brûlées</p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Weekly stats carousel */}
+      <WeeklyCarousel userWeight={userWeight} />
 
       {/* Activities list - Today only */}
       <ActivitySection title="Aujourd'hui" items={todayActivities} />
@@ -297,13 +250,6 @@ const TrainingPage = () => {
         />
       </div>
 
-      {/* Rest of the activities */}
-      {thisWeekActivities.length > 0 && (
-        <ActivitySection title="Cette semaine" items={thisWeekActivities} />
-      )}
-      {olderActivities.length > 0 && (
-        <ActivitySection title="Plus ancien" items={olderActivities} />
-      )}
 
       {/* Empty state when no activities */}
       {activities.length === 0 && (

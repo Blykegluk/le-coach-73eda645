@@ -6,6 +6,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { Skeleton } from '@/components/ui/skeleton';
 import AddMealModal from '@/components/nutrition/AddMealModal';
 import MealDetailSheet from '@/components/nutrition/MealDetailSheet';
+import NutritionHistorySheet from '@/components/nutrition/NutritionHistorySheet';
 
 interface NutritionLog {
   id: string;
@@ -120,6 +121,7 @@ const NutritionPage = () => {
     mealName: '',
     logs: [],
   });
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const baseGoals = calculateDailyGoals(profile);
 
@@ -367,7 +369,10 @@ const NutritionPage = () => {
       <div>
         <div className="mb-3 flex items-center justify-between">
           <p className="text-sm font-medium text-foreground">Repas du jour</p>
-          <button className="flex items-center gap-1 text-sm font-medium text-primary hover:text-primary-glow transition-colors">
+          <button 
+            onClick={() => setHistoryOpen(true)}
+            className="flex items-center gap-1 text-sm font-medium text-primary hover:text-primary-glow transition-colors"
+          >
             Historique
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -445,6 +450,17 @@ const NutritionPage = () => {
         mealName={mealDetail.mealName}
         logs={mealDetail.logs}
         onChanged={fetchTodayNutrition}
+      />
+
+      {/* Nutrition History Sheet */}
+      <NutritionHistorySheet
+        isOpen={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        calorieGoal={baseGoals.calories.goal}
+        proteinGoal={baseGoals.protein.goal}
+        carbsGoal={baseGoals.carbs.goal}
+        fatGoal={baseGoals.fat.goal}
+        waterGoal={baseGoals.hydration.goal}
       />
     </div>
   );
