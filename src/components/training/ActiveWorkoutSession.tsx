@@ -247,27 +247,27 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
 
   if (phase === 'completed') {
     return (
-      <div className="fixed inset-0 z-50 bg-background flex flex-col">
+      <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center justify-between p-4 border-b border-border bg-card/80 backdrop-blur-xl">
           <h2 className="text-lg font-semibold">Séance terminée 🎉</h2>
           <span className="text-sm text-muted-foreground">{formatTime(globalTime)}</span>
         </div>
 
         {/* Summary */}
         <div className="flex-1 overflow-auto p-4 space-y-4">
-          <div className="bg-primary/10 rounded-xl p-4 text-center">
+          <div className="card-premium p-4 text-center">
             <Timer className="h-12 w-12 mx-auto text-primary mb-2" />
             <p className="text-2xl font-bold text-primary">{formatTime(globalTime)}</p>
             <p className="text-sm text-muted-foreground">Durée totale</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-muted/30 rounded-xl p-3 text-center">
+            <div className="card-premium p-3 text-center">
               <p className="text-xl font-bold">{exerciseLogs.filter(l => !l.skipped).length}</p>
               <p className="text-xs text-muted-foreground">Exercices complétés</p>
             </div>
-            <div className="bg-muted/30 rounded-xl p-3 text-center">
+            <div className="card-premium p-3 text-center">
               <p className="text-xl font-bold">{exerciseLogs.reduce((sum, l) => sum + (l.skipped ? 0 : l.actual_sets), 0)}</p>
               <p className="text-xs text-muted-foreground">Séries totales</p>
             </div>
@@ -275,12 +275,12 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
 
           <h3 className="font-semibold mt-4">Récapitulatif des exercices</h3>
           <div className="space-y-2">
-            {exerciseLogs.map((log, index) => {
+          {exerciseLogs.map((log, index) => {
               const ExIcon = getExerciseIcon(log.exercise_name);
               return (
                 <div 
                   key={index}
-                  className={`flex items-center gap-3 p-3 rounded-xl ${log.skipped ? 'bg-muted/20 opacity-50' : 'bg-muted/30'}`}
+                  className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${log.skipped ? 'bg-muted/20 border-border/50 opacity-50' : 'card-premium cursor-pointer hover:border-primary/50'}`}
                   onClick={() => !log.skipped && handleEditExercise(index)}
                 >
                   <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -302,7 +302,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t">
+        <div className="p-4 border-t border-border bg-card/80 backdrop-blur-xl">
           <Button className="w-full" size="lg" onClick={handleCompleteSession}>
             <Check className="h-5 w-5 mr-2" />
             Valider et enregistrer
@@ -351,9 +351,9 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
   const ExerciseIcon = currentExercise ? getExerciseIcon(currentExercise.name) : Dumbbell;
 
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col">
+    <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b">
+      <div className="flex items-center justify-between p-4 border-b border-border bg-card/80 backdrop-blur-xl">
         <Button variant="ghost" size="sm" onClick={handleAbort}>
           <X className="h-5 w-5" />
         </Button>
@@ -383,8 +383,8 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
       <div className="flex-1 flex flex-col items-center justify-center p-6">
         {phase === 'exercise' ? (
           <>
-            <div className="h-32 w-32 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
-              <ExerciseIcon className="h-24 w-24" />
+            <div className="h-32 w-32 rounded-2xl card-premium flex items-center justify-center mb-6">
+              <ExerciseIcon className="h-24 w-24 text-primary" />
             </div>
             
             <h2 className="text-xl font-bold text-center mb-2">{currentExercise?.name}</h2>
@@ -397,7 +397,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
             
             <p className="text-muted-foreground mb-2">{currentLog?.actual_weight}</p>
             
-            <div className="bg-muted/30 rounded-xl px-6 py-3 mb-8">
+            <div className="card-premium px-6 py-3 mb-8">
               <p className="font-mono text-3xl font-bold">{formatTime(phaseTime)}</p>
             </div>
 
@@ -413,15 +413,15 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
           </>
         ) : (
           <>
-            <div className="h-32 w-32 rounded-full bg-orange-500/20 flex items-center justify-center mb-6 animate-pulse">
-              <Timer className="h-16 w-16 text-orange-500" />
+            <div className="h-32 w-32 rounded-full bg-energy/20 border border-energy/30 flex items-center justify-center mb-6 animate-pulse shadow-glow-md">
+              <Timer className="h-16 w-16 text-energy" />
             </div>
             
             <h2 className="text-xl font-bold text-center mb-2">Repos</h2>
             <p className="text-muted-foreground mb-6">Prochain : {workout.exercises[currentExerciseIndex + 1]?.name || 'Fin'}</p>
             
-            <div className="bg-orange-500/10 rounded-xl px-8 py-4 mb-8">
-              <p className="font-mono text-4xl font-bold text-orange-500">{formatTime(restTimeRemaining)}</p>
+            <div className="card-premium px-8 py-4 mb-8 border-energy/30">
+              <p className="font-mono text-4xl font-bold text-energy">{formatTime(restTimeRemaining)}</p>
             </div>
           </>
         )}
@@ -440,12 +440,12 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
               <button
                 key={index}
                 onClick={() => !isDone && handleEditExercise(index)}
-                className={`flex-shrink-0 p-2 rounded-lg transition-all ${
+                className={`flex-shrink-0 p-2 rounded-lg border transition-all ${
                   isActive 
-                    ? 'bg-primary/20 ring-2 ring-primary' 
+                    ? 'bg-primary/20 border-primary ring-2 ring-primary shadow-glow-sm' 
                     : isDone 
-                      ? log?.skipped ? 'bg-muted/20 opacity-40' : 'bg-green-500/20' 
-                      : 'bg-muted/30'
+                      ? log?.skipped ? 'bg-muted/20 border-border/50 opacity-40' : 'bg-green-500/20 border-green-500/30' 
+                      : 'bg-card border-border hover:border-primary/50'
                 }`}
               >
                 <Icon className="h-8 w-8" />
@@ -456,7 +456,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
       </div>
 
       {/* Footer actions */}
-      <div className="p-4 border-t flex gap-3">
+      <div className="p-4 border-t border-border bg-card/80 backdrop-blur-xl flex gap-3">
         {phase === 'exercise' ? (
           <>
             <Button 
