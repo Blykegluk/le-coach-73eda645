@@ -3,8 +3,8 @@ import TabBar from './TabBar';
 
 const AppLayout = () => {
   return (
-    // Important: avoid `h-screen` on mobile (100vh can include the browser UI and clip the bottom nav).
     <div className="flex h-[100dvh] min-h-[100dvh] w-screen flex-col overflow-hidden bg-gradient-glow">
+      {/* Important: avoid `h-screen` on mobile (100vh can include the browser UI and clip the bottom nav). */}
       {/* Scrollable content area */}
       <main className="flex-1 overflow-y-auto">
         <Outlet />
