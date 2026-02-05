@@ -649,6 +649,42 @@ async function executeToolCall(
         };
       }
 
+      case "remove_water": {
+        // Use specified date or default to today (Paris timezone)
+        const targetDate = getLocalDate(args.date);
+        
+        // Get current water
+        const { data: current } = await supabase
+          .from("daily_metrics")
+          .select("water_ml")
+          .eq("user_id", userId)
+          .eq("date", targetDate)
+          .maybeSingle();
+
+        const currentWater = current?.water_ml || 0;
+        const newTotal = Math.max(0, currentWater - args.amount_ml);
+
+        const { error } = await supabase.from("daily_metrics").upsert(
+          {
+            user_id: userId,
+            date: targetDate,
+            water_ml: newTotal,
+          },
+          { onConflict: "user_id,date" }
+        );
+
+        if (error) throw error;
+        
+        const isToday = targetDate === today;
+        const dateLabel = isToday ? "" : ` (${targetDate})`;
+        
+        return {
+          success: true,
+          message: `💧 ${args.amount_ml}ml d'eau retirés${dateLabel} (nouveau total: ${newTotal}ml)`,
+          data: { total: newTotal, date: targetDate, removed: args.amount_ml },
+        };
+      }
+
       case "log_meal": {
         // Calculate logged_at based on meal type and estimated time
         // Use estimated_time if provided, otherwise use default for meal type
