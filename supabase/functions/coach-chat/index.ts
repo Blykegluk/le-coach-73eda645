@@ -69,18 +69,62 @@ interface ToolCall {
 }
 
 // Available tools for the coach
+// Helper to get date in Europe/Paris timezone
+function getLocalDate(dateStr?: string): string {
+  if (dateStr) {
+    // Validate format YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return dateStr;
+    }
+  }
+  // Get current date in Paris timezone
+  const now = new Date();
+  const parisTime = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Paris",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+  return parisTime; // Returns YYYY-MM-DD format
+}
+
 const tools = [
   {
     type: "function",
     function: {
       name: "log_water",
-      description: "Enregistre une consommation d'eau pour l'utilisateur",
+      description: "Enregistre une consommation d'eau pour l'utilisateur. Par défaut, enregistre sur la date du jour (heure de Paris). Peut aussi enregistrer sur une date passée si spécifié.",
       parameters: {
         type: "object",
         properties: {
           amount_ml: {
             type: "number",
             description: "Quantité d'eau en millilitres (250 = 1 verre)",
+          },
+          date: {
+            type: "string",
+            description: "Date d'enregistrement au format YYYY-MM-DD. Si non spécifié, utilise aujourd'hui (heure de Paris). Utiliser pour enregistrer rétroactivement (ex: 'hier' → date d'hier).",
+          },
+        },
+        required: ["amount_ml"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "remove_water",
+      description: "Retire/corrige une consommation d'eau pour une date donnée. Utiliser quand l'utilisateur a fait une erreur de saisie et veut retirer de l'eau.",
+      parameters: {
+        type: "object",
+        properties: {
+          amount_ml: {
+            type: "number",
+            description: "Quantité d'eau à retirer en millilitres (nombre positif)",
+          },
+          date: {
+            type: "string",
+            description: "Date au format YYYY-MM-DD. Si non spécifié, utilise aujourd'hui (heure de Paris).",
           },
         },
         required: ["amount_ml"],
@@ -563,19 +607,22 @@ async function executeToolCall(
 ): Promise<{ success: boolean; message: string; data?: unknown }> {
   const { name, arguments: argsStr } = toolCall.function;
   const args = JSON.parse(argsStr);
-  const today = new Date().toISOString().split("T")[0];
+  const today = getLocalDate(); // Use Paris timezone
 
   console.log(`Executing tool: ${name}`, args);
 
   try {
     switch (name) {
       case "log_water": {
+        // Use specified date or default to today (Paris timezone)
+        const targetDate = getLocalDate(args.date);
+        
         // Get current water and add to it
         const { data: current } = await supabase
           .from("daily_metrics")
           .select("water_ml")
           .eq("user_id", userId)
-          .eq("date", today)
+          .eq("date", targetDate)
           .maybeSingle();
 
         const currentWater = current?.water_ml || 0;
@@ -584,17 +631,57 @@ async function executeToolCall(
         const { error } = await supabase.from("daily_metrics").upsert(
           {
             user_id: userId,
-            date: today,
+            date: targetDate,
             water_ml: newTotal,
           },
           { onConflict: "user_id,date" }
         );
 
         if (error) throw error;
+        
+        const isToday = targetDate === today;
+        const dateLabel = isToday ? "" : ` (${targetDate})`;
+        
         return {
           success: true,
-          message: `💧 ${args.amount_ml}ml d'eau ajoutés (total: ${newTotal}ml)`,
-          data: { total: newTotal },
+          message: `💧 ${args.amount_ml}ml d'eau ajoutés${dateLabel} (total: ${newTotal}ml)`,
+          data: { total: newTotal, date: targetDate },
+        };
+      }
+
+      case "remove_water": {
+        // Use specified date or default to today (Paris timezone)
+        const targetDate = getLocalDate(args.date);
+        
+        // Get current water
+        const { data: current } = await supabase
+          .from("daily_metrics")
+          .select("water_ml")
+          .eq("user_id", userId)
+          .eq("date", targetDate)
+          .maybeSingle();
+
+        const currentWater = current?.water_ml || 0;
+        const newTotal = Math.max(0, currentWater - args.amount_ml);
+
+        const { error } = await supabase.from("daily_metrics").upsert(
+          {
+            user_id: userId,
+            date: targetDate,
+            water_ml: newTotal,
+          },
+          { onConflict: "user_id,date" }
+        );
+
+        if (error) throw error;
+        
+        const isToday = targetDate === today;
+        const dateLabel = isToday ? "" : ` (${targetDate})`;
+        
+        return {
+          success: true,
+          message: `💧 ${args.amount_ml}ml d'eau retirés${dateLabel} (nouveau total: ${newTotal}ml)`,
+          data: { total: newTotal, date: targetDate, removed: args.amount_ml },
         };
       }
 
@@ -1793,27 +1880,51 @@ ${parsedContexts.map((c: any) => `- ${categoryLabels[c.category] || c.category}:
       }
     }
 
-    // Build current date/time context for the AI
-    const now = new Date();
-    const parisTime = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Paris" }));
-    const currentDate = parisTime.toISOString().split("T")[0];
-    const currentTime = parisTime.toTimeString().slice(0, 5);
+    // Build current date/time context for the AI using Paris timezone
+    const today = getLocalDate();
+    // Get yesterday's date
+    const yesterdayDate = new Date();
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterday = getLocalDate(
+      `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, "0")}-${String(yesterdayDate.getDate()).padStart(2, "0")}`
+    );
+    
+    // Get current time in Paris
+    const currentTime = new Intl.DateTimeFormat("fr-FR", {
+      timeZone: "Europe/Paris",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date());
+    
     const dayNames = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
     const monthNames = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
-    const dayName = dayNames[parisTime.getDay()];
-    const dayOfMonth = parisTime.getDate();
-    const monthName = monthNames[parisTime.getMonth()];
-    const year = parisTime.getFullYear();
+    
+    // Parse the date for display
+    const [yearStr, monthStr, dayStr] = today.split("-");
+    const displayDate = new Date(parseInt(yearStr), parseInt(monthStr) - 1, parseInt(dayStr));
+    const dayName = dayNames[displayDate.getDay()];
+    const dayOfMonth = displayDate.getDate();
+    const monthName = monthNames[displayDate.getMonth()];
+    const year = displayDate.getFullYear();
     const formattedDate = `${dayName} ${dayOfMonth} ${monthName} ${year}`;
 
     const systemPrompt = `Tu es un coach santé et fitness bienveillant et motivant. Tu parles français de manière naturelle et encourageante.
 
 ⏰ **DATE ET HEURE ACTUELLES (fuseau Paris):**
 - **Aujourd'hui:** ${formattedDate}
-- **Date:** ${currentDate}
+- **Date d'aujourd'hui:** ${today}
+- **Date d'hier:** ${yesterday}
 - **Heure:** ${currentTime}
 
-IMPORTANT: Quand l'utilisateur te demande des informations sur "aujourd'hui", "ce jour", "maintenant", utilise TOUJOURS la date ci-dessus (${currentDate}). Les données sont stockées avec des timestamps, tu dois TOUJOURS utiliser l'outil get_daily_summary pour récupérer les données du jour en cours.
+GESTION DES DATES (CRITIQUE):
+- Quand l'utilisateur parle d'"hier", utilise la date: ${yesterday}
+- Quand l'utilisateur parle d'"aujourd'hui", utilise la date: ${today}
+- Pour log_water avec une date passée, spécifie le paramètre "date" (ex: {"amount_ml": 500, "date": "${yesterday}"})
+- Pour RETIRER de l'eau (erreur de saisie), utilise remove_water avec une quantité négative ou positive selon le contexte
+- TOUJOURS vérifier sur quelle date l'utilisateur veut que tu enregistres les données !
+
+IMPORTANT: Quand l'utilisateur te demande des informations sur "aujourd'hui", "ce jour", "maintenant", utilise TOUJOURS la date ci-dessus (${today}). Les données sont stockées avec des timestamps, tu dois TOUJOURS utiliser l'outil get_daily_summary pour récupérer les données du jour en cours.
 
 ${userContext}
 ${healthContext}
