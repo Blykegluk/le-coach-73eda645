@@ -104,8 +104,29 @@ const tools = [
           date: {
             type: "string",
             description: "Date d'enregistrement au format YYYY-MM-DD. Si non spécifié, utilise aujourd'hui (heure de Paris). Utiliser pour enregistrer rétroactivement (ex: 'hier' → date d'hier).",
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "remove_water",
+      description: "Retire/corrige une consommation d'eau pour une date donnée. Utiliser quand l'utilisateur a fait une erreur de saisie et veut retirer de l'eau.",
+      parameters: {
+        type: "object",
+        properties: {
+          amount_ml: {
+            type: "number",
+            description: "Quantité d'eau à retirer en millilitres (nombre positif)",
+          },
+          date: {
+            type: "string",
+            description: "Date au format YYYY-MM-DD. Si non spécifié, utilise aujourd'hui (heure de Paris).",
           },
         },
+        required: ["amount_ml"],
+      },
+    },
+  },
         required: ["amount_ml"],
       },
     },
