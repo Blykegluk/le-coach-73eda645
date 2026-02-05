@@ -46,7 +46,6 @@ export default function GoalAssistant({
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [validatedGoal, setValidatedGoal] = useState<ValidatedGoal | null>(null);
-  const [showChat, setShowChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
