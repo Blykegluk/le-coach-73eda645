@@ -1822,6 +1822,148 @@ IMPORTANT: Retourne un JSON valide avec cette structure exacte:
         };
       }
 
+      case "get_recent_workout_sessions": {
+        const limit = args.limit || 5;
+        let query = supabase
+          .from("workout_sessions")
+          .select("id, workout_name, started_at, completed_at, status, target_muscles, total_duration_seconds, notes")
+          .eq("user_id", userId)
+          .order("started_at", { ascending: false })
+          .limit(limit);
+
+        // Filter by specific date if provided
+        if (args.date) {
+          const targetDate = getLocalDate(args.date);
+          query = query
+            .gte("started_at", `${targetDate}T00:00:00`)
+            .lt("started_at", `${targetDate}T23:59:59`);
+        }
+
+        const { data: sessions, error } = await query;
+
+        if (error) throw error;
+
+        const formattedSessions = (sessions || []).map((s: any) => ({
+          id: s.id,
+          workout_name: s.workout_name,
+          started_at: s.started_at,
+          completed_at: s.completed_at,
+          status: s.status,
+          target_muscles: s.target_muscles,
+          duration_min: s.total_duration_seconds ? Math.round(s.total_duration_seconds / 60) : null,
+          notes: s.notes,
+          time_ago: getTimeAgo(s.started_at),
+        }));
+
+        return {
+          success: true,
+          message: `${formattedSessions.length} séance(s) trouvée(s)`,
+          data: formattedSessions,
+        };
+      }
+
+      case "get_workout_exercises": {
+        const { data: exercises, error } = await supabase
+          .from("workout_exercise_logs")
+          .select("id, exercise_name, exercise_order, planned_sets, planned_reps, planned_weight, actual_sets, actual_reps, actual_weight, rest_seconds, notes, skipped")
+          .eq("session_id", args.session_id)
+          .eq("user_id", userId)
+          .order("exercise_order", { ascending: true });
+
+        if (error) throw error;
+
+        const formattedExercises = (exercises || []).map((e: any) => ({
+          id: e.id,
+          exercise_name: e.exercise_name,
+          order: e.exercise_order,
+          planned: {
+            sets: e.planned_sets,
+            reps: e.planned_reps,
+            weight: e.planned_weight,
+          },
+          actual: {
+            sets: e.actual_sets,
+            reps: e.actual_reps,
+            weight: e.actual_weight,
+          },
+          rest_seconds: e.rest_seconds,
+          notes: e.notes,
+          skipped: e.skipped,
+        }));
+
+        return {
+          success: true,
+          message: `${formattedExercises.length} exercice(s) dans cette séance`,
+          data: formattedExercises,
+        };
+      }
+
+      case "update_workout_exercise": {
+        // Get current exercise to show what was changed
+        const { data: currentExercise } = await supabase
+          .from("workout_exercise_logs")
+          .select("exercise_name, actual_sets, actual_reps, actual_weight")
+          .eq("id", args.exercise_id)
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (!currentExercise) {
+          return { success: false, message: "Exercice non trouvé" };
+        }
+
+        const updates: any = {};
+        if (args.actual_sets !== undefined) updates.actual_sets = args.actual_sets;
+        if (args.actual_reps !== undefined) updates.actual_reps = args.actual_reps;
+        if (args.actual_weight !== undefined) updates.actual_weight = args.actual_weight;
+        if (args.notes !== undefined) updates.notes = args.notes;
+        if (args.skipped !== undefined) updates.skipped = args.skipped;
+
+        const { error } = await supabase
+          .from("workout_exercise_logs")
+          .update(updates)
+          .eq("id", args.exercise_id)
+          .eq("user_id", userId);
+
+        if (error) throw error;
+
+        const changes: string[] = [];
+        if (args.actual_sets !== undefined) changes.push(`${args.actual_sets} séries`);
+        if (args.actual_reps !== undefined) changes.push(`${args.actual_reps} reps`);
+        if (args.actual_weight !== undefined) changes.push(`${args.actual_weight}`);
+
+        return {
+          success: true,
+          message: `✏️ "${currentExercise.exercise_name}" corrigé: ${changes.join(", ") || "mis à jour"}`,
+          data: updates,
+        };
+      }
+
+      case "delete_workout_exercise": {
+        const { data: exercise } = await supabase
+          .from("workout_exercise_logs")
+          .select("exercise_name")
+          .eq("id", args.exercise_id)
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (!exercise) {
+          return { success: false, message: "Exercice non trouvé" };
+        }
+
+        const { error } = await supabase
+          .from("workout_exercise_logs")
+          .delete()
+          .eq("id", args.exercise_id)
+          .eq("user_id", userId);
+
+        if (error) throw error;
+
+        return {
+          success: true,
+          message: `🗑️ "${exercise.exercise_name}" supprimé de la séance`,
+        };
+      }
+
       default:
         return { success: false, message: `Outil inconnu: ${name}` };
     }
