@@ -1823,17 +1823,33 @@ ${parsedContexts.map((c: any) => `- ${categoryLabels[c.category] || c.category}:
       }
     }
 
-    // Build current date/time context for the AI
-    const now = new Date();
-    const parisTime = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Paris" }));
-    const currentDate = parisTime.toISOString().split("T")[0];
-    const currentTime = parisTime.toTimeString().slice(0, 5);
+    // Build current date/time context for the AI using Paris timezone
+    const today = getLocalDate();
+    // Get yesterday's date
+    const yesterdayDate = new Date();
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterday = getLocalDate(
+      `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, "0")}-${String(yesterdayDate.getDate()).padStart(2, "0")}`
+    );
+    
+    // Get current time in Paris
+    const currentTime = new Intl.DateTimeFormat("fr-FR", {
+      timeZone: "Europe/Paris",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date());
+    
     const dayNames = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
     const monthNames = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
-    const dayName = dayNames[parisTime.getDay()];
-    const dayOfMonth = parisTime.getDate();
-    const monthName = monthNames[parisTime.getMonth()];
-    const year = parisTime.getFullYear();
+    
+    // Parse the date for display
+    const [yearStr, monthStr, dayStr] = today.split("-");
+    const displayDate = new Date(parseInt(yearStr), parseInt(monthStr) - 1, parseInt(dayStr));
+    const dayName = dayNames[displayDate.getDay()];
+    const dayOfMonth = displayDate.getDate();
+    const monthName = monthNames[displayDate.getMonth()];
+    const year = displayDate.getFullYear();
     const formattedDate = `${dayName} ${dayOfMonth} ${monthName} ${year}`;
 
     const systemPrompt = `Tu es un coach santé et fitness bienveillant et motivant. Tu parles français de manière naturelle et encourageante.
