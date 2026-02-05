@@ -104,6 +104,10 @@ const tools = [
           date: {
             type: "string",
             description: "Date d'enregistrement au format YYYY-MM-DD. Si non spécifié, utilise aujourd'hui (heure de Paris). Utiliser pour enregistrer rétroactivement (ex: 'hier' → date d'hier).",
+          },
+        },
+        required: ["amount_ml"],
+      },
     },
   },
   {
@@ -123,10 +127,6 @@ const tools = [
             description: "Date au format YYYY-MM-DD. Si non spécifié, utilise aujourd'hui (heure de Paris).",
           },
         },
-        required: ["amount_ml"],
-      },
-    },
-  },
         required: ["amount_ml"],
       },
     },
