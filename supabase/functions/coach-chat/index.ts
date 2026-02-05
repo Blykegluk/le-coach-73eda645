@@ -1856,10 +1856,18 @@ ${parsedContexts.map((c: any) => `- ${categoryLabels[c.category] || c.category}:
 
 ⏰ **DATE ET HEURE ACTUELLES (fuseau Paris):**
 - **Aujourd'hui:** ${formattedDate}
-- **Date:** ${currentDate}
+- **Date d'aujourd'hui:** ${today}
+- **Date d'hier:** ${yesterday}
 - **Heure:** ${currentTime}
 
-IMPORTANT: Quand l'utilisateur te demande des informations sur "aujourd'hui", "ce jour", "maintenant", utilise TOUJOURS la date ci-dessus (${currentDate}). Les données sont stockées avec des timestamps, tu dois TOUJOURS utiliser l'outil get_daily_summary pour récupérer les données du jour en cours.
+GESTION DES DATES (CRITIQUE):
+- Quand l'utilisateur parle d'"hier", utilise la date: ${yesterday}
+- Quand l'utilisateur parle d'"aujourd'hui", utilise la date: ${today}
+- Pour log_water avec une date passée, spécifie le paramètre "date" (ex: {"amount_ml": 500, "date": "${yesterday}"})
+- Pour RETIRER de l'eau (erreur de saisie), utilise remove_water avec une quantité négative ou positive selon le contexte
+- TOUJOURS vérifier sur quelle date l'utilisateur veut que tu enregistres les données !
+
+IMPORTANT: Quand l'utilisateur te demande des informations sur "aujourd'hui", "ce jour", "maintenant", utilise TOUJOURS la date ci-dessus (${today}). Les données sont stockées avec des timestamps, tu dois TOUJOURS utiliser l'outil get_daily_summary pour récupérer les données du jour en cours.
 
 ${userContext}
 ${healthContext}
