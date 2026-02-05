@@ -597,6 +597,98 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "get_recent_workout_sessions",
+      description: "Récupère les séances d'entraînement récentes de l'utilisateur avec leurs détails",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: {
+            type: "number",
+            description: "Nombre de séances à récupérer (défaut: 5)",
+          },
+          date: {
+            type: "string",
+            description: "Date spécifique au format YYYY-MM-DD pour filtrer (optionnel). Utiliser pour 'hier', 'lundi dernier', etc.",
+          },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_workout_exercises",
+      description: "Récupère les exercices détaillés d'une séance spécifique",
+      parameters: {
+        type: "object",
+        properties: {
+          session_id: {
+            type: "string",
+            description: "ID de la séance (obtenu via get_recent_workout_sessions)",
+          },
+        },
+        required: ["session_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_workout_exercise",
+      description: "Modifie un exercice d'une séance d'entraînement. Utiliser get_workout_exercises d'abord pour obtenir l'ID.",
+      parameters: {
+        type: "object",
+        properties: {
+          exercise_id: {
+            type: "string",
+            description: "ID de l'exercice à modifier (obtenu via get_workout_exercises)",
+          },
+          actual_sets: {
+            type: "number",
+            description: "Nombre de séries réellement effectuées",
+          },
+          actual_reps: {
+            type: "string",
+            description: "Répétitions réellement effectuées (ex: '10-10-8' ou '12')",
+          },
+          actual_weight: {
+            type: "string",
+            description: "Poids réellement utilisé (ex: '80kg' ou '70-75-80')",
+          },
+          notes: {
+            type: "string",
+            description: "Notes ou commentaires sur l'exercice",
+          },
+          skipped: {
+            type: "boolean",
+            description: "Marquer l'exercice comme sauté",
+          },
+        },
+        required: ["exercise_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_workout_exercise",
+      description: "Supprime un exercice d'une séance",
+      parameters: {
+        type: "object",
+        properties: {
+          exercise_id: {
+            type: "string",
+            description: "ID de l'exercice à supprimer",
+          },
+        },
+        required: ["exercise_id"],
+      },
+    },
+  },
 ];
 
 // Execute tool calls
