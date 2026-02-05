@@ -597,6 +597,98 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "get_recent_workout_sessions",
+      description: "Récupère les séances d'entraînement récentes de l'utilisateur avec leurs détails",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: {
+            type: "number",
+            description: "Nombre de séances à récupérer (défaut: 5)",
+          },
+          date: {
+            type: "string",
+            description: "Date spécifique au format YYYY-MM-DD pour filtrer (optionnel). Utiliser pour 'hier', 'lundi dernier', etc.",
+          },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_workout_exercises",
+      description: "Récupère les exercices détaillés d'une séance spécifique",
+      parameters: {
+        type: "object",
+        properties: {
+          session_id: {
+            type: "string",
+            description: "ID de la séance (obtenu via get_recent_workout_sessions)",
+          },
+        },
+        required: ["session_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_workout_exercise",
+      description: "Modifie un exercice d'une séance d'entraînement. Utiliser get_workout_exercises d'abord pour obtenir l'ID.",
+      parameters: {
+        type: "object",
+        properties: {
+          exercise_id: {
+            type: "string",
+            description: "ID de l'exercice à modifier (obtenu via get_workout_exercises)",
+          },
+          actual_sets: {
+            type: "number",
+            description: "Nombre de séries réellement effectuées",
+          },
+          actual_reps: {
+            type: "string",
+            description: "Répétitions réellement effectuées (ex: '10-10-8' ou '12')",
+          },
+          actual_weight: {
+            type: "string",
+            description: "Poids réellement utilisé (ex: '80kg' ou '70-75-80')",
+          },
+          notes: {
+            type: "string",
+            description: "Notes ou commentaires sur l'exercice",
+          },
+          skipped: {
+            type: "boolean",
+            description: "Marquer l'exercice comme sauté",
+          },
+        },
+        required: ["exercise_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_workout_exercise",
+      description: "Supprime un exercice d'une séance",
+      parameters: {
+        type: "object",
+        properties: {
+          exercise_id: {
+            type: "string",
+            description: "ID de l'exercice à supprimer",
+          },
+        },
+        required: ["exercise_id"],
+      },
+    },
+  },
 ];
 
 // Execute tool calls
@@ -1730,6 +1822,148 @@ IMPORTANT: Retourne un JSON valide avec cette structure exacte:
         };
       }
 
+      case "get_recent_workout_sessions": {
+        const limit = args.limit || 5;
+        let query = supabase
+          .from("workout_sessions")
+          .select("id, workout_name, started_at, completed_at, status, target_muscles, total_duration_seconds, notes")
+          .eq("user_id", userId)
+          .order("started_at", { ascending: false })
+          .limit(limit);
+
+        // Filter by specific date if provided
+        if (args.date) {
+          const targetDate = getLocalDate(args.date);
+          query = query
+            .gte("started_at", `${targetDate}T00:00:00`)
+            .lt("started_at", `${targetDate}T23:59:59`);
+        }
+
+        const { data: sessions, error } = await query;
+
+        if (error) throw error;
+
+        const formattedSessions = (sessions || []).map((s: any) => ({
+          id: s.id,
+          workout_name: s.workout_name,
+          started_at: s.started_at,
+          completed_at: s.completed_at,
+          status: s.status,
+          target_muscles: s.target_muscles,
+          duration_min: s.total_duration_seconds ? Math.round(s.total_duration_seconds / 60) : null,
+          notes: s.notes,
+          time_ago: getTimeAgo(s.started_at),
+        }));
+
+        return {
+          success: true,
+          message: `${formattedSessions.length} séance(s) trouvée(s)`,
+          data: formattedSessions,
+        };
+      }
+
+      case "get_workout_exercises": {
+        const { data: exercises, error } = await supabase
+          .from("workout_exercise_logs")
+          .select("id, exercise_name, exercise_order, planned_sets, planned_reps, planned_weight, actual_sets, actual_reps, actual_weight, rest_seconds, notes, skipped")
+          .eq("session_id", args.session_id)
+          .eq("user_id", userId)
+          .order("exercise_order", { ascending: true });
+
+        if (error) throw error;
+
+        const formattedExercises = (exercises || []).map((e: any) => ({
+          id: e.id,
+          exercise_name: e.exercise_name,
+          order: e.exercise_order,
+          planned: {
+            sets: e.planned_sets,
+            reps: e.planned_reps,
+            weight: e.planned_weight,
+          },
+          actual: {
+            sets: e.actual_sets,
+            reps: e.actual_reps,
+            weight: e.actual_weight,
+          },
+          rest_seconds: e.rest_seconds,
+          notes: e.notes,
+          skipped: e.skipped,
+        }));
+
+        return {
+          success: true,
+          message: `${formattedExercises.length} exercice(s) dans cette séance`,
+          data: formattedExercises,
+        };
+      }
+
+      case "update_workout_exercise": {
+        // Get current exercise to show what was changed
+        const { data: currentExercise } = await supabase
+          .from("workout_exercise_logs")
+          .select("exercise_name, actual_sets, actual_reps, actual_weight")
+          .eq("id", args.exercise_id)
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (!currentExercise) {
+          return { success: false, message: "Exercice non trouvé" };
+        }
+
+        const updates: any = {};
+        if (args.actual_sets !== undefined) updates.actual_sets = args.actual_sets;
+        if (args.actual_reps !== undefined) updates.actual_reps = args.actual_reps;
+        if (args.actual_weight !== undefined) updates.actual_weight = args.actual_weight;
+        if (args.notes !== undefined) updates.notes = args.notes;
+        if (args.skipped !== undefined) updates.skipped = args.skipped;
+
+        const { error } = await supabase
+          .from("workout_exercise_logs")
+          .update(updates)
+          .eq("id", args.exercise_id)
+          .eq("user_id", userId);
+
+        if (error) throw error;
+
+        const changes: string[] = [];
+        if (args.actual_sets !== undefined) changes.push(`${args.actual_sets} séries`);
+        if (args.actual_reps !== undefined) changes.push(`${args.actual_reps} reps`);
+        if (args.actual_weight !== undefined) changes.push(`${args.actual_weight}`);
+
+        return {
+          success: true,
+          message: `✏️ "${currentExercise.exercise_name}" corrigé: ${changes.join(", ") || "mis à jour"}`,
+          data: updates,
+        };
+      }
+
+      case "delete_workout_exercise": {
+        const { data: exercise } = await supabase
+          .from("workout_exercise_logs")
+          .select("exercise_name")
+          .eq("id", args.exercise_id)
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (!exercise) {
+          return { success: false, message: "Exercice non trouvé" };
+        }
+
+        const { error } = await supabase
+          .from("workout_exercise_logs")
+          .delete()
+          .eq("id", args.exercise_id)
+          .eq("user_id", userId);
+
+        if (error) throw error;
+
+        return {
+          success: true,
+          message: `🗑️ "${exercise.exercise_name}" supprimé de la séance`,
+        };
+      }
+
       default:
         return { success: false, message: `Outil inconnu: ${name}` };
     }
@@ -1979,6 +2213,17 @@ RÈGLES IMPORTANTES:
 2. Quand l'utilisateur CORRIGE ou PRÉCISE une entrée précédente → utilise d'abord get_recent_meals ou get_recent_activities pour trouver l'entrée, puis update_meal ou update_activity
 3. Si tu as un DOUTE sur si c'est un nouvel élément ou une correction → DEMANDE à l'utilisateur!
 4. Quand l'utilisateur veut supprimer quelque chose → utilise delete_meal ou delete_activity
+
+CORRECTIONS DE SÉANCES D'ENTRAÎNEMENT (TRÈS IMPORTANT):
+Quand l'utilisateur veut corriger des données d'une séance passée (séries, répétitions, poids utilisé):
+1) D'abord, utilise get_recent_workout_sessions avec le paramètre "date" si l'utilisateur mentionne "hier", "lundi", etc.
+2) Ensuite, utilise get_workout_exercises avec l'ID de la séance pour voir les exercices
+3) Enfin, utilise update_workout_exercise pour corriger les valeurs (actual_sets, actual_reps, actual_weight)
+
+Exemples de corrections de séances:
+- "Hier j'ai fait 3 séries au développé couché, pas 4" → get_recent_workout_sessions(date=hier) → get_workout_exercises → update_workout_exercise(actual_sets=3)
+- "Sur le squat de ma dernière séance, c'était 100kg, pas 80kg" → get_recent_workout_sessions → get_workout_exercises → update_workout_exercise(actual_weight="100kg")
+- "Retire le curl de la séance d'hier, je l'ai pas fait" → ... → delete_workout_exercise OU update_workout_exercise(skipped=true)
 
 CORRECTIONS DE TYPE/HEURE DE REPAS (TRÈS IMPORTANT):
 - Si l'utilisateur dit par ex. "c'était mon goûter de 17h30, pas une collation du matin" →
