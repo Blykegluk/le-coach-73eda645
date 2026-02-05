@@ -586,7 +586,7 @@ async function executeToolCall(
 ): Promise<{ success: boolean; message: string; data?: unknown }> {
   const { name, arguments: argsStr } = toolCall.function;
   const args = JSON.parse(argsStr);
-  const today = new Date().toISOString().split("T")[0];
+  const today = getLocalDate(); // Use Paris timezone
 
   console.log(`Executing tool: ${name}`, args);
 
