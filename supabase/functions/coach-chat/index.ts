@@ -593,12 +593,15 @@ async function executeToolCall(
   try {
     switch (name) {
       case "log_water": {
+        // Use specified date or default to today (Paris timezone)
+        const targetDate = getLocalDate(args.date);
+        
         // Get current water and add to it
         const { data: current } = await supabase
           .from("daily_metrics")
           .select("water_ml")
           .eq("user_id", userId)
-          .eq("date", today)
+          .eq("date", targetDate)
           .maybeSingle();
 
         const currentWater = current?.water_ml || 0;
@@ -607,17 +610,21 @@ async function executeToolCall(
         const { error } = await supabase.from("daily_metrics").upsert(
           {
             user_id: userId,
-            date: today,
+            date: targetDate,
             water_ml: newTotal,
           },
           { onConflict: "user_id,date" }
         );
 
         if (error) throw error;
+        
+        const isToday = targetDate === today;
+        const dateLabel = isToday ? "" : ` (${targetDate})`;
+        
         return {
           success: true,
-          message: `💧 ${args.amount_ml}ml d'eau ajoutés (total: ${newTotal}ml)`,
-          data: { total: newTotal },
+          message: `💧 ${args.amount_ml}ml d'eau ajoutés${dateLabel} (total: ${newTotal}ml)`,
+          data: { total: newTotal, date: targetDate },
         };
       }
 
