@@ -46,7 +46,6 @@ export default function GoalAssistant({
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [validatedGoal, setValidatedGoal] = useState<ValidatedGoal | null>(null);
-  const [showChat, setShowChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -112,7 +111,7 @@ export default function GoalAssistant({
             onClick={() => {
               onSuggestionSelect(goal.value);
               setValidatedGoal(null);
-              setShowChat(false);
+              setMessages([]);
             }}
             className={`flex w-full cursor-pointer items-center gap-4 rounded-xl border p-4 text-left transition-all ${
               selectedGoal === goal.value && !validatedGoal
@@ -134,33 +133,24 @@ export default function GoalAssistant({
         ))}
       </div>
 
-      {/* Custom goal section */}
+      {/* Custom goal section - Always visible */}
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-border" />
         </div>
         <div className="relative flex justify-center">
-          <button
-            type="button"
-            onClick={() => setShowChat(!showChat)}
-            className="bg-background px-3 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
-          >
+          <span className="bg-background px-3 text-sm text-muted-foreground flex items-center gap-2">
             <Sparkles className="h-4 w-4" />
-            {showChat ? "Masquer l'assistant" : "Ou décris ton objectif à l'IA"}
-          </button>
+            Ou décris ton objectif à l'IA
+          </span>
         </div>
       </div>
 
-      {/* AI Chat interface */}
-      {showChat && (
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          {/* Chat messages */}
+      {/* AI Chat interface - Always visible */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        {/* Chat messages */}
+        {messages.length > 0 && (
           <div className="max-h-48 overflow-y-auto p-3 space-y-3">
-            {messages.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-2">
-                Décris ton objectif en quelques mots, je t'aide à le préciser ! 💪
-              </p>
-            )}
             {messages.map((msg, i) => (
               <div
                 key={i}
@@ -186,43 +176,43 @@ export default function GoalAssistant({
             )}
             <div ref={messagesEndRef} />
           </div>
+        )}
 
-          {/* Validated goal indicator */}
-          {validatedGoal && (
-            <div className="mx-3 mb-3 flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/30 px-3 py-2">
-              <Check className="h-5 w-5 text-primary" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-foreground">Objectif défini :</p>
-                <p className="text-sm text-primary">{validatedGoal.goal_label}</p>
-              </div>
+        {/* Validated goal indicator */}
+        {validatedGoal && (
+          <div className="mx-3 my-3 flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/30 px-3 py-2">
+            <Check className="h-5 w-5 text-primary" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground">Objectif défini :</p>
+              <p className="text-sm text-primary">{validatedGoal.goal_label}</p>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Input */}
-          <form onSubmit={handleSubmit} className="border-t border-border p-3">
-            <div className="flex gap-2">
-              <Input
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                placeholder="Ex: Je veux courir un semi-marathon..."
-                disabled={isLoading || !!validatedGoal}
-                className="flex-1"
-              />
-              <button
-                type="submit"
-                disabled={!input.trim() || isLoading || !!validatedGoal}
-                className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-50 transition-all hover:bg-primary/90"
-              >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+        {/* Input - Always visible */}
+        <form onSubmit={handleSubmit} className={messages.length > 0 || validatedGoal ? "border-t border-border p-3" : "p-3"}>
+          <div className="flex gap-2">
+            <Input
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              placeholder={validatedGoal ? "Objectif validé ✓" : "Ex: Je veux perdre 5kg en 3 mois..."}
+              disabled={isLoading || !!validatedGoal}
+              className="flex-1"
+            />
+            <button
+              type="submit"
+              disabled={!input.trim() || isLoading || !!validatedGoal}
+              className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-50 transition-all hover:bg-primary/90"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
