@@ -69,18 +69,41 @@ interface ToolCall {
 }
 
 // Available tools for the coach
+// Helper to get date in Europe/Paris timezone
+function getLocalDate(dateStr?: string): string {
+  if (dateStr) {
+    // Validate format YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return dateStr;
+    }
+  }
+  // Get current date in Paris timezone
+  const now = new Date();
+  const parisTime = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Paris",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+  return parisTime; // Returns YYYY-MM-DD format
+}
+
 const tools = [
   {
     type: "function",
     function: {
       name: "log_water",
-      description: "Enregistre une consommation d'eau pour l'utilisateur",
+      description: "Enregistre une consommation d'eau pour l'utilisateur. Par défaut, enregistre sur la date du jour (heure de Paris). Peut aussi enregistrer sur une date passée si spécifié.",
       parameters: {
         type: "object",
         properties: {
           amount_ml: {
             type: "number",
             description: "Quantité d'eau en millilitres (250 = 1 verre)",
+          },
+          date: {
+            type: "string",
+            description: "Date d'enregistrement au format YYYY-MM-DD. Si non spécifié, utilise aujourd'hui (heure de Paris). Utiliser pour enregistrer rétroactivement (ex: 'hier' → date d'hier).",
           },
         },
         required: ["amount_ml"],
