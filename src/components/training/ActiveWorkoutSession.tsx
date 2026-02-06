@@ -162,8 +162,67 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
     setExerciseLogs(logs => logs.map((log, i) => 
       i === currentExerciseIndex ? { ...log, skipped: true } : log
     ));
+    setFeedbackMessage(null);
     handleNextExercise();
   }, [currentExerciseIndex, handleNextExercise]);
+
+  // Handle in-flow feedback
+  const handleFeedback = useCallback(async (feedbackType: FeedbackType) => {
+    setIsProcessingFeedback(true);
+    
+    // Store feedback for current exercise
+    setExerciseLogs(logs => logs.map((log, i) => 
+      i === currentExerciseIndex ? { ...log, feedback: feedbackType } : log
+    ));
+    
+    // Generate contextual response based on feedback
+    let message = '';
+    let adjustment = null;
+    
+    switch (feedbackType) {
+      case 'too_easy':
+        // Suggest increasing weight or reps
+        const currentWeight = currentLog?.actual_weight || '';
+        const weightMatch = currentWeight.match(/(\d+)/);
+        if (weightMatch) {
+          const newWeight = Math.round(parseInt(weightMatch[1]) * 1.1);
+          adjustment = { weight: currentWeight.replace(/\d+/, newWeight.toString()) };
+          message = `💪 Bien joué ! Je te propose ${adjustment.weight} pour la prochaine série.`;
+        } else {
+          message = '💪 Super ! Essaie d\'augmenter légèrement la charge.';
+        }
+        break;
+        
+      case 'pain':
+        message = '⚠️ Stop ! Passe à l\'exercice suivant ou réduis la charge de 20%.';
+        // Suggest reducing weight
+        const painWeight = currentLog?.actual_weight || '';
+        const painMatch = painWeight.match(/(\d+)/);
+        if (painMatch) {
+          const reducedWeight = Math.round(parseInt(painMatch[1]) * 0.8);
+          adjustment = { weight: painWeight.replace(/\d+/, reducedWeight.toString()) };
+        }
+        break;
+        
+      case 'ok':
+        message = '✅ Parfait, continue comme ça !';
+        break;
+    }
+    
+    setFeedbackMessage(message);
+    
+    // Apply weight adjustment if suggested
+    if (adjustment?.weight) {
+      setExerciseLogs(logs => logs.map((log, i) => 
+        i === currentExerciseIndex ? { ...log, actual_weight: adjustment.weight } : log
+      ));
+    }
+    
+    setIsProcessingFeedback(false);
+    
+    // Auto-hide message after 3 seconds
+    setTimeout(() => setFeedbackMessage(null), 4000);
+  }, [currentExerciseIndex, currentLog]);
 
   const handleEditExercise = (index: number) => {
     const log = exerciseLogs[index];
