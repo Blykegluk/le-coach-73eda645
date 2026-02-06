@@ -23,6 +23,7 @@ interface ExerciseDetail {
   tips: string[];
   common_mistakes: string[];
   video_url?: string;
+  media_type?: 'image' | 'video';
 }
 
 const CACHE_KEY_PREFIX = 'exercise_detail_';
