@@ -277,8 +277,10 @@ const HomePage = () => {
     : 2;
 
   const handleStartWorkout = () => {
-    setIsWorkoutPreviewOpen(false);
-    navigate('/training');
+    if (preparedWorkout) {
+      setIsWorkoutPreviewOpen(false);
+      setIsSessionActive(true);
+    }
   };
 
   const handleOpenCoach = () => {
@@ -288,6 +290,55 @@ const HomePage = () => {
   const handlePreviewWorkout = () => {
     if (preparedWorkout) {
       setIsWorkoutPreviewOpen(true);
+    }
+  };
+
+  const handleRefreshWorkout = async () => {
+    if (!user) return;
+    setIsRefreshingWorkout(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data, error: fnError } = await supabase.functions.invoke('next-workout', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (fnError) throw fnError;
+      if (data?.error) throw new Error(data.error);
+
+      // Save to user_context
+      await supabase
+        .from('user_context')
+        .upsert({
+          user_id: user.id,
+          key: WORKOUT_STORAGE_KEY,
+          value: JSON.stringify(data),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,key' });
+
+      setPreparedWorkout(data);
+    } catch (err) {
+      console.error("Error refreshing workout:", err);
+    } finally {
+      setIsRefreshingWorkout(false);
+    }
+  };
+
+  const handleSessionComplete = async () => {
+    setIsSessionActive(false);
+    // Clear the saved workout and refresh
+    if (user) {
+      await supabase
+        .from('user_context')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('key', WORKOUT_STORAGE_KEY);
+      setPreparedWorkout(null);
+      // Generate a new workout
+      await handleRefreshWorkout();
     }
   };
 
