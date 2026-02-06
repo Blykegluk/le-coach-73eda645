@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
 import { format, startOfDay, isToday, isYesterday, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Dumbbell, Apple, Droplets, ChevronLeft, ChevronRight, Plus, Calendar } from 'lucide-react';
+import { Dumbbell, Droplets, ChevronLeft, ChevronRight, Plus, Calendar, Coffee, UtensilsCrossed, Moon, Cookie } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 
 interface JournalEntry {
   id: string;
   type: 'workout' | 'meal' | 'water';
   title: string;
   subtitle?: string;
+  mealType?: string;
   time: Date;
   meta?: string;
 }
@@ -21,6 +22,7 @@ const JournalPage = () => {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+  const { onOpenCoach } = useOutletContext<{ onOpenCoach: () => void }>();
 
   useEffect(() => {
     loadEntries();
@@ -39,22 +41,26 @@ const JournalPage = () => {
 
       const allEntries: JournalEntry[] = [];
 
-      // Fetch workout sessions
-      // Only fetch COMPLETED workout sessions
+      // Fetch workout sessions (completed or in_progress)
       const { data: workouts } = await supabase
         .from('workout_sessions')
-        .select('id, workout_name, started_at, completed_at, total_duration_seconds, target_muscles')
+        .select('id, workout_name, started_at, completed_at, total_duration_seconds, target_muscles, status')
         .eq('user_id', user.id)
-        .eq('status', 'completed')
+        .in('status', ['completed', 'in_progress'])
         .gte('started_at', startOfDayDate.toISOString())
         .lt('started_at', endOfDayDate.toISOString())
         .order('started_at', { ascending: true });
 
       if (workouts) {
         workouts.forEach(w => {
-          const duration = w.total_duration_seconds 
-            ? `${Math.round(w.total_duration_seconds / 60)} min`
-            : w.completed_at ? 'Terminée' : 'En cours';
+          let duration = '';
+          if (w.total_duration_seconds) {
+            duration = `${Math.round(w.total_duration_seconds / 60)} min`;
+          } else if (w.status === 'completed') {
+            duration = 'Terminée';
+          } else {
+            duration = 'En cours';
+          }
           allEntries.push({
             id: `workout-${w.id}`,
             type: 'workout',
@@ -88,6 +94,7 @@ const JournalPage = () => {
             type: 'meal',
             title: m.food_name,
             subtitle: mealTypeLabels[m.meal_type] || m.meal_type,
+            mealType: m.meal_type,
             time: parseISO(m.logged_at),
             meta: m.calories ? `${m.calories} kcal` : undefined,
           });
@@ -135,10 +142,20 @@ const JournalPage = () => {
     return format(selectedDate, 'EEEE d MMMM', { locale: fr });
   };
 
-  const getEntryIcon = (type: JournalEntry['type']) => {
+  const getMealIcon = (mealType?: string) => {
+    switch (mealType) {
+      case 'breakfast': return Coffee;
+      case 'lunch': return UtensilsCrossed;
+      case 'dinner': return Moon;
+      case 'snack': return Cookie;
+      default: return UtensilsCrossed;
+    }
+  };
+
+  const getEntryIcon = (type: JournalEntry['type'], mealType?: string) => {
     switch (type) {
       case 'workout': return Dumbbell;
-      case 'meal': return Apple;
+      case 'meal': return getMealIcon(mealType);
       case 'water': return Droplets;
     }
   };
@@ -233,7 +250,7 @@ const JournalPage = () => {
                 onClick={() => navigate('/nutrition')}
                 className="gap-2"
               >
-                <Apple className="h-4 w-4" />
+                <UtensilsCrossed className="h-4 w-4" />
                 Repas
               </Button>
             </div>
@@ -246,7 +263,7 @@ const JournalPage = () => {
             {/* Entries */}
             <div className="space-y-6">
               {entries.map((entry, index) => {
-                const Icon = getEntryIcon(entry.type);
+                const Icon = getEntryIcon(entry.type, entry.mealType);
                 const colorClass = getEntryColor(entry.type);
 
                 return (
@@ -285,7 +302,7 @@ const JournalPage = () => {
 
       {/* FAB for adding */}
       <button
-        onClick={() => {/* Could open coach drawer or action sheet */}}
+        onClick={() => onOpenCoach?.()}
         className="fixed bottom-24 md:bottom-8 right-4 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-primary-foreground shadow-glow-lg hover:scale-105 transition-transform"
       >
         <Plus className="h-6 w-6" />
