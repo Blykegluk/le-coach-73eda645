@@ -418,7 +418,7 @@ const HomePage = () => {
         <div className="space-y-2">
           {/* Add meal button */}
           <button
-            onClick={() => navigate('/nutrition')}
+            onClick={() => navigate('/journal')}
             className="flex w-full items-center justify-between card-premium p-4"
           >
             <div className="flex items-center gap-3">
@@ -427,16 +427,16 @@ const HomePage = () => {
                 <div className="absolute inset-0 rounded-xl bg-primary/20 blur-sm -z-10 opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
               <div className="text-left">
-                <p className="font-medium text-foreground">Ajouter un repas</p>
-                <p className="text-sm text-muted-foreground">Enregistre ce que tu manges</p>
+                <p className="font-medium text-foreground">Ajouter au journal</p>
+                <p className="text-sm text-muted-foreground">Repas, séances, hydratation</p>
               </div>
             </div>
             <ChevronRight className="h-5 w-5 text-muted-foreground" />
           </button>
 
-          {/* Explore equipment button */}
+          {/* View journal button */}
           <button
-            onClick={() => navigate('/training?section=equipment')}
+            onClick={() => navigate('/journal')}
             className="flex w-full items-center justify-between card-premium p-4"
           >
             <div className="flex items-center gap-3">
@@ -444,8 +444,8 @@ const HomePage = () => {
                 <Dumbbell className="h-5 w-5 text-primary" />
               </div>
               <div className="text-left">
-                <p className="font-medium text-foreground">Voir les équipements</p>
-                <p className="text-sm text-muted-foreground">Découvre les machines disponibles</p>
+                <p className="font-medium text-foreground">Voir le journal</p>
+                <p className="text-sm text-muted-foreground">Historique unifié</p>
               </div>
             </div>
             <ChevronRight className="h-5 w-5 text-muted-foreground" />
