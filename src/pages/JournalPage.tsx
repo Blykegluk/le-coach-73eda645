@@ -145,9 +145,9 @@ const JournalPage = () => {
 
   const getEntryColor = (type: JournalEntry['type']) => {
     switch (type) {
-      case 'workout': return 'text-energy bg-energy/10';
-      case 'meal': return 'text-calories bg-calories/10';
-      case 'water': return 'text-water bg-water/10';
+      case 'workout': return 'text-energy bg-energy/10 border-l-4 border-l-energy';
+      case 'meal': return 'text-calories bg-calories/10 border-l-4 border-l-calories';
+      case 'water': return 'text-water bg-water/10 border-l-4 border-l-water';
     }
   };
 
