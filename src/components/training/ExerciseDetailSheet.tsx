@@ -2,9 +2,16 @@ import { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Play, RefreshCw, Info, Dumbbell, AlertCircle } from 'lucide-react';
+import { Play, RefreshCw, Info, Dumbbell, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { getExerciseIcon } from './ExerciseIcons';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from '@/components/ui/carousel';
 
 interface ExerciseDetailSheetProps {
   isOpen: boolean;
