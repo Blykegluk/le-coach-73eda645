@@ -15,6 +15,7 @@ import SmartActionCard from '@/components/home/SmartActionCard';
 import CircularProgressRings from '@/components/home/CircularProgressRings';
 import ContextualAlertChips from '@/components/home/ContextualAlertChips';
 import WorkoutPreviewSheet from '@/components/home/WorkoutPreviewSheet';
+import { ActiveWorkoutSession } from '@/components/training/ActiveWorkoutSession';
 import { useNutritionGoals } from '@/hooks/useNutritionGoals';
 import { Workout } from '@/components/training/NextWorkoutCard';
 
