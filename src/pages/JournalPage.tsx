@@ -250,7 +250,7 @@ const JournalPage = () => {
                 onClick={() => navigate('/nutrition')}
                 className="gap-2"
               >
-                <Apple className="h-4 w-4" />
+                <UtensilsCrossed className="h-4 w-4" />
                 Repas
               </Button>
             </div>
