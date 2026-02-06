@@ -41,13 +41,12 @@ const JournalPage = () => {
 
       const allEntries: JournalEntry[] = [];
 
-      // Fetch workout sessions
-      // Only fetch COMPLETED workout sessions
+      // Fetch workout sessions (completed or in_progress)
       const { data: workouts } = await supabase
         .from('workout_sessions')
-        .select('id, workout_name, started_at, completed_at, total_duration_seconds, target_muscles')
+        .select('id, workout_name, started_at, completed_at, total_duration_seconds, target_muscles, status')
         .eq('user_id', user.id)
-        .eq('status', 'completed')
+        .in('status', ['completed', 'in_progress'])
         .gte('started_at', startOfDayDate.toISOString())
         .lt('started_at', endOfDayDate.toISOString())
         .order('started_at', { ascending: true });
