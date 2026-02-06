@@ -100,11 +100,25 @@ Professional lighting, high quality fitness photography style. No text or labels
     }
 
     const imageData = await imageResponse.json();
+    
+    // Check for error in the response (API might return 200 but with error in body)
+    const choiceError = imageData.choices?.[0]?.error;
+    if (choiceError) {
+      console.error("Image generation error in response:", JSON.stringify(choiceError));
+      if (choiceError.code === 429 || choiceError.code === 502) {
+        return new Response(
+          JSON.stringify({ error: "Service temporairement surchargé. Réessaie dans quelques secondes." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(choiceError.message || "Image generation failed");
+    }
+    
     const generatedImage = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
     if (!generatedImage) {
       console.error("No image generated:", JSON.stringify(imageData));
-      throw new Error("Failed to generate starting frame image");
+      throw new Error("Impossible de générer l'aperçu. Réessaie.");
     }
 
     console.log("Starting frame generated, now generating video...");
