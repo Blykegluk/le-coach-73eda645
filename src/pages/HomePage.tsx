@@ -15,6 +15,7 @@ import SmartActionCard from '@/components/home/SmartActionCard';
 import CircularProgressRings from '@/components/home/CircularProgressRings';
 import ContextualAlertChips from '@/components/home/ContextualAlertChips';
 import WorkoutPreviewSheet from '@/components/home/WorkoutPreviewSheet';
+import { ActiveWorkoutSession } from '@/components/training/ActiveWorkoutSession';
 import { useNutritionGoals } from '@/hooks/useNutritionGoals';
 import { Workout } from '@/components/training/NextWorkoutCard';
 
@@ -39,6 +40,8 @@ const HomePage = () => {
   const [caloriesConsumed, setCaloriesConsumed] = useState<number>(0);
   const [preparedWorkout, setPreparedWorkout] = useState<Workout | null>(null);
   const [isWorkoutPreviewOpen, setIsWorkoutPreviewOpen] = useState(false);
+  const [isSessionActive, setIsSessionActive] = useState(false);
+  const [isRefreshingWorkout, setIsRefreshingWorkout] = useState(false);
   const [healthStats, setHealthStats] = useState({
     sleepHours: null as number | null,
     steps: null as number | null,
@@ -274,8 +277,10 @@ const HomePage = () => {
     : 2;
 
   const handleStartWorkout = () => {
-    setIsWorkoutPreviewOpen(false);
-    navigate('/training');
+    if (preparedWorkout) {
+      setIsWorkoutPreviewOpen(false);
+      setIsSessionActive(true);
+    }
   };
 
   const handleOpenCoach = () => {
@@ -285,6 +290,55 @@ const HomePage = () => {
   const handlePreviewWorkout = () => {
     if (preparedWorkout) {
       setIsWorkoutPreviewOpen(true);
+    }
+  };
+
+  const handleRefreshWorkout = async () => {
+    if (!user) return;
+    setIsRefreshingWorkout(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data, error: fnError } = await supabase.functions.invoke('next-workout', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (fnError) throw fnError;
+      if (data?.error) throw new Error(data.error);
+
+      // Save to user_context
+      await supabase
+        .from('user_context')
+        .upsert({
+          user_id: user.id,
+          key: WORKOUT_STORAGE_KEY,
+          value: JSON.stringify(data),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,key' });
+
+      setPreparedWorkout(data);
+    } catch (err) {
+      console.error("Error refreshing workout:", err);
+    } finally {
+      setIsRefreshingWorkout(false);
+    }
+  };
+
+  const handleSessionComplete = async () => {
+    setIsSessionActive(false);
+    // Clear the saved workout and refresh
+    if (user) {
+      await supabase
+        .from('user_context')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('key', WORKOUT_STORAGE_KEY);
+      setPreparedWorkout(null);
+      // Generate a new workout
+      await handleRefreshWorkout();
     }
   };
 
@@ -298,6 +352,19 @@ const HomePage = () => {
         <Skeleton className="mb-4 h-24 w-full rounded-2xl" />
         <Skeleton className="mb-4 h-32 w-full rounded-2xl" />
         <Skeleton className="mb-4 h-20 w-full rounded-2xl" />
+      </div>
+    );
+  }
+
+  // Show active session if active
+  if (isSessionActive && preparedWorkout) {
+    return (
+      <div className="safe-top px-4 pb-24 md:pb-4 pt-2">
+        <ActiveWorkoutSession 
+          workout={preparedWorkout}
+          onClose={() => setIsSessionActive(false)}
+          onComplete={handleSessionComplete}
+        />
       </div>
     );
   }
@@ -354,34 +421,6 @@ const HomePage = () => {
         <DailyTipsCard />
       </div>
 
-      {/* Weekly progress */}
-      <div className="mb-4 card-premium p-4">
-        <p className="mb-2 text-sm font-medium text-foreground">Cette semaine</p>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-              <Target className="h-5 w-5 text-primary" />
-              <div className="absolute inset-0 rounded-full bg-primary/20 blur-sm -z-10" />
-            </div>
-            <div>
-              <p className="font-semibold text-foreground">
-                {weeklySessionsCompleted}/{weeklySessionsTotal} séances
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {weeklySessionsCompleted === 0 
-                  ? "C'est parti !" 
-                  : "Continue comme ça !"}
-              </p>
-            </div>
-          </div>
-          {weeklySessionsCompleted > 0 && (
-            <div className="flex items-center gap-1 text-primary">
-              <span className="text-2xl">🔥</span>
-              <span className="font-semibold">{weeklySessionsCompleted} {weeklySessionsCompleted === 1 ? 'jour' : 'jours'}</span>
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* Quick actions */}
       <div className="mb-4">
@@ -463,6 +502,8 @@ const HomePage = () => {
         onClose={() => setIsWorkoutPreviewOpen(false)}
         workout={preparedWorkout}
         onStartWorkout={handleStartWorkout}
+        onRefresh={handleRefreshWorkout}
+        isRefreshing={isRefreshingWorkout}
       />
     </div>
   );
