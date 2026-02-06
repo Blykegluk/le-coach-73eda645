@@ -140,20 +140,10 @@ const JournalPage = () => {
     return format(selectedDate, 'EEEE d MMMM', { locale: fr });
   };
 
-  const getMealIcon = (mealType?: string) => {
-    switch (mealType) {
-      case 'breakfast': return Coffee;
-      case 'lunch': return UtensilsCrossed;
-      case 'dinner': return Moon;
-      case 'snack': return Cookie;
-      default: return UtensilsCrossed;
-    }
-  };
-
   const getEntryIcon = (type: JournalEntry['type'], mealType?: string) => {
     switch (type) {
       case 'workout': return Dumbbell;
-      case 'meal': return getMealIcon(mealType);
+      case 'meal': return getMealIcon(mealType || 'lunch');
       case 'water': return Droplets;
     }
   };
