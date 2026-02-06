@@ -473,7 +473,23 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
               <p className="font-mono text-3xl font-bold">{formatTime(phaseTime)}</p>
             </div>
 
-            <div className="flex gap-2 mb-4">
+            {/* Feedback Message */}
+            {feedbackMessage && (
+              <div className="mb-4 px-4 py-2 rounded-xl bg-primary/10 border border-primary/30 animate-fade-in">
+                <p className="text-sm text-center">{feedbackMessage}</p>
+              </div>
+            )}
+
+            {/* In-Flow Feedback Buttons */}
+            <div className="mb-4 w-full max-w-xs">
+              <p className="text-xs text-muted-foreground text-center mb-2">Comment te sens-tu ?</p>
+              <ExerciseFeedbackButtons 
+                onFeedback={handleFeedback} 
+                isLoading={isProcessingFeedback}
+              />
+            </div>
+
+            <div className="flex gap-2">
               <Button 
                 variant="outline" 
                 size="sm"
