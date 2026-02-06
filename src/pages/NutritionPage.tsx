@@ -29,12 +29,12 @@ interface NutritionSummary {
 }
 
 const MEAL_TYPES = [
-  { type: 'breakfast', name: 'Petit-déjeuner', defaultTime: '08:00', icon: Coffee },
-  { type: 'morning_snack', name: 'Collation', defaultTime: '10:30', icon: Apple },
-  { type: 'lunch', name: 'Déjeuner', defaultTime: '12:30', icon: UtensilsCrossed },
-  { type: 'afternoon_snack', name: 'Goûter', defaultTime: '16:00', icon: Apple },
-  { type: 'dinner', name: 'Dîner', defaultTime: '19:30', icon: Moon },
-  { type: 'dessert', name: 'Dessert', defaultTime: '20:30', icon: Cake },
+  { type: 'breakfast', name: 'Petit-déjeuner', defaultTime: '08:00' },
+  { type: 'morning_snack', name: 'Collation', defaultTime: '10:30' },
+  { type: 'lunch', name: 'Déjeuner', defaultTime: '12:30' },
+  { type: 'afternoon_snack', name: 'Goûter', defaultTime: '16:00' },
+  { type: 'dinner', name: 'Dîner', defaultTime: '19:30' },
+  { type: 'dessert', name: 'Dessert', defaultTime: '20:30' },
 ];
 
 // Map old 'snack' type to new types (for backward compatibility)
