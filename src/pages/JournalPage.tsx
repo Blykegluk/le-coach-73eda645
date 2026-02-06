@@ -263,7 +263,7 @@ const JournalPage = () => {
             {/* Entries */}
             <div className="space-y-6">
               {entries.map((entry, index) => {
-                const Icon = getEntryIcon(entry.type);
+                const Icon = getEntryIcon(entry.type, entry.mealType);
                 const colorClass = getEntryColor(entry.type);
 
                 return (
