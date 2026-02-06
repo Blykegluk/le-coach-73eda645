@@ -456,6 +456,14 @@ const HomePage = () => {
         currentGoal={profile?.goal}
         currentTargetWeight={profile?.target_weight_kg}
       />
+
+      {/* Workout Preview Sheet */}
+      <WorkoutPreviewSheet
+        isOpen={isWorkoutPreviewOpen}
+        onClose={() => setIsWorkoutPreviewOpen(false)}
+        workout={preparedWorkout}
+        onStartWorkout={handleStartWorkout}
+      />
     </div>
   );
 };
