@@ -42,6 +42,8 @@ export const NextWorkoutCard = ({ externalWorkout, onWorkoutGenerated }: NextWor
   const [isExpanded, setIsExpanded] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Load saved workout from database
   const loadSavedWorkout = useCallback(async () => {
