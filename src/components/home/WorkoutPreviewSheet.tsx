@@ -8,12 +8,13 @@ import { Workout } from '@/components/training/NextWorkoutCard';
 import { getExerciseIcon } from '@/components/training/ExerciseIcons';
 import { ExerciseDetailSheet } from '@/components/training/ExerciseDetailSheet';
 
+
 interface WorkoutPreviewSheetProps {
   isOpen: boolean;
   onClose: () => void;
   workout: Workout | null;
   onStartWorkout: () => void;
-  onRefresh?: () => void;
+  onRefresh?: () => Promise<void>;
   isRefreshing?: boolean;
 }
 

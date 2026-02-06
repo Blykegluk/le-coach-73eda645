@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Play, Utensils, Droplets, Moon, Dumbbell, ChevronRight, Eye } from 'lucide-react';
+import { Utensils, Droplets, Moon, Dumbbell, ChevronRight, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface SmartActionCardProps {
@@ -37,7 +37,7 @@ const SmartActionCard = ({ preparedWorkout, onStartWorkout, onOpenCoach, onPrevi
       const muscleText = preparedWorkout.targetMuscles?.slice(0, 2).join(' & ') || 'Full Body';
       return {
         type: 'workout',
-        icon: <Play className="h-6 w-6" />,
+        icon: <Dumbbell className="h-6 w-6" />,
         title: 'Lancer la séance',
         subtitle: `Focus ${muscleText}`,
         buttonText: 'Commencer',

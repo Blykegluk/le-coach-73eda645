@@ -354,34 +354,6 @@ const HomePage = () => {
         <DailyTipsCard />
       </div>
 
-      {/* Weekly progress */}
-      <div className="mb-4 card-premium p-4">
-        <p className="mb-2 text-sm font-medium text-foreground">Cette semaine</p>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-              <Target className="h-5 w-5 text-primary" />
-              <div className="absolute inset-0 rounded-full bg-primary/20 blur-sm -z-10" />
-            </div>
-            <div>
-              <p className="font-semibold text-foreground">
-                {weeklySessionsCompleted}/{weeklySessionsTotal} séances
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {weeklySessionsCompleted === 0 
-                  ? "C'est parti !" 
-                  : "Continue comme ça !"}
-              </p>
-            </div>
-          </div>
-          {weeklySessionsCompleted > 0 && (
-            <div className="flex items-center gap-1 text-primary">
-              <span className="text-2xl">🔥</span>
-              <span className="font-semibold">{weeklySessionsCompleted} {weeklySessionsCompleted === 1 ? 'jour' : 'jours'}</span>
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* Quick actions */}
       <div className="mb-4">
