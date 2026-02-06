@@ -327,6 +327,7 @@ const HomePage = () => {
         } : null}
         onStartWorkout={handleStartWorkout}
         onOpenCoach={handleOpenCoach}
+        onPreviewWorkout={handlePreviewWorkout}
       />
 
       {/* Circular Progress Rings */}
