@@ -23,6 +23,7 @@ interface ExerciseLog {
   rest_seconds: number;
   duration_seconds: number;
   skipped: boolean;
+  feedback?: ExerciseFeedback;
 }
 
 interface ActiveWorkoutSessionProps {
