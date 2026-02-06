@@ -251,8 +251,8 @@ const JournalPage = () => {
 
                 return (
                   <div key={entry.id} className="relative flex gap-4 pl-0">
-                    {/* Icon */}
-                    <div className={`relative z-10 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full ${colorClass}`}>
+                    {/* Icon + Type indicator */}
+                    <div className={`relative z-10 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl ${colorClass}`}>
                       <Icon className="h-5 w-5" />
                     </div>
 
