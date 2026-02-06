@@ -40,6 +40,8 @@ const HomePage = () => {
   const [caloriesConsumed, setCaloriesConsumed] = useState<number>(0);
   const [preparedWorkout, setPreparedWorkout] = useState<Workout | null>(null);
   const [isWorkoutPreviewOpen, setIsWorkoutPreviewOpen] = useState(false);
+  const [isSessionActive, setIsSessionActive] = useState(false);
+  const [isRefreshingWorkout, setIsRefreshingWorkout] = useState(false);
   const [healthStats, setHealthStats] = useState({
     sleepHours: null as number | null,
     steps: null as number | null,
