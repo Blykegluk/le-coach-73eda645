@@ -30,7 +30,7 @@ type Message = {
 
 const WELCOME_MESSAGE: Message = { 
   role: "assistant", 
-  content: "Salut ! 👋 Je suis ton Coach HealthLab. Comment puis-je t'aider ?" 
+  content: "Salut ! 👋 Je suis ton Perfect Coach. Comment puis-je t'aider ?" 
 };
 
 interface CoachDrawerProps {

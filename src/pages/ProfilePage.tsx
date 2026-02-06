@@ -226,7 +226,7 @@ const ProfilePage = () => {
 
       {/* Version */}
       <p className="mt-4 text-center text-xs text-muted-foreground">
-        HealthLab Coach v1.0.0
+        The Perfect Coach v1.0.0
       </p>
     </div>
   );

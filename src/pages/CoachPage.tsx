@@ -24,7 +24,7 @@ type Message = {
 
 const WELCOME_MESSAGE: Message = { 
   role: "assistant", 
-  content: "Salut ! 👋 Je suis ton Coach HealthLab. Comment puis-je t'aider aujourd'hui ? Tu peux me parler de tes repas, ton entraînement, tes objectifs, ou m'envoyer des photos de tes repas ou mesures !" 
+  content: "Salut ! 👋 Je suis ton Perfect Coach. Comment puis-je t'aider aujourd'hui ? Tu peux me parler de tes repas, ton entraînement, tes objectifs, ou m'envoyer des photos de tes repas ou mesures !" 
 };
 
 const CoachPage = () => {

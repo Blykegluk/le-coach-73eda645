@@ -20,9 +20,9 @@ const DesktopSidebar = ({ onOpenCoach }: DesktopSidebarProps) => {
       {/* Logo */}
       <div className="flex items-center gap-3 p-6 border-b border-border/50">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary-glow font-bold text-primary-foreground shadow-glow-sm">
-          H
+          C
         </div>
-        <span className="text-lg font-bold text-foreground">HealthLab</span>
+        <span className="text-lg font-bold text-foreground">The Perfect Coach</span>
       </div>
 
       {/* Navigation */}
