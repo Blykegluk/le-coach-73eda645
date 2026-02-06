@@ -94,6 +94,7 @@ const JournalPage = () => {
             type: 'meal',
             title: m.food_name,
             subtitle: mealTypeLabels[m.meal_type] || m.meal_type,
+            mealType: m.meal_type,
             time: parseISO(m.logged_at),
             meta: m.calories ? `${m.calories} kcal` : undefined,
           });
