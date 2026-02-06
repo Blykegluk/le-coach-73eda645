@@ -166,15 +166,7 @@ const JournalPage = () => {
 
   const renderEntry = (entry: JournalEntry) => {
     const Icon = getEntryIcon(entry.type, entry.mealType);
-    
-    let colorClass = '';
-    if (entry.type === 'workout') {
-      colorClass = getWorkoutStatusColor(entry.status);
-    } else if (entry.type === 'meal') {
-      colorClass = 'text-calories bg-calories/10';
-    } else {
-      colorClass = 'text-water bg-water/10';
-    }
+    const colorClass = getEntryColorClasses(entry);
 
     return (
       <div key={entry.id} className="flex gap-3 rounded-xl bg-card border border-border/50 p-3">
