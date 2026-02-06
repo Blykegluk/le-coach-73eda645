@@ -1,4 +1,4 @@
-import { Plus, ChevronRight, Droplets, Coffee, UtensilsCrossed, Moon, Apple, Utensils, Cake } from 'lucide-react';
+import { Plus, ChevronRight, Droplets, Utensils } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import AddMealModal from '@/components/nutrition/AddMealModal';
 import MealDetailSheet from '@/components/nutrition/MealDetailSheet';
 import NutritionHistorySheet from '@/components/nutrition/NutritionHistorySheet';
+import { getMealIcon, getMealColorClasses, getMealTextColor } from '@/utils/mealColors';
 
 interface NutritionLog {
   id: string;
@@ -28,12 +29,12 @@ interface NutritionSummary {
 }
 
 const MEAL_TYPES = [
-  { type: 'breakfast', name: 'Petit-déjeuner', defaultTime: '08:00', icon: Coffee },
-  { type: 'morning_snack', name: 'Collation', defaultTime: '10:30', icon: Apple },
-  { type: 'lunch', name: 'Déjeuner', defaultTime: '12:30', icon: UtensilsCrossed },
-  { type: 'afternoon_snack', name: 'Goûter', defaultTime: '16:00', icon: Apple },
-  { type: 'dinner', name: 'Dîner', defaultTime: '19:30', icon: Moon },
-  { type: 'dessert', name: 'Dessert', defaultTime: '20:30', icon: Cake },
+  { type: 'breakfast', name: 'Petit-déjeuner', defaultTime: '08:00' },
+  { type: 'morning_snack', name: 'Collation', defaultTime: '10:30' },
+  { type: 'lunch', name: 'Déjeuner', defaultTime: '12:30' },
+  { type: 'afternoon_snack', name: 'Goûter', defaultTime: '16:00' },
+  { type: 'dinner', name: 'Dîner', defaultTime: '19:30' },
+  { type: 'dessert', name: 'Dessert', defaultTime: '20:30' },
 ];
 
 // Map old 'snack' type to new types (for backward compatibility)
@@ -378,9 +379,11 @@ const NutritionPage = () => {
           </button>
         </div>
         <div className="space-y-2">
-          {mealsByType.map((meal, index) => {
-            const Icon = meal.icon;
+          {mealsByType.map((meal) => {
+            const Icon = getMealIcon(meal.type);
             const isEmpty = !meal.description;
+            const iconColor = getMealTextColor(meal.type);
+            const bgClass = isEmpty ? 'bg-muted' : getMealColorClasses(meal.type).split(' ')[1];
             
             return (
               <div
@@ -396,11 +399,9 @@ const NutritionPage = () => {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`relative flex h-10 w-10 items-center justify-center rounded-full ${
-                      isEmpty ? 'bg-muted' : 'bg-primary/10'
-                    }`}>
-                      <Icon className={`h-5 w-5 ${isEmpty ? 'text-muted-foreground' : 'text-primary'}`} />
-                      {!isEmpty && <div className="absolute inset-0 rounded-full bg-primary/20 blur-sm -z-10" />}
+                    <div className={`relative flex h-10 w-10 items-center justify-center rounded-full ${isEmpty ? 'bg-muted' : bgClass}`}>
+                      <Icon className={`h-5 w-5 ${isEmpty ? 'text-muted-foreground' : iconColor}`} />
+                      {!isEmpty && <div className={`absolute inset-0 rounded-full ${bgClass} blur-sm -z-10`} />}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">

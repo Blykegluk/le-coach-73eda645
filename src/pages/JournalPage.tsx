@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { format, startOfDay, isToday, isYesterday, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Dumbbell, Droplets, ChevronLeft, ChevronRight, Plus, Calendar, Coffee, UtensilsCrossed, Moon, Cookie, Zap } from 'lucide-react';
+import { Dumbbell, Droplets, ChevronLeft, ChevronRight, Plus, Calendar, Zap, UtensilsCrossed } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { useNavigate, useOutletContext } from 'react-router-dom';
+import { getMealIcon, getMealColorClasses } from '@/utils/mealColors';
 
 interface JournalEntry {
   id: string;
@@ -42,33 +43,21 @@ const JournalPage = () => {
 
       const allEntries: JournalEntry[] = [];
 
-      // Fetch ALL workout sessions for this day (completed, in_progress, aborted)
+      // Fetch ONLY completed workout sessions for this day
       const { data: workouts } = await supabase
         .from('workout_sessions')
         .select('id, workout_name, started_at, completed_at, total_duration_seconds, target_muscles, status')
         .eq('user_id', user.id)
+        .eq('status', 'completed')
         .gte('started_at', startOfDayDate.toISOString())
         .lt('started_at', endOfDayDate.toISOString())
         .order('started_at', { ascending: true });
 
       if (workouts) {
         workouts.forEach(w => {
-          let duration = '';
-          let statusLabel = '';
-          if (w.status === 'completed') {
-            if (w.total_duration_seconds) {
-              duration = `${Math.round(w.total_duration_seconds / 60)} min`;
-            } else {
-              duration = 'Terminée';
-            }
-            statusLabel = 'completed';
-          } else if (w.status === 'in_progress') {
-            duration = 'En cours';
-            statusLabel = 'in_progress';
-          } else if (w.status === 'aborted') {
-            duration = 'Abandonnée';
-            statusLabel = 'aborted';
-          }
+          const duration = w.total_duration_seconds
+            ? `${Math.round(w.total_duration_seconds / 60)} min`
+            : 'Terminée';
           allEntries.push({
             id: `workout-${w.id}`,
             type: 'workout',
@@ -76,7 +65,7 @@ const JournalPage = () => {
             subtitle: w.target_muscles?.join(', ') || 'Entraînement',
             time: parseISO(w.started_at),
             meta: duration,
-            status: statusLabel,
+            status: 'completed',
           });
         });
       }
@@ -151,31 +140,24 @@ const JournalPage = () => {
     return format(selectedDate, 'EEEE d MMMM', { locale: fr });
   };
 
-  const getMealIcon = (mealType?: string) => {
-    switch (mealType) {
-      case 'breakfast': return Coffee;
-      case 'lunch': return UtensilsCrossed;
-      case 'dinner': return Moon;
-      case 'snack': return Cookie;
-      default: return UtensilsCrossed;
-    }
-  };
-
   const getEntryIcon = (type: JournalEntry['type'], mealType?: string) => {
     switch (type) {
       case 'workout': return Dumbbell;
-      case 'meal': return getMealIcon(mealType);
+      case 'meal': return getMealIcon(mealType || 'lunch');
       case 'water': return Droplets;
     }
   };
 
-  const getWorkoutStatusColor = (status?: string) => {
-    switch (status) {
-      case 'completed': return 'text-green-600 bg-green-500/10';
-      case 'in_progress': return 'text-energy bg-energy/10';
-      case 'aborted': return 'text-muted-foreground bg-muted/50';
-      default: return 'text-energy bg-energy/10';
+  const getEntryColorClasses = (entry: JournalEntry): string => {
+    if (entry.type === 'workout') {
+      // Always completed now, use a success/green token via primary
+      return 'text-primary bg-primary/10';
     }
+    if (entry.type === 'meal') {
+      return getMealColorClasses(entry.mealType || 'lunch');
+    }
+    // water
+    return 'text-water bg-water/10';
   };
 
   // Separate workouts from nutrition/water
@@ -184,15 +166,7 @@ const JournalPage = () => {
 
   const renderEntry = (entry: JournalEntry) => {
     const Icon = getEntryIcon(entry.type, entry.mealType);
-    
-    let colorClass = '';
-    if (entry.type === 'workout') {
-      colorClass = getWorkoutStatusColor(entry.status);
-    } else if (entry.type === 'meal') {
-      colorClass = 'text-calories bg-calories/10';
-    } else {
-      colorClass = 'text-water bg-water/10';
-    }
+    const colorClass = getEntryColorClasses(entry);
 
     return (
       <div key={entry.id} className="flex gap-3 rounded-xl bg-card border border-border/50 p-3">
