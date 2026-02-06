@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Dumbbell, Clock, RefreshCw, AlertCircle, ChevronDown, ChevronUp, Play } from 'lucide-react';
+import { Dumbbell, Clock, RefreshCw, AlertCircle, ChevronDown, ChevronUp, Play, Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { getExerciseIcon } from './ExerciseIcons';
 import { ActiveWorkoutSession } from './ActiveWorkoutSession';
+import { ExerciseDetailSheet } from './ExerciseDetailSheet';
 
 interface Exercise {
   name: string;
