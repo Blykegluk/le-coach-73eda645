@@ -551,6 +551,17 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Exercise Detail Sheet */}
+      <ExerciseDetailSheet
+        isOpen={viewingExerciseIndex !== null}
+        onClose={() => setViewingExerciseIndex(null)}
+        exerciseName={viewingExerciseIndex !== null ? workout.exercises[viewingExerciseIndex]?.name || '' : ''}
+        sets={viewingExerciseIndex !== null ? exerciseLogs[viewingExerciseIndex]?.actual_sets : undefined}
+        reps={viewingExerciseIndex !== null ? exerciseLogs[viewingExerciseIndex]?.actual_reps : undefined}
+        weight={viewingExerciseIndex !== null ? exerciseLogs[viewingExerciseIndex]?.actual_weight : undefined}
+        notes={viewingExerciseIndex !== null ? workout.exercises[viewingExerciseIndex]?.notes : undefined}
+      />
     </div>
   );
 };
