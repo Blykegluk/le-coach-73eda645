@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.analyze-meal]
 verify_jwt = false
+
+[functions.exercise-detail]
+verify_jwt = false
+
+[functions.exercise-video]
+verify_jwt = false
