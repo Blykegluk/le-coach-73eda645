@@ -1,4 +1,4 @@
-import { Plus, ChevronRight, Droplets, Coffee, UtensilsCrossed, Moon, Apple, Utensils, Cake } from 'lucide-react';
+import { Plus, ChevronRight, Droplets, Utensils } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import AddMealModal from '@/components/nutrition/AddMealModal';
 import MealDetailSheet from '@/components/nutrition/MealDetailSheet';
 import NutritionHistorySheet from '@/components/nutrition/NutritionHistorySheet';
+import { getMealIcon, getMealColorClasses, getMealTextColor } from '@/utils/mealColors';
 
 interface NutritionLog {
   id: string;
