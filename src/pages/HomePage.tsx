@@ -274,11 +274,18 @@ const HomePage = () => {
     : 2;
 
   const handleStartWorkout = () => {
+    setIsWorkoutPreviewOpen(false);
     navigate('/training');
   };
 
   const handleOpenCoach = () => {
     outletContext.onOpenCoach?.();
+  };
+
+  const handlePreviewWorkout = () => {
+    if (preparedWorkout) {
+      setIsWorkoutPreviewOpen(true);
+    }
   };
 
   if (isLoading) {
