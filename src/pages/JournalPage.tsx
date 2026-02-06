@@ -55,22 +55,9 @@ const JournalPage = () => {
 
       if (workouts) {
         workouts.forEach(w => {
-          let duration = '';
-          let statusLabel = '';
-          if (w.status === 'completed') {
-            if (w.total_duration_seconds) {
-              duration = `${Math.round(w.total_duration_seconds / 60)} min`;
-            } else {
-              duration = 'Terminée';
-            }
-            statusLabel = 'completed';
-          } else if (w.status === 'in_progress') {
-            duration = 'En cours';
-            statusLabel = 'in_progress';
-          } else if (w.status === 'aborted') {
-            duration = 'Abandonnée';
-            statusLabel = 'aborted';
-          }
+          const duration = w.total_duration_seconds
+            ? `${Math.round(w.total_duration_seconds / 60)} min`
+            : 'Terminée';
           allEntries.push({
             id: `workout-${w.id}`,
             type: 'workout',
@@ -78,7 +65,7 @@ const JournalPage = () => {
             subtitle: w.target_muscles?.join(', ') || 'Entraînement',
             time: parseISO(w.started_at),
             meta: duration,
-            status: statusLabel,
+            status: 'completed',
           });
         });
       }
