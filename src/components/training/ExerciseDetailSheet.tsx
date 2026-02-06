@@ -1,16 +1,15 @@
-import { useState, useEffect } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useState, useEffect, useCallback } from 'react';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Play, RefreshCw, Info, Dumbbell, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, RefreshCw, Info, Dumbbell, AlertCircle, AlertTriangle, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { getExerciseIcon } from './ExerciseIcons';
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
 } from '@/components/ui/carousel';
 
 interface ExerciseDetailSheetProps {
@@ -29,6 +28,7 @@ interface ExerciseDetail {
   muscles_targeted: string[];
   tips: string[];
   common_mistakes: string[];
+  safety_warnings?: string[];
   images?: string[];
   video_url?: string;
   media_type?: 'image' | 'video' | 'images';
@@ -36,6 +36,18 @@ interface ExerciseDetail {
 
 const CACHE_KEY_PREFIX = 'exercise_detail_';
 const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// Detect injury-related instructions
+const isInjuryRelated = (text: string): boolean => {
+  const injuryKeywords = [
+    'dos', 'lombaire', 'hernie', 'blessure', 'douleur', 'épaule', 'genou',
+    'plaqué', 'neutre', 'protection', 'éviter', 'attention', 'prudence',
+    'articulation', 'vertèbre', 'compression', 'tension', 'sécurité',
+    'ne pas', 'ne jamais', 'dangereux', 'risque'
+  ];
+  const lowerText = text.toLowerCase();
+  return injuryKeywords.some(keyword => lowerText.includes(keyword));
+};
 
 export const ExerciseDetailSheet = ({
   isOpen,
@@ -46,13 +58,34 @@ export const ExerciseDetailSheet = ({
   weight,
   notes,
 }: ExerciseDetailSheetProps) => {
+  const { user } = useAuth();
   const [detail, setDetail] = useState<ExerciseDetail | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
+  const [userHealthAlerts, setUserHealthAlerts] = useState<string[]>([]);
 
   const ExerciseIcon = getExerciseIcon(exerciseName);
+
+  // Fetch user health constraints
+  const fetchHealthAlerts = useCallback(async () => {
+    if (!user) return;
+    
+    const { data } = await supabase
+      .from('user_context')
+      .select('value')
+      .eq('user_id', user.id)
+      .like('key', 'health_%');
+    
+    if (data) {
+      setUserHealthAlerts(data.map(d => d.value));
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchHealthAlerts();
+  }, [fetchHealthAlerts]);
 
   // Load cached detail or fetch new one
   useEffect(() => {
@@ -60,7 +93,6 @@ export const ExerciseDetailSheet = ({
 
     const cacheKey = `${CACHE_KEY_PREFIX}${exerciseName.toLowerCase().replace(/\s+/g, '_')}`;
     
-    // Check cache first
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
       try {
@@ -75,7 +107,6 @@ export const ExerciseDetailSheet = ({
       }
     }
 
-    // Fetch new detail
     fetchExerciseDetail();
   }, [isOpen, exerciseName]);
 
@@ -96,7 +127,6 @@ export const ExerciseDetailSheet = ({
 
       setDetail(data);
       
-      // Cache the result
       const cacheKey = `${CACHE_KEY_PREFIX}${exerciseName.toLowerCase().replace(/\s+/g, '_')}`;
       localStorage.setItem(cacheKey, JSON.stringify({
         data,
@@ -128,7 +158,6 @@ export const ExerciseDetailSheet = ({
       if (data?.images) {
         setDetail(prev => prev ? { ...prev, images: data.images, media_type: 'images' } : null);
         
-        // Update cache with images
         const cacheKey = `${CACHE_KEY_PREFIX}${exerciseName.toLowerCase().replace(/\s+/g, '_')}`;
         const cached = localStorage.getItem(cacheKey);
         if (cached) {
@@ -154,38 +183,82 @@ export const ExerciseDetailSheet = ({
       }
     } catch (err) {
       console.error('Error generating video:', err);
-      setVideoError('Impossible de générer la vidéo');
+      setVideoError('Impossible de générer les images');
     } finally {
       setIsGeneratingVideo(false);
     }
   };
 
+  // Get the header media (first image or video)
+  const headerMediaUrl = detail?.images?.[0] || detail?.video_url;
+  const hasHeaderMedia = !!headerMediaUrl;
+
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl overflow-hidden flex flex-col">
-        <SheetHeader className="flex-shrink-0">
-          <SheetTitle className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <ExerciseIcon className="h-8 w-8 text-primary" />
-            </div>
-            <div className="text-left">
-              <span className="block">{exerciseName}</span>
-              {(sets || reps || weight) && (
-                <span className="text-sm font-normal text-muted-foreground">
-                  {sets && `${sets} séries`} {reps && `× ${reps}`} {weight && `• ${weight}`}
-                </span>
-              )}
-            </div>
-          </SheetTitle>
-        </SheetHeader>
+      <SheetContent side="bottom" className="h-[90vh] rounded-t-3xl overflow-hidden flex flex-col p-0">
+        {/* Immersive Header with Video/Image Background */}
+        <div className="relative flex-shrink-0">
+          {/* Background Media */}
+          <div className="absolute inset-0 h-48 overflow-hidden">
+            {hasHeaderMedia ? (
+              <>
+                {detail?.media_type === 'video' ? (
+                  <video
+                    src={headerMediaUrl}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <img
+                    src={headerMediaUrl}
+                    alt={exerciseName}
+                    className="w-full h-full object-cover"
+                  />
+                )}
+                {/* Dark overlay for readability */}
+                <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/80 to-background" />
+              </>
+            ) : (
+              <div className="w-full h-full bg-gradient-to-b from-primary/20 to-background" />
+            )}
+          </div>
 
-        <div className="flex-1 overflow-y-auto mt-4 space-y-6 pb-6">
+          {/* Header Content */}
+          <div className="relative z-10 p-4 pt-6 h-48 flex flex-col justify-between">
+            {/* Close button */}
+            <div className="flex justify-end">
+              <Button variant="ghost" size="icon" onClick={onClose} className="bg-background/50 backdrop-blur-sm">
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {/* Exercise title */}
+            <div className="flex items-end gap-4">
+              <div className="h-16 w-16 rounded-2xl bg-background/80 backdrop-blur-sm border border-border flex items-center justify-center shadow-lg">
+                <ExerciseIcon className="h-10 w-10 text-primary" />
+              </div>
+              <div className="flex-1 pb-1">
+                <h2 className="text-xl font-bold text-foreground drop-shadow-lg">{exerciseName}</h2>
+                {(sets || reps || weight) && (
+                  <p className="text-sm text-muted-foreground">
+                    {sets && `${sets} séries`} {reps && `× ${reps}`} {weight && `• ${weight}`}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-5">
           {isLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-48 w-full rounded-xl" />
+            <div className="space-y-4 pt-4">
+              <Skeleton className="h-32 w-full rounded-xl" />
               <Skeleton className="h-4 w-3/4" />
               <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-5/6" />
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -198,83 +271,72 @@ export const ExerciseDetailSheet = ({
             </div>
           ) : detail ? (
             <>
-              {/* Media section */}
-              <div className="rounded-2xl overflow-hidden bg-muted/30 border border-border">
-                {detail.images && detail.images.length > 0 ? (
-                  <div className="p-2">
-                    <div className="flex gap-1 mb-2 justify-center">
-                      {['Départ', 'Mouvement', 'Fin'].map((label, i) => (
-                        <span key={i} className="text-xs text-muted-foreground px-2 py-0.5 bg-muted rounded-full">
-                          {i + 1}. {label}
-                        </span>
-                      ))}
-                    </div>
-                    <Carousel className="w-full">
-                      <CarouselContent>
-                        {detail.images.map((imgUrl, index) => (
-                          <CarouselItem key={index} className="basis-1/3 pl-1">
-                            <div className="aspect-[3/4] rounded-lg overflow-hidden border border-border">
-                              <img
-                                src={imgUrl}
-                                alt={`${exerciseName} - étape ${index + 1}`}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                          </CarouselItem>
-                        ))}
-                      </CarouselContent>
-                    </Carousel>
-                  </div>
-                ) : detail.video_url ? (
-                  detail.media_type === 'video' ? (
-                    <video
-                      src={detail.video_url}
-                      controls
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full aspect-video object-cover"
-                    />
-                  ) : (
-                    <img
-                      src={detail.video_url}
-                      alt={`Démonstration de ${exerciseName}`}
-                      className="w-full aspect-video object-cover"
-                    />
-                  )
-                ) : (
-                  <div className="aspect-[2/1] flex flex-col items-center justify-center p-4">
-                    <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-                      <Play className="h-7 w-7 text-primary" />
-                    </div>
-                    <p className="text-sm text-muted-foreground text-center mb-3">
-                      Génère 3 images montrant l'enchaînement
+              {/* User Health Alert Banner */}
+              {userHealthAlerts.length > 0 && (
+                <div className="rounded-xl bg-energy/10 border-2 border-energy/40 p-4 flex gap-3">
+                  <AlertTriangle className="h-5 w-5 text-energy flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-energy text-sm mb-1">Mode Adaptation Blessure</p>
+                    <p className="text-xs text-muted-foreground">
+                      Adapte l'exercice selon tes contraintes : {userHealthAlerts.join(', ')}
                     </p>
-                    <Button 
-                      onClick={generateVideo} 
-                      disabled={isGeneratingVideo}
-                      size="sm"
-                      className="gap-2"
-                    >
-                      {isGeneratingVideo ? (
-                        <>
-                          <RefreshCw className="h-4 w-4 animate-spin" />
-                          Génération...
-                        </>
-                      ) : (
-                        <>
-                          <Play className="h-4 w-4" />
-                          Générer les images
-                        </>
-                      )}
-                    </Button>
-                    {videoError && (
-                      <p className="text-xs text-destructive mt-2">{videoError}</p>
-                    )}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+
+              {/* Image Carousel (if available) */}
+              {detail.images && detail.images.length > 0 && (
+                <div className="rounded-2xl overflow-hidden bg-muted/30 border border-border p-3">
+                  <div className="flex gap-1 mb-2 justify-center">
+                    {['Départ', 'Mouvement', 'Fin'].map((label, i) => (
+                      <span key={i} className="text-xs text-muted-foreground px-2 py-0.5 bg-muted rounded-full">
+                        {i + 1}. {label}
+                      </span>
+                    ))}
+                  </div>
+                  <Carousel className="w-full">
+                    <CarouselContent>
+                      {detail.images.map((imgUrl, index) => (
+                        <CarouselItem key={index} className="basis-1/3 pl-1">
+                          <div className="aspect-[3/4] rounded-lg overflow-hidden border border-border">
+                            <img
+                              src={imgUrl}
+                              alt={`${exerciseName} - étape ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        </CarouselItem>
+                      ))}
+                    </CarouselContent>
+                  </Carousel>
+                </div>
+              )}
+
+              {/* Generate images button (if no images yet) */}
+              {!detail.images && !detail.video_url && (
+                <div className="rounded-2xl bg-muted/30 border border-border p-4 flex flex-col items-center">
+                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                    <Play className="h-6 w-6 text-primary" />
+                  </div>
+                  <p className="text-sm text-muted-foreground text-center mb-3">
+                    Génère 3 images montrant l'enchaînement
+                  </p>
+                  <Button onClick={generateVideo} disabled={isGeneratingVideo} size="sm" className="gap-2">
+                    {isGeneratingVideo ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Génération...
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4" />
+                        Générer les images
+                      </>
+                    )}
+                  </Button>
+                  {videoError && <p className="text-xs text-destructive mt-2">{videoError}</p>}
+                </div>
+              )}
 
               {/* Description */}
               <div>
@@ -282,9 +344,7 @@ export const ExerciseDetailSheet = ({
                   <Info className="h-4 w-4 text-primary" />
                   Description
                 </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {detail.description}
-                </p>
+                <p className="text-sm text-muted-foreground leading-relaxed">{detail.description}</p>
               </div>
 
               {/* Muscles targeted */}
@@ -296,10 +356,7 @@ export const ExerciseDetailSheet = ({
                   </h3>
                   <div className="flex flex-wrap gap-2">
                     {detail.muscles_targeted.map((muscle, i) => (
-                      <span
-                        key={i}
-                        className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm capitalize"
-                      >
+                      <span key={i} className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm capitalize">
                         {muscle}
                       </span>
                     ))}
@@ -307,20 +364,54 @@ export const ExerciseDetailSheet = ({
                 </div>
               )}
 
-              {/* Instructions */}
+              {/* Instructions with Injury Highlighting */}
               {detail.instructions && detail.instructions.length > 0 && (
                 <div>
                   <h3 className="font-semibold text-foreground mb-2">📋 Instructions</h3>
                   <ol className="space-y-2">
-                    {detail.instructions.map((step, i) => (
-                      <li key={i} className="flex gap-3 text-sm">
-                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-medium flex items-center justify-center">
-                          {i + 1}
-                        </span>
-                        <span className="text-muted-foreground">{step}</span>
+                    {detail.instructions.map((step, i) => {
+                      const isSafetyRelated = isInjuryRelated(step);
+                      return (
+                        <li 
+                          key={i} 
+                          className={`flex gap-3 text-sm p-2 rounded-lg transition-all ${
+                            isSafetyRelated 
+                              ? 'bg-destructive/10 border border-destructive/30' 
+                              : ''
+                          }`}
+                        >
+                          <span className={`flex-shrink-0 w-6 h-6 rounded-full text-xs font-medium flex items-center justify-center ${
+                            isSafetyRelated 
+                              ? 'bg-destructive/20 text-destructive' 
+                              : 'bg-primary/20 text-primary'
+                          }`}>
+                            {isSafetyRelated ? <AlertTriangle className="h-3 w-3" /> : i + 1}
+                          </span>
+                          <span className={isSafetyRelated ? 'text-foreground font-medium' : 'text-muted-foreground'}>
+                            {step}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
+              )}
+
+              {/* Safety Warnings (dedicated section) */}
+              {detail.safety_warnings && detail.safety_warnings.length > 0 && (
+                <div className="rounded-xl bg-destructive/10 border-2 border-destructive/40 p-4">
+                  <h3 className="font-semibold text-destructive mb-2 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Consignes de Sécurité
+                  </h3>
+                  <ul className="space-y-2">
+                    {detail.safety_warnings.map((warning, i) => (
+                      <li key={i} className="text-sm text-foreground flex gap-2">
+                        <span className="text-destructive font-bold">!</span>
+                        {warning}
                       </li>
                     ))}
-                  </ol>
+                  </ul>
                 </div>
               )}
 
@@ -354,7 +445,7 @@ export const ExerciseDetailSheet = ({
                 </div>
               )}
 
-              {/* User notes */}
+              {/* Coach notes */}
               {notes && (
                 <div className="rounded-xl bg-primary/5 border border-primary/20 p-4">
                   <h3 className="font-semibold text-primary mb-2">📝 Notes du coach</h3>
