@@ -349,6 +349,17 @@ export const NextWorkoutCard = ({ externalWorkout, onWorkoutGenerated }: NextWor
           </div>
         </div>
       )}
+
+      {/* Exercise Detail Sheet */}
+      <ExerciseDetailSheet
+        isOpen={selectedExercise !== null}
+        onClose={() => setSelectedExercise(null)}
+        exerciseName={selectedExercise?.name || ''}
+        sets={selectedExercise?.sets}
+        reps={selectedExercise?.reps}
+        weight={selectedExercise?.weight_recommendation}
+        notes={selectedExercise?.notes}
+      />
     </div>
   );
 };
