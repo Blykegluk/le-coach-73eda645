@@ -502,6 +502,8 @@ const HomePage = () => {
         onClose={() => setIsWorkoutPreviewOpen(false)}
         workout={preparedWorkout}
         onStartWorkout={handleStartWorkout}
+        onRefresh={handleRefreshWorkout}
+        isRefreshing={isRefreshingWorkout}
       />
     </div>
   );
