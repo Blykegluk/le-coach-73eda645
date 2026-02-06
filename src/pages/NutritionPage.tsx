@@ -379,9 +379,11 @@ const NutritionPage = () => {
           </button>
         </div>
         <div className="space-y-2">
-          {mealsByType.map((meal, index) => {
-            const Icon = meal.icon;
+          {mealsByType.map((meal) => {
+            const Icon = getMealIcon(meal.type);
             const isEmpty = !meal.description;
+            const iconColor = getMealTextColor(meal.type);
+            const bgClass = isEmpty ? 'bg-muted' : getMealColorClasses(meal.type).split(' ')[1];
             
             return (
               <div
@@ -397,11 +399,9 @@ const NutritionPage = () => {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`relative flex h-10 w-10 items-center justify-center rounded-full ${
-                      isEmpty ? 'bg-muted' : 'bg-primary/10'
-                    }`}>
-                      <Icon className={`h-5 w-5 ${isEmpty ? 'text-muted-foreground' : 'text-primary'}`} />
-                      {!isEmpty && <div className="absolute inset-0 rounded-full bg-primary/20 blur-sm -z-10" />}
+                    <div className={`relative flex h-10 w-10 items-center justify-center rounded-full ${isEmpty ? 'bg-muted' : bgClass}`}>
+                      <Icon className={`h-5 w-5 ${isEmpty ? 'text-muted-foreground' : iconColor}`} />
+                      {!isEmpty && <div className={`absolute inset-0 rounded-full ${bgClass} blur-sm -z-10`} />}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
