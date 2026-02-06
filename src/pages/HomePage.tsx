@@ -407,14 +407,6 @@ const HomePage = () => {
         waterGoal={waterGoal}
       />
 
-      {/* Goal Progress Card */}
-      <div className="mb-4">
-        <GoalProgressCard 
-          profile={profile} 
-          currentWeight={currentWeight}
-          currentBodyFat={currentBodyFat}
-        />
-      </div>
 
       {/* Daily Tips */}
       <div className="mb-4">
