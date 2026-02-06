@@ -279,9 +279,10 @@ export const NextWorkoutCard = ({ externalWorkout, onWorkoutGenerated }: NextWor
         {workout.exercises.slice(0, isExpanded ? undefined : 4).map((exercise, index) => {
           const ExerciseIcon = getExerciseIcon(exercise.name);
           return (
-            <div
+            <button
               key={index}
-              className="flex items-center gap-3 rounded-xl bg-muted/30 p-3"
+              onClick={() => setSelectedExercise(exercise)}
+              className="flex items-center gap-3 rounded-xl bg-muted/30 p-3 w-full text-left transition-all hover:bg-muted/50 hover:border-primary/30 border border-transparent active:scale-[0.98]"
             >
               <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10">
                 <ExerciseIcon className="h-10 w-10" />
@@ -295,11 +296,14 @@ export const NextWorkoutCard = ({ externalWorkout, onWorkoutGenerated }: NextWor
                   <p className="text-xs text-muted-foreground/70 truncate mt-0.5">{exercise.notes}</p>
                 )}
               </div>
-              <div className="text-xs text-muted-foreground text-right">
-                <span className="text-primary font-medium">{exercise.rest_seconds}s</span>
-                <p className="text-muted-foreground/70">repos</p>
+              <div className="flex flex-col items-end gap-1">
+                <div className="text-xs text-muted-foreground text-right">
+                  <span className="text-primary font-medium">{exercise.rest_seconds}s</span>
+                  <p className="text-muted-foreground/70">repos</p>
+                </div>
+                <Info className="h-4 w-4 text-muted-foreground/50" />
               </div>
-            </div>
+            </button>
           );
         })}
 
