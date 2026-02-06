@@ -38,26 +38,32 @@ serve(async (req) => {
 
     // Normalize exercise name for storage
     const normalizedName = exerciseName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-    const videoPath = `exercise-videos/${normalizedName}.mp4`;
-
-    // Check if video already exists in storage
-    const { data: existingFile } = await supabase.storage
+    
+    // Check if images already exist in storage
+    const { data: existingFiles } = await supabase.storage
       .from('chat-uploads')
-      .list('exercise-videos', { search: `${normalizedName}.mp4` });
+      .list('exercise-images', { search: normalizedName });
 
-    if (existingFile && existingFile.length > 0) {
-      const { data: urlData } = supabase.storage
-        .from('chat-uploads')
-        .getPublicUrl(videoPath);
+    const existingImages = existingFiles?.filter(f => f.name.startsWith(normalizedName)) || [];
+    
+    if (existingImages.length >= 3) {
+      // Return existing images
+      const imageUrls = existingImages
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .slice(0, 3)
+        .map(f => {
+          const { data } = supabase.storage.from('chat-uploads').getPublicUrl(`exercise-images/${f.name}`);
+          return data.publicUrl;
+        });
 
-      console.log(`Video already exists for ${exerciseName}`);
+      console.log(`Images already exist for ${exerciseName}`);
       return new Response(
-        JSON.stringify({ video_url: urlData.publicUrl }),
+        JSON.stringify({ images: imageUrls, type: 'images' }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`Generating video for exercise: ${exerciseName}`);
+    console.log(`Generating images for exercise: ${exerciseName}`);
 
     // First, generate a starting frame image using Gemini image generation
     const imagePrompt = `Professional fitness demonstration starting position for "${exerciseName}" exercise. 
