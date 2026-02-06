@@ -200,7 +200,32 @@ export const ExerciseDetailSheet = ({
             <>
               {/* Media section */}
               <div className="rounded-2xl overflow-hidden bg-muted/30 border border-border">
-                {detail.video_url ? (
+                {detail.images && detail.images.length > 0 ? (
+                  <div className="p-2">
+                    <div className="flex gap-1 mb-2 justify-center">
+                      {['Départ', 'Mouvement', 'Fin'].map((label, i) => (
+                        <span key={i} className="text-xs text-muted-foreground px-2 py-0.5 bg-muted rounded-full">
+                          {i + 1}. {label}
+                        </span>
+                      ))}
+                    </div>
+                    <Carousel className="w-full">
+                      <CarouselContent>
+                        {detail.images.map((imgUrl, index) => (
+                          <CarouselItem key={index} className="basis-1/3 pl-1">
+                            <div className="aspect-[3/4] rounded-lg overflow-hidden border border-border">
+                              <img
+                                src={imgUrl}
+                                alt={`${exerciseName} - étape ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          </CarouselItem>
+                        ))}
+                      </CarouselContent>
+                    </Carousel>
+                  </div>
+                ) : detail.video_url ? (
                   detail.media_type === 'video' ? (
                     <video
                       src={detail.video_url}
@@ -219,27 +244,28 @@ export const ExerciseDetailSheet = ({
                     />
                   )
                 ) : (
-                  <div className="aspect-video flex flex-col items-center justify-center p-6">
-                    <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                      <Play className="h-10 w-10 text-primary" />
+                  <div className="aspect-[2/1] flex flex-col items-center justify-center p-4">
+                    <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                      <Play className="h-7 w-7 text-primary" />
                     </div>
-                    <p className="text-sm text-muted-foreground text-center mb-4">
-                      Génère une image de démonstration de l'exercice
+                    <p className="text-sm text-muted-foreground text-center mb-3">
+                      Génère 3 images montrant l'enchaînement
                     </p>
                     <Button 
                       onClick={generateVideo} 
                       disabled={isGeneratingVideo}
+                      size="sm"
                       className="gap-2"
                     >
                       {isGeneratingVideo ? (
                         <>
                           <RefreshCw className="h-4 w-4 animate-spin" />
-                          Génération en cours...
+                          Génération...
                         </>
                       ) : (
                         <>
                           <Play className="h-4 w-4" />
-                          Générer l'image
+                          Générer les images
                         </>
                       )}
                     </Button>
