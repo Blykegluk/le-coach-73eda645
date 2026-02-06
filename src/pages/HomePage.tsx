@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Flame, Target, Plus, Dumbbell, Droplets, Beef } from 'lucide-react';
+import { useNavigate, useOutletContext } from 'react-router-dom';
+import { ChevronRight, Target, Plus, Dumbbell } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { healthProvider } from '@/providers/health';
@@ -11,12 +11,23 @@ import GoalEditorModal from '@/components/profile/GoalEditorModal';
 import GoalProgressCard from '@/components/home/GoalProgressCard';
 import DailyTipsCard from '@/components/home/DailyTipsCard';
 import HealthStatsCard from '@/components/home/HealthStatsCard';
+import SmartActionCard from '@/components/home/SmartActionCard';
+import CircularProgressRings from '@/components/home/CircularProgressRings';
+import ContextualAlertChips from '@/components/home/ContextualAlertChips';
 import { useNutritionGoals } from '@/hooks/useNutritionGoals';
+import { Workout } from '@/components/training/NextWorkoutCard';
+
+interface OutletContextType {
+  onOpenCoach?: () => void;
+}
+
+const WORKOUT_STORAGE_KEY = 'prepared_workout';
 
 const HomePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { profile } = useProfile();
+  const outletContext = useOutletContext<OutletContextType>() || {};
   const [metrics, setMetrics] = useState<HealthMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
@@ -25,6 +36,7 @@ const HomePage = () => {
   const [currentBodyFat, setCurrentBodyFat] = useState<number | null>(null);
   const [proteinConsumed, setProteinConsumed] = useState<number>(0);
   const [caloriesConsumed, setCaloriesConsumed] = useState<number>(0);
+  const [preparedWorkout, setPreparedWorkout] = useState<Workout | null>(null);
   const [healthStats, setHealthStats] = useState({
     sleepHours: null as number | null,
     steps: null as number | null,
@@ -48,11 +60,31 @@ const HomePage = () => {
     setIsLoading(false);
   }, [user]);
 
+  // Fetch prepared workout from user_context
+  const fetchPreparedWorkout = useCallback(async () => {
+    if (!user) return;
+
+    const { data } = await supabase
+      .from('user_context')
+      .select('value')
+      .eq('user_id', user.id)
+      .eq('key', WORKOUT_STORAGE_KEY)
+      .maybeSingle();
+
+    if (data?.value) {
+      try {
+        const parsed = JSON.parse(data.value);
+        setPreparedWorkout(parsed as Workout);
+      } catch {
+        console.error('Error parsing prepared workout');
+      }
+    }
+  }, [user]);
+
   // Fetch current weight and body fat from latest data
   const fetchCurrentMetrics = useCallback(async () => {
     if (!user) return;
 
-    // Try daily_metrics first for weight and body fat
     const { data: dailyData } = await supabase
       .from('daily_metrics')
       .select('weight, body_fat_pct')
@@ -68,7 +100,6 @@ const HomePage = () => {
       setCurrentBodyFat(dailyData.body_fat_pct);
     }
 
-    // Fallback to body_composition for more detailed data
     const { data: bodyData } = await supabase
       .from('body_composition')
       .select('weight_kg, body_fat_pct')
@@ -87,7 +118,7 @@ const HomePage = () => {
     }
   }, [user]);
 
-  // Fetch today's nutrition intake (calories + protein from nutrition_logs)
+  // Fetch today's nutrition intake
   const fetchNutritionIntake = useCallback(async () => {
     if (!user) return;
 
@@ -114,7 +145,6 @@ const HomePage = () => {
   const fetchWeeklySessions = useCallback(async () => {
     if (!user) return;
 
-    // Get start of current week (Monday)
     const now = new Date();
     const dayOfWeek = now.getDay();
     const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
@@ -133,7 +163,7 @@ const HomePage = () => {
     }
   }, [user]);
 
-  // Fetch health stats (sleep, heart rate, steps, etc.)
+  // Fetch health stats
   const fetchHealthStats = useCallback(async () => {
     if (!user) return;
 
@@ -164,64 +194,61 @@ const HomePage = () => {
     fetchCurrentMetrics();
     fetchNutritionIntake();
     fetchHealthStats();
+    fetchPreparedWorkout();
 
-    // Subscribe to real-time updates
     if (user) {
       healthProvider.setUserId(user.id);
       const unsubscribe = healthProvider.subscribeToMetrics((newMetrics) => {
         setMetrics(newMetrics);
       });
 
-      // Subscribe to activities changes
       const activitiesChannel = supabase
         .channel('homepage_activities')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'activities',
-            filter: `user_id=eq.${user.id}`,
-          },
-          () => {
-            fetchWeeklySessions();
-          }
-        )
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'activities',
+          filter: `user_id=eq.${user.id}`,
+        }, () => {
+          fetchWeeklySessions();
+        })
         .subscribe();
 
-      // Subscribe to nutrition_logs changes for protein and calories updates
       const nutritionChannel = supabase
         .channel('homepage_nutrition')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'nutrition_logs',
-            filter: `user_id=eq.${user.id}`,
-          },
-          () => {
-            fetchNutritionIntake();
-          }
-        )
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'nutrition_logs',
+          filter: `user_id=eq.${user.id}`,
+        }, () => {
+          fetchNutritionIntake();
+        })
         .subscribe();
 
-      // Subscribe to daily_metrics changes for health stats updates
       const metricsChannel = supabase
         .channel('homepage_daily_metrics')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'daily_metrics',
-            filter: `user_id=eq.${user.id}`,
-          },
-          () => {
-            fetchHealthStats();
-            fetchMetrics();
-          }
-        )
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'daily_metrics',
+          filter: `user_id=eq.${user.id}`,
+        }, () => {
+          fetchHealthStats();
+          fetchMetrics();
+        })
+        .subscribe();
+
+      const contextChannel = supabase
+        .channel('homepage_context')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'user_context',
+          filter: `user_id=eq.${user.id}`,
+        }, () => {
+          fetchPreparedWorkout();
+        })
         .subscribe();
 
       return () => {
@@ -229,21 +256,28 @@ const HomePage = () => {
         supabase.removeChannel(activitiesChannel);
         supabase.removeChannel(nutritionChannel);
         supabase.removeChannel(metricsChannel);
+        supabase.removeChannel(contextChannel);
       };
     }
-  }, [user, fetchMetrics, fetchWeeklySessions, fetchCurrentMetrics, fetchNutritionIntake, fetchHealthStats]);
+  }, [user, fetchMetrics, fetchWeeklySessions, fetchCurrentMetrics, fetchNutritionIntake, fetchHealthStats, fetchPreparedWorkout]);
 
   const firstName = profile?.first_name || user?.email?.split('@')[0] || 'Athlète';
-  const caloriesPercentage = (caloriesConsumed / caloriesGoal) * 100;
   const waterConsumed = metrics?.waterMl || 0;
-  const waterPercentage = (waterConsumed / waterGoal) * 100;
-  const proteinPercentage = (proteinConsumed / proteinGoal) * 100;
+  const caloriesPercentage = (caloriesConsumed / caloriesGoal) * 100;
 
   const weeklySessionsTotal = profile?.activity_level === 'very_active' ? 6 
     : profile?.activity_level === 'active' ? 5
     : profile?.activity_level === 'moderate' ? 4
     : profile?.activity_level === 'light' ? 3
     : 2;
+
+  const handleStartWorkout = () => {
+    navigate('/training');
+  };
+
+  const handleOpenCoach = () => {
+    outletContext.onOpenCoach?.();
+  };
 
   if (isLoading) {
     return (
@@ -253,28 +287,51 @@ const HomePage = () => {
           <Skeleton className="h-8 w-48" />
         </div>
         <Skeleton className="mb-4 h-24 w-full rounded-2xl" />
-        <div className="mb-4 grid grid-cols-2 gap-3">
-          <Skeleton className="h-32 rounded-2xl" />
-          <Skeleton className="h-32 rounded-2xl" />
-        </div>
+        <Skeleton className="mb-4 h-32 w-full rounded-2xl" />
         <Skeleton className="mb-4 h-20 w-full rounded-2xl" />
-        <Skeleton className="h-24 w-full rounded-2xl" />
       </div>
     );
   }
 
   return (
-    <div className="safe-top px-4 pb-4 pt-2">
+    <div className="safe-top px-4 pb-24 md:pb-4 pt-2">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-4">
         <span className="text-sm text-muted-foreground">Bonjour 👋</span>
         <h1 className="text-2xl font-bold text-foreground">
           {firstName}, <span className="text-gradient-primary">prêt à transpirer ?</span>
         </h1>
       </div>
 
+      {/* Contextual Alert Chips */}
+      <ContextualAlertChips
+        weeklySessionsCompleted={weeklySessionsCompleted}
+        sleepHours={healthStats.sleepHours}
+        caloriesPercentage={caloriesPercentage}
+      />
+
+      {/* Smart Action Card - Hero Section */}
+      <SmartActionCard
+        preparedWorkout={preparedWorkout ? {
+          name: preparedWorkout.workout_name,
+          targetMuscles: preparedWorkout.target_muscles,
+        } : null}
+        onStartWorkout={handleStartWorkout}
+        onOpenCoach={handleOpenCoach}
+      />
+
+      {/* Circular Progress Rings */}
+      <CircularProgressRings
+        caloriesConsumed={caloriesConsumed}
+        caloriesGoal={caloriesGoal}
+        proteinConsumed={proteinConsumed}
+        proteinGoal={proteinGoal}
+        waterConsumed={waterConsumed}
+        waterGoal={waterGoal}
+      />
+
       {/* Goal Progress Card */}
-      <div>
+      <div className="mb-4">
         <GoalProgressCard 
           profile={profile} 
           currentWeight={currentWeight}
@@ -282,104 +339,8 @@ const HomePage = () => {
         />
       </div>
 
-      {/* Nutrition summary - Calories, Protéines, Hydratation */}
-      <div className="mb-4 grid grid-cols-3 gap-2">
-        {/* Calories Card */}
-        <div className="card-premium p-3 group">
-          <div className="mb-1.5 flex items-center gap-1.5">
-            <div className="relative">
-              <Flame className="h-3.5 w-3.5 text-primary" />
-              <div className="absolute inset-0 bg-primary/30 blur-sm rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
-            <span className="text-xs text-muted-foreground leading-tight">Calories<br/>consommées</span>
-          </div>
-          {caloriesConsumed > 0 ? (
-            <>
-              <p className="mb-1.5 text-lg font-bold text-foreground">
-                {caloriesConsumed}
-                <span className="text-xs font-normal text-muted-foreground">
-                  /{caloriesGoal}
-                </span>
-              </p>
-              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                <div 
-                  className="h-full rounded-full bg-gradient-to-r from-primary to-primary-glow transition-all"
-                  style={{ width: `${Math.min(caloriesPercentage, 100)}%` }}
-                />
-              </div>
-            </>
-          ) : (
-            <div className="py-1">
-              <p className="text-sm text-muted-foreground">0/{caloriesGoal}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Protein Card */}
-        <div className="card-premium p-3 group">
-          <div className="mb-1.5 flex items-center gap-1.5">
-            <div className="relative">
-              <Beef className="h-3.5 w-3.5 text-primary" />
-              <div className="absolute inset-0 bg-primary/30 blur-sm rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
-            <span className="text-xs text-muted-foreground">Protéines</span>
-          </div>
-          {proteinConsumed > 0 ? (
-            <>
-              <p className="mb-1.5 text-lg font-bold text-foreground">
-                {proteinConsumed}g
-                <span className="text-xs font-normal text-muted-foreground">
-                  /{proteinGoal}g
-                </span>
-              </p>
-              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                <div 
-                  className="h-full rounded-full bg-gradient-to-r from-primary to-primary-glow transition-all"
-                  style={{ width: `${Math.min(proteinPercentage, 100)}%` }}
-                />
-              </div>
-            </>
-          ) : (
-            <div className="py-1">
-              <p className="text-sm text-muted-foreground">0/{proteinGoal}g</p>
-            </div>
-          )}
-        </div>
-
-        {/* Hydration Card */}
-        <div className="card-premium p-3 group">
-          <div className="mb-1.5 flex items-center gap-1.5">
-            <div className="relative">
-              <Droplets className="h-3.5 w-3.5 text-water" />
-              <div className="absolute inset-0 bg-water/30 blur-sm rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
-            <span className="text-xs text-muted-foreground">Hydratation</span>
-          </div>
-          {waterConsumed > 0 ? (
-            <>
-              <p className="mb-1.5 text-lg font-bold text-foreground">
-                {(waterConsumed / 1000).toFixed(1)}L
-                <span className="text-xs font-normal text-muted-foreground">
-                  /{(waterGoal / 1000).toFixed(1)}L
-                </span>
-              </p>
-              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                <div 
-                  className="h-full rounded-full bg-gradient-to-r from-water to-water/70 transition-all"
-                  style={{ width: `${Math.min(waterPercentage, 100)}%` }}
-                />
-              </div>
-            </>
-          ) : (
-            <div className="py-1">
-              <p className="text-sm text-muted-foreground">0/{(waterGoal / 1000).toFixed(1)}L</p>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Daily Tips */}
-      <div>
+      <div className="mb-4">
         <DailyTipsCard />
       </div>
 
@@ -416,7 +377,6 @@ const HomePage = () => {
       <div className="mb-4">
         <p className="mb-3 text-sm font-medium text-foreground">Accès rapide</p>
         <div className="space-y-2">
-          {/* Add meal button */}
           <button
             onClick={() => navigate('/journal')}
             className="flex w-full items-center justify-between card-premium p-4"
@@ -424,7 +384,6 @@ const HomePage = () => {
             <div className="flex items-center gap-3">
               <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
                 <Plus className="h-5 w-5 text-primary" />
-                <div className="absolute inset-0 rounded-xl bg-primary/20 blur-sm -z-10 opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
               <div className="text-left">
                 <p className="font-medium text-foreground">Ajouter au journal</p>
@@ -434,7 +393,6 @@ const HomePage = () => {
             <ChevronRight className="h-5 w-5 text-muted-foreground" />
           </button>
 
-          {/* View journal button */}
           <button
             onClick={() => navigate('/journal')}
             className="flex w-full items-center justify-between card-premium p-4"
@@ -451,7 +409,6 @@ const HomePage = () => {
             <ChevronRight className="h-5 w-5 text-muted-foreground" />
           </button>
 
-          {/* Goal button */}
           <button
             onClick={() => setIsGoalModalOpen(true)}
             className="flex w-full items-center justify-between card-premium p-4"
