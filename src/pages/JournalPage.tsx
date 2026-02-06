@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { format, startOfDay, isToday, isYesterday, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Dumbbell, Droplets, ChevronLeft, ChevronRight, Plus, Calendar, Coffee, UtensilsCrossed, Moon, Cookie } from 'lucide-react';
+import { Dumbbell, Droplets, ChevronLeft, ChevronRight, Plus, Calendar, Coffee, UtensilsCrossed, Moon, Cookie, Zap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ interface JournalEntry {
   mealType?: string;
   time: Date;
   meta?: string;
+  status?: string;
 }
 
 const JournalPage = () => {
@@ -41,12 +42,11 @@ const JournalPage = () => {
 
       const allEntries: JournalEntry[] = [];
 
-      // Fetch workout sessions (completed or in_progress)
+      // Fetch ALL workout sessions for this day (completed, in_progress, aborted)
       const { data: workouts } = await supabase
         .from('workout_sessions')
         .select('id, workout_name, started_at, completed_at, total_duration_seconds, target_muscles, status')
         .eq('user_id', user.id)
-        .in('status', ['completed', 'in_progress'])
         .gte('started_at', startOfDayDate.toISOString())
         .lt('started_at', endOfDayDate.toISOString())
         .order('started_at', { ascending: true });
@@ -54,12 +54,20 @@ const JournalPage = () => {
       if (workouts) {
         workouts.forEach(w => {
           let duration = '';
-          if (w.total_duration_seconds) {
-            duration = `${Math.round(w.total_duration_seconds / 60)} min`;
-          } else if (w.status === 'completed') {
-            duration = 'Terminée';
-          } else {
+          let statusLabel = '';
+          if (w.status === 'completed') {
+            if (w.total_duration_seconds) {
+              duration = `${Math.round(w.total_duration_seconds / 60)} min`;
+            } else {
+              duration = 'Terminée';
+            }
+            statusLabel = 'completed';
+          } else if (w.status === 'in_progress') {
             duration = 'En cours';
+            statusLabel = 'in_progress';
+          } else if (w.status === 'aborted') {
+            duration = 'Abandonnée';
+            statusLabel = 'aborted';
           }
           allEntries.push({
             id: `workout-${w.id}`,
@@ -68,6 +76,7 @@ const JournalPage = () => {
             subtitle: w.target_muscles?.join(', ') || 'Entraînement',
             time: parseISO(w.started_at),
             meta: duration,
+            status: statusLabel,
           });
         });
       }
@@ -160,12 +169,61 @@ const JournalPage = () => {
     }
   };
 
-  const getEntryColor = (type: JournalEntry['type']) => {
-    switch (type) {
-      case 'workout': return 'text-energy bg-energy/10 border-l-4 border-l-energy';
-      case 'meal': return 'text-calories bg-calories/10 border-l-4 border-l-calories';
-      case 'water': return 'text-water bg-water/10 border-l-4 border-l-water';
+  const getWorkoutStatusColor = (status?: string) => {
+    switch (status) {
+      case 'completed': return 'text-green-600 bg-green-500/10';
+      case 'in_progress': return 'text-energy bg-energy/10';
+      case 'aborted': return 'text-muted-foreground bg-muted/50';
+      default: return 'text-energy bg-energy/10';
     }
+  };
+
+  // Separate workouts from nutrition/water
+  const workoutEntries = entries.filter(e => e.type === 'workout');
+  const nutritionEntries = entries.filter(e => e.type === 'meal' || e.type === 'water');
+
+  const renderEntry = (entry: JournalEntry) => {
+    const Icon = getEntryIcon(entry.type, entry.mealType);
+    
+    let colorClass = '';
+    if (entry.type === 'workout') {
+      colorClass = getWorkoutStatusColor(entry.status);
+    } else if (entry.type === 'meal') {
+      colorClass = 'text-calories bg-calories/10';
+    } else {
+      colorClass = 'text-water bg-water/10';
+    }
+
+    return (
+      <div key={entry.id} className="flex gap-3 rounded-xl bg-card border border-border/50 p-3">
+        {/* Icon */}
+        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${colorClass}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <h3 className="font-medium text-foreground text-sm truncate">{entry.title}</h3>
+              {entry.subtitle && (
+                <p className="text-xs text-muted-foreground truncate">{entry.subtitle}</p>
+              )}
+            </div>
+            <div className="flex-shrink-0 text-right">
+              <p className="text-xs font-medium text-foreground">
+                {format(entry.time, 'HH:mm')}
+              </p>
+              {entry.meta && (
+                <p className={`text-xs ${entry.status === 'aborted' ? 'text-muted-foreground/70' : 'text-muted-foreground'}`}>
+                  {entry.meta}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -211,13 +269,13 @@ const JournalPage = () => {
         </div>
       </header>
 
-      {/* Timeline */}
+      {/* Content */}
       <div className="flex-1 px-4 py-6">
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="flex gap-4">
-                <Skeleton className="h-12 w-12 rounded-full flex-shrink-0" />
+                <Skeleton className="h-12 w-12 rounded-xl flex-shrink-0" />
                 <div className="flex-1 space-y-2">
                   <Skeleton className="h-4 w-3/4" />
                   <Skeleton className="h-3 w-1/2" />
@@ -256,46 +314,39 @@ const JournalPage = () => {
             </div>
           </div>
         ) : (
-          <div className="relative">
-            {/* Timeline line */}
-            <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-border/50" />
+          <div className="space-y-6">
+            {/* Workout Section */}
+            {workoutEntries.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-3">
+                  <Zap className="h-4 w-4 text-energy" />
+                  <h2 className="text-sm font-semibold text-foreground">Entraînements</h2>
+                  <span className="text-xs text-muted-foreground">({workoutEntries.length})</span>
+                </div>
+                <div className="space-y-2">
+                  {workoutEntries.map(renderEntry)}
+                </div>
+              </section>
+            )}
 
-            {/* Entries */}
-            <div className="space-y-6">
-              {entries.map((entry, index) => {
-                const Icon = getEntryIcon(entry.type, entry.mealType);
-                const colorClass = getEntryColor(entry.type);
+            {/* Separator if both sections have content */}
+            {workoutEntries.length > 0 && nutritionEntries.length > 0 && (
+              <div className="border-t border-border/50" />
+            )}
 
-                return (
-                  <div key={entry.id} className="relative flex gap-4 pl-0">
-                    {/* Icon + Type indicator */}
-                    <div className={`relative z-10 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl ${colorClass}`}>
-                      <Icon className="h-5 w-5" />
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0 pt-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-medium text-foreground truncate">{entry.title}</h3>
-                          {entry.subtitle && (
-                            <p className="text-sm text-muted-foreground truncate">{entry.subtitle}</p>
-                          )}
-                        </div>
-                        <div className="flex-shrink-0 text-right">
-                          <p className="text-sm font-medium text-foreground">
-                            {format(entry.time, 'HH:mm')}
-                          </p>
-                          {entry.meta && (
-                            <p className="text-xs text-muted-foreground">{entry.meta}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            {/* Nutrition Section */}
+            {nutritionEntries.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-3">
+                  <UtensilsCrossed className="h-4 w-4 text-calories" />
+                  <h2 className="text-sm font-semibold text-foreground">Nutrition</h2>
+                  <span className="text-xs text-muted-foreground">({nutritionEntries.length})</span>
+                </div>
+                <div className="space-y-2">
+                  {nutritionEntries.map(renderEntry)}
+                </div>
+              </section>
+            )}
           </div>
         )}
       </div>
