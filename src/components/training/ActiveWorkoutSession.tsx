@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Play, Pause, SkipForward, Check, X, Edit2, Timer, Dumbbell } from 'lucide-react';
+import { Play, Pause, SkipForward, Check, X, Edit2, Timer, Dumbbell, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Workout } from './NextWorkoutCard';
 import { getExerciseIcon } from './ExerciseIcons';
+import { ExerciseDetailSheet } from './ExerciseDetailSheet';
 
 interface ExerciseLog {
   exercise_name: string;
@@ -65,6 +66,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
 
   const [editingExercise, setEditingExercise] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ sets: '', reps: '', weight: '' });
+  const [viewingExerciseIndex, setViewingExerciseIndex] = useState<number | null>(null);
 
   const currentExercise = workout.exercises[currentExerciseIndex];
   const currentLog = exerciseLogs[currentExerciseIndex];
@@ -383,9 +385,15 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
       <div className="flex-1 flex flex-col items-center justify-center p-6">
         {phase === 'exercise' ? (
           <>
-            <div className="h-32 w-32 rounded-2xl card-premium flex items-center justify-center mb-6">
+            <button
+              onClick={() => setViewingExerciseIndex(currentExerciseIndex)}
+              className="h-32 w-32 rounded-2xl card-premium flex items-center justify-center mb-6 transition-all hover:border-primary/50 hover:shadow-glow-sm active:scale-95 relative group"
+            >
               <ExerciseIcon className="h-24 w-24 text-primary" />
-            </div>
+              <div className="absolute bottom-1 right-1 h-6 w-6 rounded-full bg-primary/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Info className="h-3 w-3 text-primary" />
+              </div>
+            </button>
             
             <h2 className="text-xl font-bold text-center mb-2">{currentExercise?.name}</h2>
             
@@ -401,15 +409,24 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
               <p className="font-mono text-3xl font-bold">{formatTime(phaseTime)}</p>
             </div>
 
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="mb-4"
-              onClick={() => handleEditExercise(currentExerciseIndex)}
-            >
-              <Edit2 className="h-4 w-4 mr-2" />
-              Modifier
-            </Button>
+            <div className="flex gap-2 mb-4">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setViewingExerciseIndex(currentExerciseIndex)}
+              >
+                <Info className="h-4 w-4 mr-2" />
+                Voir l'exercice
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => handleEditExercise(currentExerciseIndex)}
+              >
+                <Edit2 className="h-4 w-4 mr-2" />
+                Modifier
+              </Button>
+            </div>
           </>
         ) : (
           <>
@@ -423,6 +440,19 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
             <div className="card-premium px-8 py-4 mb-8 border-energy/30">
               <p className="font-mono text-4xl font-bold text-energy">{formatTime(restTimeRemaining)}</p>
             </div>
+
+            {/* Button to preview next exercise during rest */}
+            {workout.exercises[currentExerciseIndex + 1] && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewingExerciseIndex(currentExerciseIndex + 1)}
+                className="text-muted-foreground"
+              >
+                <Info className="h-4 w-4 mr-2" />
+                Voir l'exercice suivant
+              </Button>
+            )}
           </>
         )}
       </div>
@@ -521,6 +551,17 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Exercise Detail Sheet */}
+      <ExerciseDetailSheet
+        isOpen={viewingExerciseIndex !== null}
+        onClose={() => setViewingExerciseIndex(null)}
+        exerciseName={viewingExerciseIndex !== null ? workout.exercises[viewingExerciseIndex]?.name || '' : ''}
+        sets={viewingExerciseIndex !== null ? exerciseLogs[viewingExerciseIndex]?.actual_sets : undefined}
+        reps={viewingExerciseIndex !== null ? exerciseLogs[viewingExerciseIndex]?.actual_reps : undefined}
+        weight={viewingExerciseIndex !== null ? exerciseLogs[viewingExerciseIndex]?.actual_weight : undefined}
+        notes={viewingExerciseIndex !== null ? workout.exercises[viewingExerciseIndex]?.notes : undefined}
+      />
     </div>
   );
 };
