@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
 import { format, startOfDay, isToday, isYesterday, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Dumbbell, Apple, Droplets, ChevronLeft, ChevronRight, Plus, Calendar } from 'lucide-react';
+import { Dumbbell, Droplets, ChevronLeft, ChevronRight, Plus, Calendar, Coffee, UtensilsCrossed, Moon, Cookie } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 
 interface JournalEntry {
   id: string;
   type: 'workout' | 'meal' | 'water';
   title: string;
   subtitle?: string;
+  mealType?: string;
   time: Date;
   meta?: string;
 }
