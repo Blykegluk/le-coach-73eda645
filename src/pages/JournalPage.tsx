@@ -53,9 +53,14 @@ const JournalPage = () => {
 
       if (workouts) {
         workouts.forEach(w => {
-          const duration = w.total_duration_seconds 
-            ? `${Math.round(w.total_duration_seconds / 60)} min`
-            : w.completed_at ? 'Terminée' : 'En cours';
+          let duration = '';
+          if (w.total_duration_seconds) {
+            duration = `${Math.round(w.total_duration_seconds / 60)} min`;
+          } else if (w.status === 'completed') {
+            duration = 'Terminée';
+          } else {
+            duration = 'En cours';
+          }
           allEntries.push({
             id: `workout-${w.id}`,
             type: 'workout',
