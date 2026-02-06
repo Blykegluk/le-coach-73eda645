@@ -29,8 +29,9 @@ interface ExerciseDetail {
   muscles_targeted: string[];
   tips: string[];
   common_mistakes: string[];
+  images?: string[];
   video_url?: string;
-  media_type?: 'image' | 'video';
+  media_type?: 'image' | 'video' | 'images';
 }
 
 const CACHE_KEY_PREFIX = 'exercise_detail_';
