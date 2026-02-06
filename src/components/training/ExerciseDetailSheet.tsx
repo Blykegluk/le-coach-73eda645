@@ -178,25 +178,33 @@ export const ExerciseDetailSheet = ({
             </div>
           ) : detail ? (
             <>
-              {/* Video section */}
+              {/* Media section */}
               <div className="rounded-2xl overflow-hidden bg-muted/30 border border-border">
                 {detail.video_url ? (
-                  <video
-                    src={detail.video_url}
-                    controls
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="w-full aspect-video object-cover"
-                  />
+                  detail.media_type === 'video' ? (
+                    <video
+                      src={detail.video_url}
+                      controls
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full aspect-video object-cover"
+                    />
+                  ) : (
+                    <img
+                      src={detail.video_url}
+                      alt={`Démonstration de ${exerciseName}`}
+                      className="w-full aspect-video object-cover"
+                    />
+                  )
                 ) : (
                   <div className="aspect-video flex flex-col items-center justify-center p-6">
                     <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                       <Play className="h-10 w-10 text-primary" />
                     </div>
                     <p className="text-sm text-muted-foreground text-center mb-4">
-                      Génère une démonstration vidéo de l'exercice
+                      Génère une image de démonstration de l'exercice
                     </p>
                     <Button 
                       onClick={generateVideo} 
@@ -211,7 +219,7 @@ export const ExerciseDetailSheet = ({
                       ) : (
                         <>
                           <Play className="h-4 w-4" />
-                          Générer la vidéo
+                          Générer l'image
                         </>
                       )}
                     </Button>
