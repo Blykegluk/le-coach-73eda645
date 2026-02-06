@@ -356,6 +356,19 @@ const HomePage = () => {
     );
   }
 
+  // Show active session if active
+  if (isSessionActive && preparedWorkout) {
+    return (
+      <div className="safe-top px-4 pb-24 md:pb-4 pt-2">
+        <ActiveWorkoutSession 
+          workout={preparedWorkout}
+          onClose={() => setIsSessionActive(false)}
+          onComplete={handleSessionComplete}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="safe-top px-4 pb-24 md:pb-4 pt-2">
       {/* Header */}
@@ -365,10 +378,6 @@ const HomePage = () => {
           {firstName}, <span className="text-gradient-primary">prêt à transpirer ?</span>
         </h1>
       </div>
-
-      {/* Contextual Alert Chips */}
-      <ContextualAlertChips
-        weeklySessionsCompleted={weeklySessionsCompleted}
         sleepHours={healthStats.sleepHours}
         caloriesPercentage={caloriesPercentage}
       />
