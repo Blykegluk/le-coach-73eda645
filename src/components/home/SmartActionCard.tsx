@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Play, Utensils, Droplets, Moon, Dumbbell, ChevronRight } from 'lucide-react';
+import { Play, Utensils, Droplets, Moon, Dumbbell, ChevronRight, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface SmartActionCardProps {
@@ -9,6 +9,7 @@ interface SmartActionCardProps {
   } | null;
   onStartWorkout?: () => void;
   onOpenCoach?: () => void;
+  onPreviewWorkout?: () => void;
 }
 
 type ActionType = 'workout' | 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'hydration' | 'sleep';
