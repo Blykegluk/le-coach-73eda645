@@ -378,6 +378,10 @@ const HomePage = () => {
           {firstName}, <span className="text-gradient-primary">prêt à transpirer ?</span>
         </h1>
       </div>
+
+      {/* Contextual Alert Chips */}
+      <ContextualAlertChips
+        weeklySessionsCompleted={weeklySessionsCompleted}
         sleepHours={healthStats.sleepHours}
         caloriesPercentage={caloriesPercentage}
       />
