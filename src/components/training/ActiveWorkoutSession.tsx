@@ -66,6 +66,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
 
   const [editingExercise, setEditingExercise] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ sets: '', reps: '', weight: '' });
+  const [viewingExerciseIndex, setViewingExerciseIndex] = useState<number | null>(null);
 
   const currentExercise = workout.exercises[currentExerciseIndex];
   const currentLog = exerciseLogs[currentExerciseIndex];
