@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Play, Pause, SkipForward, Check, X, Edit2, Timer, Dumbbell, Info } from 'lucide-react';
+import { Play, Pause, SkipForward, Check, X, Edit2, Timer, Dumbbell, Info, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { Workout } from './NextWorkoutCard';
 import { getExerciseIcon } from './ExerciseIcons';
 import { ExerciseDetailSheet } from './ExerciseDetailSheet';
-
+import ExerciseFeedbackButtons, { FeedbackType } from './ExerciseFeedbackButtons';
 interface ExerciseLog {
   exercise_name: string;
   exercise_order: number;
@@ -23,6 +23,7 @@ interface ExerciseLog {
   rest_seconds: number;
   duration_seconds: number;
   skipped: boolean;
+  feedback?: ExerciseFeedback;
 }
 
 interface ActiveWorkoutSessionProps {
@@ -32,7 +33,7 @@ interface ActiveWorkoutSessionProps {
 }
 
 type SessionPhase = 'exercise' | 'rest' | 'completed';
-
+type ExerciseFeedback = 'too_easy' | 'pain' | 'ok' | null;
 const formatTime = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
@@ -61,8 +62,12 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
       rest_seconds: ex.rest_seconds,
       duration_seconds: 0,
       skipped: false,
+      feedback: null,
     }))
   );
+  
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [isProcessingFeedback, setIsProcessingFeedback] = useState(false);
 
   const [editingExercise, setEditingExercise] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ sets: '', reps: '', weight: '' });
@@ -157,8 +162,67 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
     setExerciseLogs(logs => logs.map((log, i) => 
       i === currentExerciseIndex ? { ...log, skipped: true } : log
     ));
+    setFeedbackMessage(null);
     handleNextExercise();
   }, [currentExerciseIndex, handleNextExercise]);
+
+  // Handle in-flow feedback
+  const handleFeedback = useCallback(async (feedbackType: FeedbackType) => {
+    setIsProcessingFeedback(true);
+    
+    // Store feedback for current exercise
+    setExerciseLogs(logs => logs.map((log, i) => 
+      i === currentExerciseIndex ? { ...log, feedback: feedbackType } : log
+    ));
+    
+    // Generate contextual response based on feedback
+    let message = '';
+    let adjustment = null;
+    
+    switch (feedbackType) {
+      case 'too_easy':
+        // Suggest increasing weight or reps
+        const currentWeight = currentLog?.actual_weight || '';
+        const weightMatch = currentWeight.match(/(\d+)/);
+        if (weightMatch) {
+          const newWeight = Math.round(parseInt(weightMatch[1]) * 1.1);
+          adjustment = { weight: currentWeight.replace(/\d+/, newWeight.toString()) };
+          message = `💪 Bien joué ! Je te propose ${adjustment.weight} pour la prochaine série.`;
+        } else {
+          message = '💪 Super ! Essaie d\'augmenter légèrement la charge.';
+        }
+        break;
+        
+      case 'pain':
+        message = '⚠️ Stop ! Passe à l\'exercice suivant ou réduis la charge de 20%.';
+        // Suggest reducing weight
+        const painWeight = currentLog?.actual_weight || '';
+        const painMatch = painWeight.match(/(\d+)/);
+        if (painMatch) {
+          const reducedWeight = Math.round(parseInt(painMatch[1]) * 0.8);
+          adjustment = { weight: painWeight.replace(/\d+/, reducedWeight.toString()) };
+        }
+        break;
+        
+      case 'ok':
+        message = '✅ Parfait, continue comme ça !';
+        break;
+    }
+    
+    setFeedbackMessage(message);
+    
+    // Apply weight adjustment if suggested
+    if (adjustment?.weight) {
+      setExerciseLogs(logs => logs.map((log, i) => 
+        i === currentExerciseIndex ? { ...log, actual_weight: adjustment.weight } : log
+      ));
+    }
+    
+    setIsProcessingFeedback(false);
+    
+    // Auto-hide message after 3 seconds
+    setTimeout(() => setFeedbackMessage(null), 4000);
+  }, [currentExerciseIndex, currentLog]);
 
   const handleEditExercise = (index: number) => {
     const log = exerciseLogs[index];
@@ -409,7 +473,23 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
               <p className="font-mono text-3xl font-bold">{formatTime(phaseTime)}</p>
             </div>
 
-            <div className="flex gap-2 mb-4">
+            {/* Feedback Message */}
+            {feedbackMessage && (
+              <div className="mb-4 px-4 py-2 rounded-xl bg-primary/10 border border-primary/30 animate-fade-in">
+                <p className="text-sm text-center">{feedbackMessage}</p>
+              </div>
+            )}
+
+            {/* In-Flow Feedback Buttons */}
+            <div className="mb-4 w-full max-w-xs">
+              <p className="text-xs text-muted-foreground text-center mb-2">Comment te sens-tu ?</p>
+              <ExerciseFeedbackButtons 
+                onFeedback={handleFeedback} 
+                isLoading={isProcessingFeedback}
+              />
+            </div>
+
+            <div className="flex gap-2">
               <Button 
                 variant="outline" 
                 size="sm"
