@@ -22,6 +22,7 @@ const JournalPage = () => {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+  const { onOpenCoach } = useOutletContext<{ onOpenCoach: () => void }>();
 
   useEffect(() => {
     loadEntries();
