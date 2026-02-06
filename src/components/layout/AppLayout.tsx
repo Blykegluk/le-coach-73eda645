@@ -7,21 +7,23 @@ import CoachDrawer from './CoachDrawer';
 const AppLayout = () => {
   const [isCoachOpen, setIsCoachOpen] = useState(false);
 
+  const handleOpenCoach = () => setIsCoachOpen(true);
+
   return (
     <div className="flex h-[100dvh] min-h-[100dvh] w-screen overflow-hidden bg-gradient-glow">
       {/* Desktop Sidebar */}
-      <DesktopSidebar onOpenCoach={() => setIsCoachOpen(true)} />
+      <DesktopSidebar onOpenCoach={handleOpenCoach} />
       
       {/* Main content area */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Scrollable content */}
         <main className="flex-1 overflow-y-auto">
-          <Outlet />
+          <Outlet context={{ onOpenCoach: handleOpenCoach }} />
         </main>
         
         {/* Mobile TabBar */}
         <div className="flex-shrink-0">
-          <MobileTabBar onOpenCoach={() => setIsCoachOpen(true)} />
+          <MobileTabBar onOpenCoach={handleOpenCoach} />
         </div>
       </div>
 
