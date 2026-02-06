@@ -14,6 +14,7 @@ import HealthStatsCard from '@/components/home/HealthStatsCard';
 import SmartActionCard from '@/components/home/SmartActionCard';
 import CircularProgressRings from '@/components/home/CircularProgressRings';
 import ContextualAlertChips from '@/components/home/ContextualAlertChips';
+import WorkoutPreviewSheet from '@/components/home/WorkoutPreviewSheet';
 import { useNutritionGoals } from '@/hooks/useNutritionGoals';
 import { Workout } from '@/components/training/NextWorkoutCard';
 
@@ -37,6 +38,7 @@ const HomePage = () => {
   const [proteinConsumed, setProteinConsumed] = useState<number>(0);
   const [caloriesConsumed, setCaloriesConsumed] = useState<number>(0);
   const [preparedWorkout, setPreparedWorkout] = useState<Workout | null>(null);
+  const [isWorkoutPreviewOpen, setIsWorkoutPreviewOpen] = useState(false);
   const [healthStats, setHealthStats] = useState({
     sleepHours: null as number | null,
     steps: null as number | null,
@@ -272,11 +274,18 @@ const HomePage = () => {
     : 2;
 
   const handleStartWorkout = () => {
+    setIsWorkoutPreviewOpen(false);
     navigate('/training');
   };
 
   const handleOpenCoach = () => {
     outletContext.onOpenCoach?.();
+  };
+
+  const handlePreviewWorkout = () => {
+    if (preparedWorkout) {
+      setIsWorkoutPreviewOpen(true);
+    }
   };
 
   if (isLoading) {
@@ -318,6 +327,7 @@ const HomePage = () => {
         } : null}
         onStartWorkout={handleStartWorkout}
         onOpenCoach={handleOpenCoach}
+        onPreviewWorkout={handlePreviewWorkout}
       />
 
       {/* Circular Progress Rings */}
@@ -445,6 +455,14 @@ const HomePage = () => {
         onClose={() => setIsGoalModalOpen(false)}
         currentGoal={profile?.goal}
         currentTargetWeight={profile?.target_weight_kg}
+      />
+
+      {/* Workout Preview Sheet */}
+      <WorkoutPreviewSheet
+        isOpen={isWorkoutPreviewOpen}
+        onClose={() => setIsWorkoutPreviewOpen(false)}
+        workout={preparedWorkout}
+        onStartWorkout={handleStartWorkout}
       />
     </div>
   );

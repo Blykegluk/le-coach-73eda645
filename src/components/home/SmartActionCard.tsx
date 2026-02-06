@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Play, Utensils, Droplets, Moon, Dumbbell, ChevronRight } from 'lucide-react';
+import { Play, Utensils, Droplets, Moon, Dumbbell, ChevronRight, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface SmartActionCardProps {
@@ -9,6 +9,7 @@ interface SmartActionCardProps {
   } | null;
   onStartWorkout?: () => void;
   onOpenCoach?: () => void;
+  onPreviewWorkout?: () => void;
 }
 
 type ActionType = 'workout' | 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'hydration' | 'sleep';
@@ -23,7 +24,7 @@ interface ActionConfig {
   iconBg: string;
 }
 
-const SmartActionCard = ({ preparedWorkout, onStartWorkout, onOpenCoach }: SmartActionCardProps) => {
+const SmartActionCard = ({ preparedWorkout, onStartWorkout, onOpenCoach, onPreviewWorkout }: SmartActionCardProps) => {
   const navigate = useNavigate();
   
   // Determine the best action based on context
@@ -168,15 +169,27 @@ const SmartActionCard = ({ preparedWorkout, onStartWorkout, onOpenCoach }: Smart
             </div>
           </div>
           
-          {/* Action button */}
-          <Button
-            onClick={handleAction}
-            size="lg"
-            className={`bg-gradient-to-r ${action.gradient} text-white font-semibold rounded-xl px-6 shadow-glow-sm hover:shadow-glow-md transition-all`}
-          >
-            {action.buttonText}
-            <ChevronRight className="ml-1 h-4 w-4" />
-          </Button>
+          {/* Action buttons */}
+          <div className="flex gap-2">
+            {action.type === 'workout' && onPreviewWorkout && (
+              <Button
+                onClick={onPreviewWorkout}
+                variant="outline"
+                size="lg"
+                className="rounded-xl"
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+            )}
+            <Button
+              onClick={handleAction}
+              size="lg"
+              className={`bg-gradient-to-r ${action.gradient} text-white font-semibold rounded-xl px-6 shadow-glow-sm hover:shadow-glow-md transition-all`}
+            >
+              {action.buttonText}
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
         </div>
         
         {/* Workout-specific extras */}

@@ -40,10 +40,12 @@ const JournalPage = () => {
       const allEntries: JournalEntry[] = [];
 
       // Fetch workout sessions
+      // Only fetch COMPLETED workout sessions
       const { data: workouts } = await supabase
         .from('workout_sessions')
         .select('id, workout_name, started_at, completed_at, total_duration_seconds, target_muscles')
         .eq('user_id', user.id)
+        .eq('status', 'completed')
         .gte('started_at', startOfDayDate.toISOString())
         .lt('started_at', endOfDayDate.toISOString())
         .order('started_at', { ascending: true });
@@ -143,9 +145,9 @@ const JournalPage = () => {
 
   const getEntryColor = (type: JournalEntry['type']) => {
     switch (type) {
-      case 'workout': return 'text-energy bg-energy/10';
-      case 'meal': return 'text-calories bg-calories/10';
-      case 'water': return 'text-water bg-water/10';
+      case 'workout': return 'text-energy bg-energy/10 border-l-4 border-l-energy';
+      case 'meal': return 'text-calories bg-calories/10 border-l-4 border-l-calories';
+      case 'water': return 'text-water bg-water/10 border-l-4 border-l-water';
     }
   };
 
@@ -249,8 +251,8 @@ const JournalPage = () => {
 
                 return (
                   <div key={entry.id} className="relative flex gap-4 pl-0">
-                    {/* Icon */}
-                    <div className={`relative z-10 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full ${colorClass}`}>
+                    {/* Icon + Type indicator */}
+                    <div className={`relative z-10 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl ${colorClass}`}>
                       <Icon className="h-5 w-5" />
                     </div>
 
