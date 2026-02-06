@@ -62,8 +62,12 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
       rest_seconds: ex.rest_seconds,
       duration_seconds: 0,
       skipped: false,
+      feedback: null,
     }))
   );
+  
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [isProcessingFeedback, setIsProcessingFeedback] = useState(false);
 
   const [editingExercise, setEditingExercise] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ sets: '', reps: '', weight: '' });
