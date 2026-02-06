@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { HealthMetrics } from '@/providers/health';
 import { Skeleton } from '@/components/ui/skeleton';
 import GoalEditorModal from '@/components/profile/GoalEditorModal';
-import GoalProgressCard from '@/components/home/GoalProgressCard';
+
 import DailyTipsCard from '@/components/home/DailyTipsCard';
 import HealthStatsCard from '@/components/home/HealthStatsCard';
 import SmartActionCard from '@/components/home/SmartActionCard';
@@ -407,14 +407,6 @@ const HomePage = () => {
         waterGoal={waterGoal}
       />
 
-      {/* Goal Progress Card */}
-      <div className="mb-4">
-        <GoalProgressCard 
-          profile={profile} 
-          currentWeight={currentWeight}
-          currentBodyFat={currentBodyFat}
-        />
-      </div>
 
       {/* Daily Tips */}
       <div className="mb-4">
