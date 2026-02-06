@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { format, startOfDay, isToday, isYesterday, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Dumbbell, Droplets, ChevronLeft, ChevronRight, Plus, Calendar, Zap } from 'lucide-react';
+import { Dumbbell, Droplets, ChevronLeft, ChevronRight, Plus, Calendar, Zap, UtensilsCrossed } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
