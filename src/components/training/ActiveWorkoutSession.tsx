@@ -32,7 +32,7 @@ interface ActiveWorkoutSessionProps {
 }
 
 type SessionPhase = 'exercise' | 'rest' | 'completed';
-
+type ExerciseFeedback = 'too_easy' | 'pain' | 'ok' | null;
 const formatTime = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
