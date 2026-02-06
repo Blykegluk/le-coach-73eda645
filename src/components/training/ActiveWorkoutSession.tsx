@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Play, Pause, SkipForward, Check, X, Edit2, Timer, Dumbbell } from 'lucide-react';
+import { Play, Pause, SkipForward, Check, X, Edit2, Timer, Dumbbell, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Workout } from './NextWorkoutCard';
 import { getExerciseIcon } from './ExerciseIcons';
+import { ExerciseDetailSheet } from './ExerciseDetailSheet';
 
 interface ExerciseLog {
   exercise_name: string;
