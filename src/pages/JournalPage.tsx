@@ -148,13 +148,16 @@ const JournalPage = () => {
     }
   };
 
-  const getWorkoutStatusColor = (status?: string) => {
-    switch (status) {
-      case 'completed': return 'text-green-600 bg-green-500/10';
-      case 'in_progress': return 'text-energy bg-energy/10';
-      case 'aborted': return 'text-muted-foreground bg-muted/50';
-      default: return 'text-energy bg-energy/10';
+  const getEntryColorClasses = (entry: JournalEntry): string => {
+    if (entry.type === 'workout') {
+      // Always completed now, use a success/green token via primary
+      return 'text-primary bg-primary/10';
     }
+    if (entry.type === 'meal') {
+      return getMealColorClasses(entry.mealType || 'lunch');
+    }
+    // water
+    return 'text-water bg-water/10';
   };
 
   // Separate workouts from nutrition/water
