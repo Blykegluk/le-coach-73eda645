@@ -10,11 +10,8 @@ import ProtectedRoute from "@/components/layout/ProtectedRoute";
 import OnboardingGate from "@/components/layout/OnboardingGate";
 import AppLayout from "./components/layout/AppLayout";
 import HomePage from "./pages/HomePage";
-import TrainingPage from "./pages/TrainingPage";
-import NutritionPage from "./pages/NutritionPage";
-import PerformancePage from "./pages/PerformancePage";
+import JournalPage from "./pages/JournalPage";
 import ProfilePage from "./pages/ProfilePage";
-import CoachPage from "./pages/CoachPage";
 import AuthPage from "./pages/AuthPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import NotFound from "./pages/NotFound";
@@ -43,10 +40,7 @@ const App = () => (
                   <Route element={<OnboardingGate />}>
                     <Route element={<AppLayout />}>
                       <Route path="/" element={<HomePage />} />
-                      <Route path="/training" element={<TrainingPage />} />
-                      <Route path="/coach" element={<CoachPage />} />
-                      <Route path="/nutrition" element={<NutritionPage />} />
-                      <Route path="/performance" element={<PerformancePage />} />
+                      <Route path="/journal" element={<JournalPage />} />
                       <Route path="/profile" element={<ProfilePage />} />
                     </Route>
                   </Route>
