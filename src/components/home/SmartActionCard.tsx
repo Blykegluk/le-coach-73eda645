@@ -24,7 +24,7 @@ interface ActionConfig {
   iconBg: string;
 }
 
-const SmartActionCard = ({ preparedWorkout, onStartWorkout, onOpenCoach }: SmartActionCardProps) => {
+const SmartActionCard = ({ preparedWorkout, onStartWorkout, onOpenCoach, onPreviewWorkout }: SmartActionCardProps) => {
   const navigate = useNavigate();
   
   // Determine the best action based on context
