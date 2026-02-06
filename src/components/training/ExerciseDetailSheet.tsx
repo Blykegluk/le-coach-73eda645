@@ -125,11 +125,23 @@ export const ExerciseDetailSheet = ({
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);
 
-      if (data?.video_url) {
+      if (data?.images) {
+        setDetail(prev => prev ? { ...prev, images: data.images, media_type: 'images' } : null);
+        
+        // Update cache with images
+        const cacheKey = `${CACHE_KEY_PREFIX}${exerciseName.toLowerCase().replace(/\s+/g, '_')}`;
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          const { data: cachedData, timestamp } = JSON.parse(cached);
+          localStorage.setItem(cacheKey, JSON.stringify({
+            data: { ...cachedData, images: data.images, media_type: 'images' },
+            timestamp,
+          }));
+        }
+      } else if (data?.video_url) {
         const mediaType = data.type === 'image' ? 'image' : 'video';
         setDetail(prev => prev ? { ...prev, video_url: data.video_url, media_type: mediaType } : null);
         
-        // Update cache with media
         const cacheKey = `${CACHE_KEY_PREFIX}${exerciseName.toLowerCase().replace(/\s+/g, '_')}`;
         const cached = localStorage.getItem(cacheKey);
         if (cached) {
