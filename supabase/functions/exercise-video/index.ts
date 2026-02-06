@@ -65,119 +65,111 @@ serve(async (req) => {
 
     console.log(`Generating images for exercise: ${exerciseName}`);
 
-    // First, generate a starting frame image using Gemini image generation
-    const imagePrompt = `Professional fitness demonstration starting position for "${exerciseName}" exercise. 
-Clean gym background, athletic person in proper form showing the starting position. 
-Professional lighting, high quality fitness photography style. No text or labels.`;
+    // Generate 3 images: start position, movement, end position
+    const phases = [
+      { name: "start", prompt: `Starting position for "${exerciseName}" exercise. Athletic person in proper starting form, clean gym background, professional fitness photography. Show the initial stance before the movement begins. No text.` },
+      { name: "mid", prompt: `Middle/movement phase of "${exerciseName}" exercise. Athletic person in the middle of the movement, showing proper technique and muscle engagement. Clean gym background, professional fitness photography. No text.` },
+      { name: "end", prompt: `End/final position of "${exerciseName}" exercise. Athletic person at the peak of the movement or return position. Clean gym background, professional fitness photography. No text.` },
+    ];
 
-    console.log("Generating starting frame image...");
+    const generatedUrls: string[] = [];
 
-    const imageResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
-        messages: [
-          { role: "user", content: imagePrompt }
-        ],
-        modalities: ["image", "text"],
-      }),
-    });
+    for (const phase of phases) {
+      console.log(`Generating ${phase.name} phase image...`);
 
-    if (!imageResponse.ok) {
-      if (imageResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Trop de requêtes, réessaie dans un moment." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (imageResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Crédits IA épuisés." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      const errorText = await imageResponse.text();
-      console.error("Image generation error:", imageResponse.status, errorText);
-      throw new Error(`Image generation failed: ${imageResponse.status}`);
-    }
-
-    const imageData = await imageResponse.json();
-    
-    // Check for error in the response (API might return 200 but with error in body)
-    const choiceError = imageData.choices?.[0]?.error;
-    if (choiceError) {
-      console.error("Image generation error in response:", JSON.stringify(choiceError));
-      if (choiceError.code === 429 || choiceError.code === 502) {
-        return new Response(
-          JSON.stringify({ error: "Service temporairement surchargé. Réessaie dans quelques secondes." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      throw new Error(choiceError.message || "Image generation failed");
-    }
-    
-    const generatedImage = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
-    if (!generatedImage) {
-      console.error("No image generated:", JSON.stringify(imageData));
-      throw new Error("Impossible de générer l'aperçu. Réessaie.");
-    }
-
-    console.log("Starting frame generated, now generating video...");
-
-    // Now generate video from the image using video generation
-    // Since videogen tool is for the agent, we'll use the image as a still for now
-    // and return it as a fallback, or use a video generation API if available
-
-    // For now, let's save the image and return it as a "preview"
-    // In production, you'd integrate with a video generation service
-
-    // Extract base64 data from data URL
-    const base64Match = generatedImage.match(/^data:image\/[^;]+;base64,(.+)$/);
-    if (!base64Match) {
-      throw new Error("Invalid image format");
-    }
-
-    const imageBuffer = Uint8Array.from(atob(base64Match[1]), c => c.charCodeAt(0));
-
-    // Save as a preview image for now
-    const imagePath = `exercise-videos/${normalizedName}_preview.png`;
-    
-    const { error: uploadError } = await supabase.storage
-      .from('chat-uploads')
-      .upload(imagePath, imageBuffer, {
-        contentType: 'image/png',
-        upsert: true,
+      const imageResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image",
+          messages: [{ role: "user", content: phase.prompt }],
+          modalities: ["image", "text"],
+        }),
       });
 
-    if (uploadError) {
-      console.error("Upload error:", uploadError);
-      throw new Error("Failed to upload preview image");
+      if (!imageResponse.ok) {
+        if (imageResponse.status === 429) {
+          return new Response(
+            JSON.stringify({ error: "Trop de requêtes, réessaie dans un moment." }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        if (imageResponse.status === 402) {
+          return new Response(
+            JSON.stringify({ error: "Crédits IA épuisés." }),
+            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const errorText = await imageResponse.text();
+        console.error("Image generation error:", imageResponse.status, errorText);
+        throw new Error(`Image generation failed: ${imageResponse.status}`);
+      }
+
+      const imageData = await imageResponse.json();
+      
+      // Check for error in the response
+      const choiceError = imageData.choices?.[0]?.error;
+      if (choiceError) {
+        console.error("Image generation error in response:", JSON.stringify(choiceError));
+        if (choiceError.code === 429 || choiceError.code === 502) {
+          return new Response(
+            JSON.stringify({ error: "Service temporairement surchargé. Réessaie dans quelques secondes." }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        throw new Error(choiceError.message || "Image generation failed");
+      }
+
+      const generatedImage = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+      if (!generatedImage) {
+        console.error("No image generated for phase:", phase.name);
+        throw new Error(`Impossible de générer l'image (${phase.name}). Réessaie.`);
+      }
+
+      // Extract base64 data from data URL
+      const base64Match = generatedImage.match(/^data:image\/[^;]+;base64,(.+)$/);
+      if (!base64Match) {
+        throw new Error("Invalid image format");
+      }
+
+      const imageBuffer = Uint8Array.from(atob(base64Match[1]), c => c.charCodeAt(0));
+      const imagePath = `exercise-images/${normalizedName}_${phase.name}.png`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('chat-uploads')
+        .upload(imagePath, imageBuffer, {
+          contentType: 'image/png',
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        throw new Error("Failed to upload image");
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('chat-uploads')
+        .getPublicUrl(imagePath);
+
+      generatedUrls.push(urlData.publicUrl);
+      console.log(`${phase.name} phase image saved successfully`);
     }
 
-    const { data: urlData } = supabase.storage
-      .from('chat-uploads')
-      .getPublicUrl(imagePath);
-
-    console.log("Preview image saved successfully");
-
-    // Return the preview image URL
-    // Note: In a full implementation, you'd use a video generation service here
     return new Response(
       JSON.stringify({ 
-        video_url: urlData.publicUrl,
-        type: 'image', // Indicate this is an image preview
-        message: "Aperçu de l'exercice généré" 
+        images: generatedUrls,
+        type: 'images',
+        message: "Images de démonstration générées" 
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
   } catch (error) {
-    console.error("Exercise video error:", error);
+    console.error("Exercise images error:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Erreur inconnue" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
