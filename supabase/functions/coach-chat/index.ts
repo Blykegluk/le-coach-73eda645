@@ -2276,12 +2276,18 @@ Quand il demande son bilan, utilise get_daily_summary puis commente les résulta
 
 Après avoir utilisé un outil, confirme l'action de manière naturelle et encourage l'utilisateur ! 🎯`;
 
-    console.log("Calling AI gateway with", messages.length, "messages", imageUrl ? "(with image)" : "");
+    // Limit conversation history to prevent context overflow
+    const MAX_MESSAGES = 30;
+    const recentMessages = messages.length > MAX_MESSAGES 
+      ? messages.slice(-MAX_MESSAGES) 
+      : messages;
+    
+    console.log("Calling AI gateway with", recentMessages.length, "messages (original:", messages.length, ")", imageUrl ? "(with image)" : "");
 
     // Prepare messages - if there's an image, add it to the last user message
-    const preparedMessages = messages.map((msg, index) => {
+    const preparedMessages = recentMessages.map((msg, index) => {
       // If this is the last message and we have an image URL, make it multimodal
-      if (imageUrl && index === messages.length - 1 && msg.role === "user") {
+      if (imageUrl && index === recentMessages.length - 1 && msg.role === "user") {
         return {
           role: msg.role,
           content: [
