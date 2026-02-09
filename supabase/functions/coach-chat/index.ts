@@ -1,6 +1,113 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+
+// ─── Zod validation schemas for tool call arguments ───
+const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional();
+const timeSchema = z.string().max(10).optional();
+
+const toolSchemas: Record<string, z.ZodSchema> = {
+  log_water: z.object({
+    amount_ml: z.number().positive().max(10000),
+    date: dateSchema,
+  }),
+  remove_water: z.object({
+    amount_ml: z.number().positive().max(10000),
+    date: dateSchema,
+  }),
+  log_meal: z.object({
+    meal_type: z.enum(["breakfast", "morning_snack", "lunch", "afternoon_snack", "dinner", "dessert", "snack"]),
+    food_name: z.string().min(1).max(500),
+    calories: z.number().nonnegative().max(10000),
+    protein: z.number().nonnegative().max(500).optional(),
+    carbs: z.number().nonnegative().max(1000).optional(),
+    fat: z.number().nonnegative().max(500).optional(),
+    estimated_time: timeSchema,
+    date: dateSchema,
+  }),
+  get_recent_meals: z.object({
+    limit: z.number().int().positive().max(50).optional(),
+  }),
+  update_meal: z.object({
+    meal_id: z.string().uuid(),
+    meal_type: z.enum(["breakfast", "morning_snack", "lunch", "afternoon_snack", "dinner", "dessert"]).optional(),
+    food_name: z.string().min(1).max(500).optional(),
+    estimated_time: timeSchema,
+    calories: z.number().nonnegative().max(10000).optional(),
+    protein: z.number().nonnegative().max(500).optional(),
+    carbs: z.number().nonnegative().max(1000).optional(),
+    fat: z.number().nonnegative().max(500).optional(),
+  }),
+  delete_meal: z.object({
+    meal_id: z.string().uuid(),
+  }),
+  get_recent_activities: z.object({
+    limit: z.number().int().positive().max(50).optional(),
+  }),
+  update_activity: z.object({
+    activity_id: z.string().uuid(),
+    activity_type: z.string().min(1).max(100).optional(),
+    duration_min: z.number().positive().max(600).optional(),
+    calories_burned: z.number().nonnegative().max(10000).optional(),
+    distance_km: z.number().nonnegative().max(500).optional(),
+    notes: z.string().max(1000).optional(),
+  }),
+  delete_activity: z.object({
+    activity_id: z.string().uuid(),
+  }),
+  get_daily_summary: z.object({
+    date: dateSchema,
+  }),
+  log_weight: z.object({
+    weight_kg: z.number().positive().min(20).max(300),
+  }),
+  log_activity: z.object({
+    activity_type: z.string().min(1).max(100),
+    duration_min: z.number().positive().max(600),
+    calories_burned: z.number().nonnegative().max(10000).optional(),
+    distance_km: z.number().nonnegative().max(500).optional(),
+    notes: z.string().max(1000).optional(),
+    date: dateSchema,
+  }),
+  log_body_fat: z.object({
+    body_fat_pct: z.number().positive().max(80),
+  }),
+  log_body_composition: z.object({
+    weight_kg: z.number().positive().min(20).max(300).optional(),
+    body_fat_pct: z.number().positive().max(80).optional(),
+    muscle_mass_kg: z.number().nonnegative().max(200).optional(),
+    lean_mass_kg: z.number().nonnegative().max(200).optional(),
+    bone_mass_kg: z.number().nonnegative().max(20).optional(),
+    water_pct: z.number().nonnegative().max(100).optional(),
+    bmi: z.number().positive().max(100).optional(),
+    bmr_kcal: z.number().positive().max(10000).optional(),
+    visceral_fat_index: z.number().int().nonnegative().max(59).optional(),
+    body_age: z.number().int().positive().max(120).optional(),
+    protein_pct: z.number().nonnegative().max(100).optional(),
+    protein_kg: z.number().nonnegative().max(100).optional(),
+    subcutaneous_fat_pct: z.number().nonnegative().max(100).optional(),
+    fat_mass_kg: z.number().nonnegative().max(200).optional(),
+    skeletal_muscle_pct: z.number().nonnegative().max(100).optional(),
+    standard_weight_kg: z.number().positive().max(300).optional(),
+  }),
+  get_body_composition_history: z.object({
+    limit: z.number().int().positive().max(50).optional(),
+  }),
+  save_health_context: z.object({
+    category: z.string().min(1).max(100),
+    key: z.string().min(1).max(200),
+    value: z.string().min(1).max(2000),
+    severity: z.enum(["low", "medium", "high", "critical"]).optional(),
+  }),
+  get_health_context: z.object({}),
+  generate_workout: z.object({
+    target_muscles: z.array(z.string().max(50)).optional(),
+    duration_min: z.number().positive().max(180).optional(),
+    difficulty: z.string().max(20).optional(),
+    equipment: z.array(z.string().max(50)).optional(),
+  }),
+};
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
