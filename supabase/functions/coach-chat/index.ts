@@ -2531,6 +2531,11 @@ Après avoir utilisé un outil, confirme l'action de manière naturelle et encou
 
     const data = await response.json();
     console.log("AI response received");
+    console.log("finish_reason:", data.choices[0].finish_reason);
+    console.log("has tool_calls:", !!(data.choices[0].message.tool_calls?.length));
+    if (data.choices[0].message.tool_calls?.length) {
+      console.log("tool_calls:", JSON.stringify(data.choices[0].message.tool_calls.map((tc: any) => tc.function.name)));
+    }
 
     let assistantMessage = data.choices[0].message;
     const executedActions: { name: string; result: { success: boolean; message: string } }[] = [];
