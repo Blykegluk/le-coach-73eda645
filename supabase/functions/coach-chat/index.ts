@@ -813,7 +813,27 @@ async function executeToolCall(
   toolCall: ToolCall
 ): Promise<{ success: boolean; message: string; data?: unknown }> {
   const { name, arguments: argsStr } = toolCall.function;
-  const args = JSON.parse(argsStr);
+  let args: any;
+  try {
+    args = JSON.parse(argsStr);
+  } catch {
+    return { success: false, message: "Paramètres invalides (JSON malformé)" };
+  }
+
+  // Validate args against schema if available
+  const schema = toolSchemas[name];
+  if (schema) {
+    const result = schema.safeParse(args);
+    if (!result.success) {
+      console.error(`Validation error for ${name}:`, result.error.errors);
+      return {
+        success: false,
+        message: `Données invalides: ${result.error.errors.map((e: any) => `${e.path.join(".")}: ${e.message}`).join(", ")}`,
+      };
+    }
+    args = result.data;
+  }
+
   const today = getLocalDate(); // Use Paris timezone
 
   console.log(`Executing tool: ${name}`, args);
