@@ -432,8 +432,10 @@ export type Database = {
       }
       workout_sessions: {
         Row: {
+          calories_burned: number | null
           completed_at: string | null
           created_at: string
+          distance_km: number | null
           id: string
           notes: string | null
           started_at: string
@@ -444,8 +446,10 @@ export type Database = {
           workout_name: string
         }
         Insert: {
+          calories_burned?: number | null
           completed_at?: string | null
           created_at?: string
+          distance_km?: number | null
           id?: string
           notes?: string | null
           started_at?: string
@@ -456,8 +460,10 @@ export type Database = {
           workout_name: string
         }
         Update: {
+          calories_burned?: number | null
           completed_at?: string | null
           created_at?: string
+          distance_km?: number | null
           id?: string
           notes?: string | null
           started_at?: string
