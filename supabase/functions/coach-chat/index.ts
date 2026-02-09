@@ -1145,24 +1145,26 @@ async function executeToolCall(
 
       case "get_recent_activities": {
         const limit = args.limit || 5;
-        const { data: activities, error } = await supabase
-          .from("activities")
-          .select("id, activity_type, duration_min, calories_burned, distance_km, notes, performed_at")
+        const { data: sessions, error } = await supabase
+          .from("workout_sessions")
+          .select("id, workout_name, started_at, completed_at, status, total_duration_seconds, calories_burned, distance_km, notes, target_muscles")
           .eq("user_id", userId)
-          .order("performed_at", { ascending: false })
+          .order("started_at", { ascending: false })
           .limit(limit);
 
         if (error) throw error;
 
-        const formattedActivities = (activities || []).map((a: any) => ({
-          id: a.id,
-          activity_type: a.activity_type,
-          duration_min: a.duration_min,
-          calories_burned: a.calories_burned,
-          distance_km: a.distance_km,
-          notes: a.notes,
-          performed_at: a.performed_at,
-          time_ago: getTimeAgo(a.performed_at),
+        const formattedActivities = (sessions || []).map((s: any) => ({
+          id: s.id,
+          activity_type: s.workout_name,
+          duration_min: s.total_duration_seconds ? Math.round(s.total_duration_seconds / 60) : null,
+          calories_burned: s.calories_burned,
+          distance_km: s.distance_km,
+          notes: s.notes,
+          performed_at: s.started_at,
+          status: s.status,
+          target_muscles: s.target_muscles,
+          time_ago: getTimeAgo(s.started_at),
         }));
 
         return {
@@ -1173,26 +1175,26 @@ async function executeToolCall(
       }
 
       case "update_activity": {
-        const { data: currentActivity } = await supabase
-          .from("activities")
-          .select("activity_type, calories_burned")
+        const { data: currentSession } = await supabase
+          .from("workout_sessions")
+          .select("workout_name, calories_burned")
           .eq("id", args.activity_id)
           .eq("user_id", userId)
           .maybeSingle();
 
-        if (!currentActivity) {
-          return { success: false, message: "Activité non trouvée" };
+        if (!currentSession) {
+          return { success: false, message: "Activité/séance non trouvée" };
         }
 
         const updates: any = {};
-        if (args.activity_type !== undefined) updates.activity_type = args.activity_type;
-        if (args.duration_min !== undefined) updates.duration_min = args.duration_min;
+        if (args.activity_type !== undefined) updates.workout_name = args.activity_type;
+        if (args.duration_min !== undefined) updates.total_duration_seconds = args.duration_min * 60;
         if (args.calories_burned !== undefined) updates.calories_burned = args.calories_burned;
         if (args.distance_km !== undefined) updates.distance_km = args.distance_km;
         if (args.notes !== undefined) updates.notes = args.notes;
 
         const { error } = await supabase
-          .from("activities")
+          .from("workout_sessions")
           .update(updates)
           .eq("id", args.activity_id)
           .eq("user_id", userId);
@@ -1200,8 +1202,8 @@ async function executeToolCall(
         if (error) throw error;
 
         // Update daily calories burned if changed
-        if (args.calories_burned !== undefined && args.calories_burned !== currentActivity.calories_burned) {
-          const calorieDiff = args.calories_burned - (currentActivity.calories_burned || 0);
+        if (args.calories_burned !== undefined && args.calories_burned !== currentSession.calories_burned) {
+          const calorieDiff = args.calories_burned - (currentSession.calories_burned || 0);
           const { data: metrics } = await supabase
             .from("daily_metrics")
             .select("calories_burned")
@@ -1218,25 +1220,33 @@ async function executeToolCall(
 
         return {
           success: true,
-          message: `✏️ ${currentActivity.activity_type} mis à jour`,
+          message: `✏️ ${currentSession.workout_name} mis à jour`,
           data: updates,
         };
       }
 
       case "delete_activity": {
-        const { data: activity } = await supabase
-          .from("activities")
-          .select("activity_type, calories_burned")
+        const { data: session } = await supabase
+          .from("workout_sessions")
+          .select("workout_name, calories_burned")
           .eq("id", args.activity_id)
           .eq("user_id", userId)
           .maybeSingle();
 
-        if (!activity) {
-          return { success: false, message: "Activité non trouvée" };
+        if (!session) {
+          return { success: false, message: "Activité/séance non trouvée" };
         }
 
+        // Delete associated exercise logs first
+        await supabase
+          .from("workout_exercise_logs")
+          .delete()
+          .eq("session_id", args.activity_id)
+          .eq("user_id", userId);
+
+        // Delete the session
         const { error } = await supabase
-          .from("activities")
+          .from("workout_sessions")
           .delete()
           .eq("id", args.activity_id)
           .eq("user_id", userId);
@@ -1244,7 +1254,7 @@ async function executeToolCall(
         if (error) throw error;
 
         // Update daily calories burned
-        if (activity.calories_burned) {
+        if (session.calories_burned) {
           const { data: metrics } = await supabase
             .from("daily_metrics")
             .select("calories_burned")
@@ -1252,7 +1262,7 @@ async function executeToolCall(
             .eq("date", today)
             .maybeSingle();
 
-          const newBurned = (metrics?.calories_burned || 0) - activity.calories_burned;
+          const newBurned = (metrics?.calories_burned || 0) - session.calories_burned;
           await supabase.from("daily_metrics").upsert(
             { user_id: userId, date: today, calories_burned: Math.max(0, newBurned) },
             { onConflict: "user_id,date" }
@@ -1261,7 +1271,7 @@ async function executeToolCall(
 
         return {
           success: true,
-          message: `🗑️ ${activity.activity_type} supprimé`,
+          message: `🗑️ "${session.workout_name}" supprimé`,
         };
       }
 
