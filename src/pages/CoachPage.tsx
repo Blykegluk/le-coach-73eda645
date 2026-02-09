@@ -140,16 +140,17 @@ const CoachPage = () => {
     await saveMessage(userId, userMsg);
 
     try {
-      // Get the current session token explicitly
-      const { data: { session } } = await supabase.auth.getSession();
-      const accessToken = session?.access_token;
-      
-      console.log("🔑 Session exists:", !!session);
-      console.log("🔑 Access token first 20:", accessToken?.substring(0, 20));
-      console.log("🔑 Token has sub:", accessToken ? JSON.parse(atob(accessToken.split('.')[1])).sub || 'MISSING' : 'NO TOKEN');
-      
-      if (!accessToken) {
-        throw new Error("Session expirée, reconnecte-toi");
+      // Force refresh the session to get a valid token
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+      if (sessionError || !session?.access_token) {
+        // Fallback: try getSession
+        const { data: fallback } = await supabase.auth.getSession();
+        if (!fallback.session?.access_token) {
+          throw new Error("Session expirée, reconnecte-toi");
+        }
+        var accessToken = fallback.session.access_token;
+      } else {
+        var accessToken = session.access_token;
       }
 
       // Use fetch() directly to guarantee the correct token is sent
