@@ -148,7 +148,6 @@ export default function AddMealModal({
         body: {
           description: textInput.trim(),
           mealType,
-          userId,
         },
       });
 
