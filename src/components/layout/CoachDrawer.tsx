@@ -130,6 +130,16 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
             )}
           </div>
 
+          {/* Scroll to bottom button */}
+          {showScrollButton && (
+            <button
+              onClick={scrollToBottom}
+              className="absolute bottom-44 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-card border border-border/50 shadow-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+            >
+              <ArrowDown className="h-4 w-4" />
+            </button>
+          )}
+
           {/* Actions overlay */}
           {showActions && (
             <div
