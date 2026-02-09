@@ -168,6 +168,10 @@ const tools = [
             type: "string",
             description: "Heure estimée du repas au format HH:MM (ex: '16:00' pour un goûter, '08:00' pour petit-déjeuner). Utilise l'heure typique du type de repas si non précisé.",
           },
+          date: {
+            type: "string",
+            description: "Date du repas au format YYYY-MM-DD. Utiliser si l'utilisateur mentionne une date passée (ex: 'hier', 'vendredi dernier'). Par défaut: aujourd'hui.",
+          },
         },
         required: ["meal_type", "food_name", "calories"],
       },
@@ -385,6 +389,10 @@ const tools = [
           notes: {
             type: "string",
             description: "Notes ou détails supplémentaires sur la séance",
+          },
+          date: {
+            type: "string",
+            description: "Date de la séance au format YYYY-MM-DD. Utiliser si l'utilisateur mentionne une date passée (ex: 'hier', 'vendredi dernier'). Par défaut: aujourd'hui.",
           },
         },
         required: ["activity_type", "duration_min"],
@@ -792,7 +800,8 @@ async function executeToolCall(
           normalizedMealType = hour >= 14 ? "afternoon_snack" : "morning_snack";
         }
 
-        const loggedAt = `${today}T${timeToUse}:00`;
+        const dateToUse = args.date || today;
+        const loggedAt = `${dateToUse}T${timeToUse}:00`;
         
         const { error } = await supabase.from("nutrition_logs").insert({
           user_id: userId,
@@ -812,7 +821,7 @@ async function executeToolCall(
           .from("daily_metrics")
           .select("calories_in")
           .eq("user_id", userId)
-          .eq("date", today)
+          .eq("date", dateToUse)
           .maybeSingle();
 
         const currentCals = currentMetrics?.calories_in || 0;
@@ -821,7 +830,7 @@ async function executeToolCall(
         await supabase.from("daily_metrics").upsert(
           {
             user_id: userId,
-            date: today,
+            date: dateToUse,
             calories_in: newCalories,
           },
           { onConflict: "user_id,date" }
@@ -1288,17 +1297,18 @@ async function executeToolCall(
           calories_burned: caloriesBurned,
           distance_km: args.distance_km || null,
           notes: args.notes || null,
-          performed_at: new Date().toISOString(),
+          performed_at: args.date ? `${args.date}T12:00:00` : new Date().toISOString(),
         });
 
         if (error) throw error;
 
         // Also update daily calories burned
+        const activityDate = args.date || today;
         const { data: currentMetrics } = await supabase
           .from("daily_metrics")
           .select("calories_burned")
           .eq("user_id", userId)
-          .eq("date", today)
+          .eq("date", activityDate)
           .maybeSingle();
 
         const currentBurned = currentMetrics?.calories_burned || 0;
@@ -1307,7 +1317,7 @@ async function executeToolCall(
         await supabase.from("daily_metrics").upsert(
           {
             user_id: userId,
-            date: today,
+            date: activityDate,
             calories_burned: newBurned,
           },
           { onConflict: "user_id,date" }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { format, startOfDay, isToday, isYesterday, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Dumbbell, Droplets, ChevronLeft, ChevronRight, Plus, Calendar, Zap, UtensilsCrossed } from 'lucide-react';
@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { getMealIcon, getMealColorClasses } from '@/utils/mealColors';
+import JournalEntryActions from '@/components/journal/JournalEntryActions';
 
 interface JournalEntry {
   id: string;
@@ -23,6 +24,8 @@ const JournalPage = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
+  const [showActions, setShowActions] = useState(false);
   const navigate = useNavigate();
   const { onOpenCoach } = useOutletContext<{ onOpenCoach: () => void }>();
 
@@ -30,7 +33,7 @@ const JournalPage = () => {
     loadEntries();
   }, [selectedDate]);
 
-  const loadEntries = async () => {
+  const loadEntries = useCallback(async () => {
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -126,7 +129,7 @@ const JournalPage = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedDate]);
 
   const navigateDay = (direction: 'prev' | 'next') => {
     const newDate = new Date(selectedDate);
@@ -169,7 +172,16 @@ const JournalPage = () => {
     const colorClass = getEntryColorClasses(entry);
 
     return (
-      <div key={entry.id} className="flex gap-3 rounded-xl bg-card border border-border/50 p-3">
+      <div
+        key={entry.id}
+        className="flex gap-3 rounded-xl bg-card border border-border/50 p-3 cursor-pointer active:scale-[0.98] transition-transform"
+        onClick={() => {
+          if (entry.type !== 'water') {
+            setSelectedEntry(entry);
+            setShowActions(true);
+          }
+        }}
+      >
         {/* Icon */}
         <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${colorClass}`}>
           <Icon className="h-5 w-5" />
@@ -332,6 +344,14 @@ const JournalPage = () => {
       >
         <Plus className="h-6 w-6" />
       </button>
+
+      {/* Entry actions */}
+      <JournalEntryActions
+        entry={selectedEntry}
+        isOpen={showActions}
+        onClose={() => setShowActions(false)}
+        onEntryUpdated={loadEntries}
+      />
     </div>
   );
 };
