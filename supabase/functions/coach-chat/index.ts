@@ -2020,6 +2020,16 @@ serve(async (req) => {
       throw new Error("Supabase configuration missing");
     }
 
+    // Parse body first (can only call req.json() once)
+    const { messages, imageUrl } = (await req.json()) as {
+      messages: ChatMessage[];
+      imageUrl?: string;
+    };
+
+    if (!messages || !Array.isArray(messages)) {
+      throw new Error("Messages array is required");
+    }
+
     // Authenticate the user via JWT
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
@@ -2042,15 +2052,6 @@ serve(async (req) => {
     }
 
     const userId = user.id;
-
-    const { messages, imageUrl } = (await req.json()) as {
-      messages: ChatMessage[];
-      imageUrl?: string;
-    };
-
-    if (!messages || !Array.isArray(messages)) {
-      throw new Error("Messages array is required");
-    }
 
     // Get user profile for context
     let userContext = "";
