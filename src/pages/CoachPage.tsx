@@ -140,7 +140,18 @@ const CoachPage = () => {
     await saveMessage(userId, userMsg);
 
     try {
+      // Get the current session token explicitly
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      
+      if (!accessToken) {
+        throw new Error("Session expirée, reconnecte-toi");
+      }
+
       const { data, error: fnError } = await supabase.functions.invoke('coach-chat', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
         body: {
           messages: [...messages, { role: userMsg.role, content: userMsg.content }].map(m => ({
             role: m.role,
