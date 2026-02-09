@@ -2166,19 +2166,22 @@ serve(async (req) => {
       );
     }
 
+    const token = authHeader.replace("Bearer ", "");
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const { data: claimsData, error: authError } = await supabase.auth.getClaims(token);
+    if (authError || !claimsData?.claims?.sub) {
+      console.error("Auth error:", authError);
       return new Response(
         JSON.stringify({ error: "Authentification invalide" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const userId = user.id;
+    const userId = claimsData.claims.sub as string;
 
     // Get user profile for context
     let userContext = "";
