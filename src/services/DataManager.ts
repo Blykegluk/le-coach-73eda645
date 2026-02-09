@@ -98,7 +98,7 @@ class DataManager {
       .select('*')
       .eq('user_id', this.userId)
       .eq('date', this.getTodayDate())
-      .single();
+      .maybeSingle();
 
     if (error && error.code !== 'PGRST116') {
       console.error('Error fetching today metrics:', error);
