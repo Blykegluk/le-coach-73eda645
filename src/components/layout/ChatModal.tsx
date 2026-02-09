@@ -58,7 +58,7 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
       </header>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4">
         {isLoadingHistory ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
