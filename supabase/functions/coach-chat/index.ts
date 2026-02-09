@@ -2157,9 +2157,12 @@ serve(async (req) => {
       throw new Error("Messages array is required");
     }
 
+    console.log("=== COACH-CHAT V2 DEPLOYED ===");
+    
     // Authenticate the user via JWT
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
+      console.error("Missing or invalid Authorization header");
       return new Response(
         JSON.stringify({ error: "Non autorisé" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -2167,22 +2170,35 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
+    console.log("Token prefix:", token.substring(0, 20) + "...");
+    console.log("Token length:", token.length);
 
-    // Create client with user's auth header and validate JWT
+    // Create client with user's auth header
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      console.error("Auth error:", authError);
-      return new Response(
-        JSON.stringify({ error: "Authentification invalide" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Use getClaims for JWT validation (recommended pattern)
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims?.sub) {
+      console.error("Auth claims error:", claimsError);
+      console.error("Claims data:", JSON.stringify(claimsData));
+      
+      // Fallback: try getUser
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !user) {
+        console.error("Auth getUser error:", authError);
+        return new Response(
+          JSON.stringify({ error: "Authentification invalide" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      var userId = user.id;
+    } else {
+      var userId = claimsData.claims.sub as string;
     }
-
-    const userId = user.id;
+    
+    console.log("Authenticated userId:", userId);
 
     // Get user profile for context
     let userContext = "";
