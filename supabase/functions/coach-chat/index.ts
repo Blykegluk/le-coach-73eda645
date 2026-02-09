@@ -168,6 +168,10 @@ const tools = [
             type: "string",
             description: "Heure estimée du repas au format HH:MM (ex: '16:00' pour un goûter, '08:00' pour petit-déjeuner). Utilise l'heure typique du type de repas si non précisé.",
           },
+          date: {
+            type: "string",
+            description: "Date du repas au format YYYY-MM-DD. Utiliser si l'utilisateur mentionne une date passée (ex: 'hier', 'vendredi dernier'). Par défaut: aujourd'hui.",
+          },
         },
         required: ["meal_type", "food_name", "calories"],
       },
