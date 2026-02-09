@@ -56,9 +56,6 @@ const toolSchemas: Record<string, z.ZodSchema> = {
   delete_activity: z.object({
     activity_id: z.string().uuid(),
   }),
-  delete_workout_session: z.object({
-    session_id: z.string().uuid(),
-  }),
   get_daily_summary: z.object({
     date: dateSchema,
   }),
