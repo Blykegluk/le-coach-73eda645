@@ -46,10 +46,10 @@ const JournalPage = () => {
 
       const allEntries: JournalEntry[] = [];
 
-      // Fetch completed workout sessions for this day
+      // Fetch all workout sessions (structured workouts + coach-logged activities)
       const { data: workouts } = await supabase
         .from('workout_sessions')
-        .select('id, workout_name, started_at, completed_at, total_duration_seconds, target_muscles, status')
+        .select('id, workout_name, started_at, completed_at, total_duration_seconds, target_muscles, status, calories_burned, notes')
         .eq('user_id', user.id)
         .eq('status', 'completed')
         .gte('started_at', startOfDayDate.toISOString())
@@ -65,32 +65,9 @@ const JournalPage = () => {
             id: `workout-${w.id}`,
             type: 'workout',
             title: w.workout_name,
-            subtitle: w.target_muscles?.join(', ') || 'Entraînement',
+            subtitle: w.target_muscles?.join(', ') || w.notes || 'Entraînement',
             time: parseISO(w.started_at),
-            meta: duration,
-            status: 'completed',
-          });
-        });
-      }
-
-      // Fetch activities logged via coach (log_activity tool)
-      const { data: activities } = await supabase
-        .from('activities')
-        .select('id, activity_type, duration_min, calories_burned, notes, performed_at')
-        .eq('user_id', user.id)
-        .gte('performed_at', startOfDayDate.toISOString())
-        .lt('performed_at', endOfDayDate.toISOString())
-        .order('performed_at', { ascending: true });
-
-      if (activities) {
-        activities.forEach(a => {
-          allEntries.push({
-            id: `activity-${a.id}`,
-            type: 'workout',
-            title: a.activity_type,
-            subtitle: a.notes || 'Activité',
-            time: parseISO(a.performed_at),
-            meta: `${a.duration_min} min${a.calories_burned ? ` · ${a.calories_burned} kcal` : ''}`,
+            meta: `${duration}${w.calories_burned ? ` · ${w.calories_burned} kcal` : ''}`,
             status: 'completed',
           });
         });
