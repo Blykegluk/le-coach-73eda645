@@ -2168,22 +2168,6 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    
-    // Debug: decode JWT payload to see what's in it
-    try {
-      const parts = token.split(".");
-      if (parts.length === 3) {
-        const payload = JSON.parse(atob(parts[1]));
-        console.log("DEBUG v5 - JWT payload keys:", Object.keys(payload));
-        console.log("DEBUG v5 - JWT sub:", payload.sub || "MISSING");
-        console.log("DEBUG v5 - JWT role:", payload.role || "MISSING");
-        console.log("DEBUG v5 - JWT iss:", payload.iss || "MISSING");
-      } else {
-        console.log("DEBUG v5 - token is not a valid JWT (parts:", parts.length, ")");
-      }
-    } catch (e) {
-      console.log("DEBUG v5 - failed to decode token:", e.message);
-    }
 
     // Use service role to validate the user token
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
