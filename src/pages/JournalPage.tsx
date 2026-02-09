@@ -129,7 +129,7 @@ const JournalPage = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedDate]);
 
   const navigateDay = (direction: 'prev' | 'next') => {
     const newDate = new Date(selectedDate);
