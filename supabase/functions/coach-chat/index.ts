@@ -1303,11 +1303,12 @@ async function executeToolCall(
         if (error) throw error;
 
         // Also update daily calories burned
+        const activityDate = args.date || today;
         const { data: currentMetrics } = await supabase
           .from("daily_metrics")
           .select("calories_burned")
           .eq("user_id", userId)
-          .eq("date", today)
+          .eq("date", activityDate)
           .maybeSingle();
 
         const currentBurned = currentMetrics?.calories_burned || 0;
