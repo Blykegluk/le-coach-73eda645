@@ -29,7 +29,7 @@ const JournalPage = () => {
   const navigate = useNavigate();
   const { onOpenCoach } = useOutletContext<{ onOpenCoach: () => void }>();
 
-  // loadEntries is defined below, useEffects reference it after declaration
+  // placeholder removed
 
   const loadEntries = useCallback(async () => {
     setIsLoading(true);
