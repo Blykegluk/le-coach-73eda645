@@ -56,7 +56,7 @@ class DataManager {
     if (existing) return existing as DailyMetrics;
 
     // Create new record if not exists
-    if (fetchError?.code === 'PGRST116') {
+    if (!existing) {
       const { data: created, error: createError } = await supabase
         .from('daily_metrics')
         .insert({
