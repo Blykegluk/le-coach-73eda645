@@ -88,12 +88,14 @@ export default function ImageCapture({ isOpen, onClose, onImageCaptured, userId 
 
       if (error) throw error;
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
+      // Get signed URL (bucket is private)
+      const { data: urlData, error: urlError } = await supabase.storage
         .from('chat-uploads')
-        .getPublicUrl(data.path);
+        .createSignedUrl(data.path, 3600); // 1 hour expiry
 
-      onImageCaptured(urlData.publicUrl);
+      if (urlError) throw urlError;
+
+      onImageCaptured(urlData.signedUrl);
       handleClose();
     } catch (error) {
       console.error('Upload error:', error);
