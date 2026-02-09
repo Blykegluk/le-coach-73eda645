@@ -1317,7 +1317,7 @@ async function executeToolCall(
         await supabase.from("daily_metrics").upsert(
           {
             user_id: userId,
-            date: today,
+            date: activityDate,
             calories_burned: newBurned,
           },
           { onConflict: "user_id,date" }
