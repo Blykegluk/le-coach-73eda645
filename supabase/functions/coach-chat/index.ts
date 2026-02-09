@@ -390,6 +390,10 @@ const tools = [
             type: "string",
             description: "Notes ou détails supplémentaires sur la séance",
           },
+          date: {
+            type: "string",
+            description: "Date de la séance au format YYYY-MM-DD. Utiliser si l'utilisateur mentionne une date passée (ex: 'hier', 'vendredi dernier'). Par défaut: aujourd'hui.",
+          },
         },
         required: ["activity_type", "duration_min"],
       },
