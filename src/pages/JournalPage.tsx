@@ -172,7 +172,16 @@ const JournalPage = () => {
     const colorClass = getEntryColorClasses(entry);
 
     return (
-      <div key={entry.id} className="flex gap-3 rounded-xl bg-card border border-border/50 p-3">
+      <div
+        key={entry.id}
+        className="flex gap-3 rounded-xl bg-card border border-border/50 p-3 cursor-pointer active:scale-[0.98] transition-transform"
+        onClick={() => {
+          if (entry.type !== 'water') {
+            setSelectedEntry(entry);
+            setShowActions(true);
+          }
+        }}
+      >
         {/* Icon */}
         <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${colorClass}`}>
           <Icon className="h-5 w-5" />
