@@ -1444,14 +1444,17 @@ async function executeToolCall(
           caloriesBurned = Math.round(met * weight * (duration / 60));
         }
 
-        const { error } = await supabase.from("activities").insert({
+        const performedAt = args.date ? `${args.date}T12:00:00` : new Date().toISOString();
+        const { error } = await supabase.from("workout_sessions").insert({
           user_id: userId,
-          activity_type: args.activity_type,
-          duration_min: args.duration_min,
+          workout_name: args.activity_type,
+          started_at: performedAt,
+          completed_at: performedAt,
+          status: "completed",
+          total_duration_seconds: args.duration_min * 60,
           calories_burned: caloriesBurned,
           distance_km: args.distance_km || null,
           notes: args.notes || null,
-          performed_at: args.date ? `${args.date}T12:00:00` : new Date().toISOString(),
         });
 
         if (error) throw error;
