@@ -33,7 +33,7 @@ const JournalPage = () => {
     loadEntries();
   }, [selectedDate]);
 
-  const loadEntries = async () => {
+  const loadEntries = useCallback(async () => {
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
