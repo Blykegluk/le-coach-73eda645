@@ -2460,7 +2460,7 @@ Exemples:
 AUTRES RÈGLES:
 1. Quand l'utilisateur CORRIGE ou PRÉCISE une entrée précédente → utilise d'abord get_recent_meals ou get_recent_activities pour trouver l'entrée, puis update_meal ou update_activity
 2. Si tu as un DOUTE sur si c'est un nouvel élément ou une correction → DEMANDE à l'utilisateur!
-3. Quand l'utilisateur veut supprimer quelque chose → utilise delete_meal ou delete_activity
+3. Quand l'utilisateur veut supprimer quelque chose → utilise delete_meal, delete_activity, ou delete_workout_session selon le type
 
 CORRECTIONS DE SÉANCES D'ENTRAÎNEMENT (TRÈS IMPORTANT):
 Quand l'utilisateur veut corriger des données d'une séance passée (séries, répétitions, poids utilisé):
