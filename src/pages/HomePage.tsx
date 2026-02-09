@@ -179,7 +179,7 @@ const HomePage = () => {
       .select('sleep_hours, steps, heart_rate_avg, heart_rate_resting, active_minutes, floors_climbed')
       .eq('user_id', user.id)
       .eq('date', today)
-      .single();
+      .maybeSingle();
 
     if (data) {
       setHealthStats({

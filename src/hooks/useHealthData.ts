@@ -48,7 +48,7 @@ export function useHealthData() {
       .select('*')
       .eq('user_id', userId)
       .eq('date', today)
-      .single();
+      .maybeSingle();
 
     setTodayMetrics(metrics as DailyMetrics | null);
 
