@@ -2121,6 +2121,40 @@ IMPORTANT: Retourne un JSON valide avec cette structure exacte:
         };
       }
 
+      case "delete_workout_session": {
+        const { data: session } = await supabase
+          .from("workout_sessions")
+          .select("workout_name, total_duration_seconds")
+          .eq("id", args.session_id)
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (!session) {
+          return { success: false, message: "Séance non trouvée" };
+        }
+
+        // Delete associated exercise logs first
+        await supabase
+          .from("workout_exercise_logs")
+          .delete()
+          .eq("session_id", args.session_id)
+          .eq("user_id", userId);
+
+        // Delete the session
+        const { error } = await supabase
+          .from("workout_sessions")
+          .delete()
+          .eq("id", args.session_id)
+          .eq("user_id", userId);
+
+        if (error) throw error;
+
+        return {
+          success: true,
+          message: `🗑️ Séance "${session.workout_name}" supprimée`,
+        };
+      }
+
       default:
         return { success: false, message: `Outil inconnu: ${name}` };
     }
