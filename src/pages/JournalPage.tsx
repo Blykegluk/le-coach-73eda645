@@ -33,6 +33,65 @@ const JournalPage = () => {
     loadEntries();
   }, [selectedDate]);
 
+  // Real-time subscription to refresh journal when data changes
+  useEffect(() => {
+    const setupRealtimeSubscription = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const nutritionChannel = supabase
+        .channel('journal_nutrition_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'nutrition_logs',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => { loadEntries(); }
+        )
+        .subscribe();
+
+      const workoutChannel = supabase
+        .channel('journal_workout_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'workout_sessions',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => { loadEntries(); }
+        )
+        .subscribe();
+
+      const metricsChannel = supabase
+        .channel('journal_metrics_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'daily_metrics',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => { loadEntries(); }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(nutritionChannel);
+        supabase.removeChannel(workoutChannel);
+        supabase.removeChannel(metricsChannel);
+      };
+    };
+
+    const cleanup = setupRealtimeSubscription();
+    return () => { cleanup.then(fn => fn?.()); };
+  }, [loadEntries]);
+
   const loadEntries = useCallback(async () => {
     setIsLoading(true);
     try {
