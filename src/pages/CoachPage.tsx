@@ -144,6 +144,10 @@ const CoachPage = () => {
       const { data: { session } } = await supabase.auth.getSession();
       const accessToken = session?.access_token;
       
+      console.log("🔑 Session exists:", !!session);
+      console.log("🔑 Access token first 20:", accessToken?.substring(0, 20));
+      console.log("🔑 Token has sub:", accessToken ? JSON.parse(atob(accessToken.split('.')[1])).sub || 'MISSING' : 'NO TOKEN');
+      
       if (!accessToken) {
         throw new Error("Session expirée, reconnecte-toi");
       }
