@@ -2300,14 +2300,14 @@ Après avoir utilisé un outil, confirme l'action de manière naturelle et encou
     });
 
     // First API call - may include tool calls
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${GEMINI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         messages: [{ role: "system", content: systemPrompt }, ...preparedMessages],
         tools: userId ? tools : undefined, // Only enable tools if user is logged in
         tool_choice: userId ? "auto" : undefined,
