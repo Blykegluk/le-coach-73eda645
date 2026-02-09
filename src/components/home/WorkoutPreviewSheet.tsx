@@ -69,7 +69,7 @@ const WorkoutPreviewSheet = ({
                     size="icon" 
                     onClick={onRefresh}
                     disabled={isRefreshing}
-                    className="h-8 w-8"
+                    className="h-8 w-8 mr-6"
                   >
                     <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                   </Button>
