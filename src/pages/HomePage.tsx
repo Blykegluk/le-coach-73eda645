@@ -111,7 +111,7 @@ const HomePage = () => {
       .eq('user_id', user.id)
       .order('measured_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (bodyData) {
       if (!dailyData?.weight && bodyData.weight_kg) {
