@@ -1209,6 +1209,7 @@ async function executeToolCall(
       }
 
       case "delete_activity": {
+        console.info(`DELETE_ACTIVITY called with activity_id: ${args.activity_id}`);
         const { data: session } = await supabase
           .from("workout_sessions")
           .select("workout_name, calories_burned")
