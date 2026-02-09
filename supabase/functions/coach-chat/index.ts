@@ -821,7 +821,7 @@ async function executeToolCall(
           .from("daily_metrics")
           .select("calories_in")
           .eq("user_id", userId)
-          .eq("date", today)
+          .eq("date", dateToUse)
           .maybeSingle();
 
         const currentCals = currentMetrics?.calories_in || 0;
