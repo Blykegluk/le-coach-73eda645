@@ -122,7 +122,6 @@ export default function AddMealModal({
           description: null,
           imageUrl: urlData.publicUrl,
           mealType,
-          userId,
         },
       });
 
@@ -149,7 +148,6 @@ export default function AddMealModal({
         body: {
           description: textInput.trim(),
           mealType,
-          userId,
         },
       });
 

@@ -140,31 +140,19 @@ const CoachPage = () => {
     await saveMessage(userId, userMsg);
 
     try {
-      const response = await fetch(
-        `https://ldllojtzoetwcwbjmfib.supabase.co/functions/v1/coach-chat`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxkbGxvanR6b2V0d2N3YmptZmliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4OTkzNzQsImV4cCI6MjA4NTQ3NTM3NH0.NAINuQt1vmut_ILrp-YFsrgRZYXx3nJmIZ77Alnn2sw`,
-          },
-          body: JSON.stringify({
-            messages: [...messages, { role: userMsg.role, content: userMsg.content }].map(m => ({
-              role: m.role,
-              content: m.content,
-            })),
-            userId,
-            imageUrl,
-          }),
-        }
-      );
+      const { data, error: fnError } = await supabase.functions.invoke('coach-chat', {
+        body: {
+          messages: [...messages, { role: userMsg.role, content: userMsg.content }].map(m => ({
+            role: m.role,
+            content: m.content,
+          })),
+          imageUrl,
+        },
+      });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Erreur ${response.status}`);
+      if (fnError) {
+        throw new Error(fnError.message || `Erreur de connexion`);
       }
-
-      const data = await response.json();
       
       if (data.actions && data.actions.length > 0) {
         data.actions.forEach((action: { name: string; result: { success: boolean; message: string; data?: { workout?: unknown; type?: string } } }) => {
