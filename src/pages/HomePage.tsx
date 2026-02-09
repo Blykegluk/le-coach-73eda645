@@ -96,7 +96,7 @@ const HomePage = () => {
       .eq('user_id', user.id)
       .order('date', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (dailyData?.weight) {
       setCurrentWeight(dailyData.weight);
