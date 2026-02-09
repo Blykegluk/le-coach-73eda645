@@ -1297,7 +1297,7 @@ async function executeToolCall(
           calories_burned: caloriesBurned,
           distance_km: args.distance_km || null,
           notes: args.notes || null,
-          performed_at: new Date().toISOString(),
+          performed_at: args.date ? `${args.date}T12:00:00` : new Date().toISOString(),
         });
 
         if (error) throw error;
