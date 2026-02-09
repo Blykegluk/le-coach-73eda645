@@ -174,8 +174,7 @@ const CoachPage = () => {
       }
 
       const data = await response.json();
-      }
-      
+
       if (data.actions && data.actions.length > 0) {
         data.actions.forEach((action: { name: string; result: { success: boolean; message: string; data?: { workout?: unknown; type?: string } } }) => {
           if (action.result.success) {
