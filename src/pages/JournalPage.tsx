@@ -29,10 +29,6 @@ const JournalPage = () => {
   const navigate = useNavigate();
   const { onOpenCoach } = useOutletContext<{ onOpenCoach: () => void }>();
 
-  useEffect(() => {
-    loadEntries();
-  }, [selectedDate]);
-
   const loadEntries = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -46,7 +42,6 @@ const JournalPage = () => {
 
       const allEntries: JournalEntry[] = [];
 
-      // Fetch all workout sessions (structured workouts + coach-logged activities)
       const { data: workouts } = await supabase
         .from('workout_sessions')
         .select('id, workout_name, started_at, completed_at, total_duration_seconds, target_muscles, status, calories_burned, notes')
@@ -73,7 +68,6 @@ const JournalPage = () => {
         });
       }
 
-      // Fetch nutrition logs
       const { data: meals } = await supabase
         .from('nutrition_logs')
         .select('id, food_name, meal_type, calories, protein, logged_at')
@@ -86,7 +80,7 @@ const JournalPage = () => {
         meals.forEach(m => {
           const mealTypeLabels: Record<string, string> = {
             breakfast: 'Petit-déjeuner',
-            lunch: 'Déjeuner', 
+            lunch: 'Déjeuner',
             dinner: 'Dîner',
             snack: 'Collation',
           };
@@ -102,7 +96,6 @@ const JournalPage = () => {
         });
       }
 
-      // Fetch water from daily_metrics
       const { data: metrics } = await supabase
         .from('daily_metrics')
         .select('water_ml, updated_at')
@@ -121,7 +114,6 @@ const JournalPage = () => {
         });
       }
 
-      // Sort by time
       allEntries.sort((a, b) => a.time.getTime() - b.time.getTime());
       setEntries(allEntries);
     } catch (error) {
@@ -130,6 +122,55 @@ const JournalPage = () => {
       setIsLoading(false);
     }
   }, [selectedDate]);
+
+  // Load entries on date change
+  useEffect(() => {
+    loadEntries();
+  }, [loadEntries]);
+
+  // Real-time subscription to refresh journal when data changes
+  useEffect(() => {
+    const setupRealtimeSubscription = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const nutritionChannel = supabase
+        .channel('journal_nutrition_changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'nutrition_logs', filter: `user_id=eq.${user.id}` },
+          () => { loadEntries(); }
+        )
+        .subscribe();
+
+      const workoutChannel = supabase
+        .channel('journal_workout_changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'workout_sessions', filter: `user_id=eq.${user.id}` },
+          () => { loadEntries(); }
+        )
+        .subscribe();
+
+      const metricsChannel = supabase
+        .channel('journal_metrics_changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'daily_metrics', filter: `user_id=eq.${user.id}` },
+          () => { loadEntries(); }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(nutritionChannel);
+        supabase.removeChannel(workoutChannel);
+        supabase.removeChannel(metricsChannel);
+      };
+    };
+
+    const cleanup = setupRealtimeSubscription();
+    return () => { cleanup.then(fn => fn?.()); };
+  }, [loadEntries]);
 
   const navigateDay = (direction: 'prev' | 'next') => {
     const newDate = new Date(selectedDate);
@@ -153,17 +194,14 @@ const JournalPage = () => {
 
   const getEntryColorClasses = (entry: JournalEntry): string => {
     if (entry.type === 'workout') {
-      // Always completed now, use a success/green token via primary
       return 'text-primary bg-primary/10';
     }
     if (entry.type === 'meal') {
       return getMealColorClasses(entry.mealType || 'lunch');
     }
-    // water
     return 'text-water bg-water/10';
   };
 
-  // Separate workouts from nutrition/water
   const workoutEntries = entries.filter(e => e.type === 'workout');
   const nutritionEntries = entries.filter(e => e.type === 'meal' || e.type === 'water');
 
@@ -182,12 +220,10 @@ const JournalPage = () => {
           }
         }}
       >
-        {/* Icon */}
         <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${colorClass}`}>
           <Icon className="h-5 w-5" />
         </div>
 
-        {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
@@ -214,7 +250,6 @@ const JournalPage = () => {
 
   return (
     <div className="flex flex-col min-h-full pb-20 md:pb-4">
-      {/* Header */}
       <header className="safe-top sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border/50">
         <div className="flex items-center justify-between px-4 py-4">
           <div>
@@ -231,7 +266,6 @@ const JournalPage = () => {
           </Button>
         </div>
 
-        {/* Date navigation */}
         <div className="flex items-center justify-between px-4 pb-4">
           <button
             onClick={() => navigateDay('prev')}
@@ -255,7 +289,6 @@ const JournalPage = () => {
         </div>
       </header>
 
-      {/* Content */}
       <div className="flex-1 px-4 py-6">
         {isLoading ? (
           <div className="space-y-4">
@@ -301,7 +334,6 @@ const JournalPage = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Workout Section */}
             {workoutEntries.length > 0 && (
               <section>
                 <div className="flex items-center gap-2 mb-3">
@@ -315,12 +347,10 @@ const JournalPage = () => {
               </section>
             )}
 
-            {/* Separator if both sections have content */}
             {workoutEntries.length > 0 && nutritionEntries.length > 0 && (
               <div className="border-t border-border/50" />
             )}
 
-            {/* Nutrition Section */}
             {nutritionEntries.length > 0 && (
               <section>
                 <div className="flex items-center gap-2 mb-3">
@@ -337,7 +367,6 @@ const JournalPage = () => {
         )}
       </div>
 
-      {/* FAB for adding */}
       <button
         onClick={() => onOpenCoach?.()}
         className="fixed bottom-24 md:bottom-8 right-4 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-primary-foreground shadow-glow-lg hover:scale-105 transition-transform"
@@ -345,7 +374,6 @@ const JournalPage = () => {
         <Plus className="h-6 w-6" />
       </button>
 
-      {/* Entry actions */}
       <JournalEntryActions
         entry={selectedEntry}
         isOpen={showActions}
