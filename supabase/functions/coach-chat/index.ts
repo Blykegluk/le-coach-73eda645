@@ -1209,6 +1209,7 @@ async function executeToolCall(
       }
 
       case "delete_activity": {
+        console.info(`DELETE_ACTIVITY called with activity_id: ${args.activity_id}`);
         const { data: session } = await supabase
           .from("workout_sessions")
           .select("workout_name, calories_burned")
@@ -2419,7 +2420,7 @@ Exemples:
 AUTRES RÈGLES:
 1. Quand l'utilisateur CORRIGE ou PRÉCISE une entrée précédente → utilise d'abord get_recent_meals ou get_recent_activities pour trouver l'entrée, puis update_meal ou update_activity
 2. Si tu as un DOUTE sur si c'est un nouvel élément ou une correction → DEMANDE à l'utilisateur!
-3. Quand l'utilisateur veut supprimer quelque chose → utilise delete_meal, delete_activity, ou delete_workout_session selon le type
+3. Quand l'utilisateur veut supprimer quelque chose → utilise delete_meal ou delete_activity selon le type. IMPORTANT: tu DOIS appeler l'outil delete_activity avec l'ID exact, ne dis JAMAIS que tu as supprimé sans avoir réellement appelé l'outil!
 
 CORRECTIONS DE SÉANCES D'ENTRAÎNEMENT (TRÈS IMPORTANT):
 Quand l'utilisateur veut corriger des données d'une séance passée (séries, répétitions, poids utilisé):
