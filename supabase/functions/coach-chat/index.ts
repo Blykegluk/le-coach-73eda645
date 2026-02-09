@@ -1295,11 +1295,11 @@ async function executeToolCall(
           .order("logged_at", { ascending: true });
 
         const { data: activities } = await supabase
-          .from("activities")
+          .from("workout_sessions")
           .select("*")
           .eq("user_id", userId)
-          .gte("performed_at", `${queryDate}T00:00:00`)
-          .lte("performed_at", `${queryDate}T23:59:59`);
+          .gte("started_at", `${queryDate}T00:00:00`)
+          .lte("started_at", `${queryDate}T23:59:59`);
 
         const { data: profile } = await supabase
           .from("profiles")
