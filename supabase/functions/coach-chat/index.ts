@@ -1696,9 +1696,9 @@ async function executeToolCall(
           }
         });
 
-        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-        if (!LOVABLE_API_KEY) {
-          return { success: false, message: "LOVABLE_API_KEY not configured" };
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+        if (!GEMINI_API_KEY) {
+          return { success: false, message: "GEMINI_API_KEY not configured" };
         }
 
         // Build focus instruction based on args
@@ -1774,14 +1774,14 @@ IMPORTANT: Retourne un JSON valide avec cette structure exacte:
   "coach_advice": "Conseil personnalisé pour cette séance"
 }`;
 
-        const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const aiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+            "Authorization": `Bearer ${GEMINI_API_KEY}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
+            model: "gemini-2.5-flash",
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: "Génère ma prochaine séance d'entraînement selon les paramètres." },
@@ -1999,9 +1999,9 @@ serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY is not configured");
     }
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -2300,14 +2300,14 @@ Après avoir utilisé un outil, confirme l'action de manière naturelle et encou
     });
 
     // First API call - may include tool calls
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${GEMINI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         messages: [{ role: "system", content: systemPrompt }, ...preparedMessages],
         tools: userId ? tools : undefined, // Only enable tools if user is logged in
         tool_choice: userId ? "auto" : undefined,
@@ -2370,14 +2370,14 @@ Après avoir utilisé un outil, confirme l'action de manière naturelle et encou
       console.log(`Calling AI for follow-up (iteration ${iteration})`);
 
       // Call AI again with updated history
-      const followUpResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const followUpResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${GEMINI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: "gemini-2.5-flash",
           messages: conversationHistory,
           tools: tools,
           tool_choice: "auto",
