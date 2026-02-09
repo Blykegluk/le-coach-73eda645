@@ -368,7 +368,7 @@ const tools = [
     type: "function",
     function: {
       name: "get_recent_activities",
-      description: "Récupère les activités sportives récentes de l'utilisateur",
+      description: "Récupère les séances/activités sportives récentes de l'utilisateur (entraînements structurés et activités libres)",
       parameters: {
         type: "object",
         properties: {
@@ -385,17 +385,17 @@ const tools = [
     type: "function",
     function: {
       name: "update_activity",
-      description: "Modifie une activité sportive existante",
+      description: "Modifie une séance/activité sportive existante",
       parameters: {
         type: "object",
         properties: {
           activity_id: {
             type: "string",
-            description: "ID de l'activité à modifier",
+            description: "ID de la séance à modifier",
           },
           activity_type: {
             type: "string",
-            description: "Nouveau type d'activité (optionnel)",
+            description: "Nouveau type/nom d'activité (optionnel)",
           },
           duration_min: {
             type: "number",
@@ -422,13 +422,13 @@ const tools = [
     type: "function",
     function: {
       name: "delete_activity",
-      description: "Supprime une activité sportive existante",
+      description: "Supprime une séance/activité sportive existante. Utilise get_recent_activities ou get_recent_workout_sessions pour obtenir l'ID.",
       parameters: {
         type: "object",
         properties: {
           activity_id: {
             type: "string",
-            description: "ID de l'activité à supprimer",
+            description: "ID de la séance/activité à supprimer",
           },
         },
         required: ["activity_id"],
