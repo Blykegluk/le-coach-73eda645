@@ -344,6 +344,14 @@ const JournalPage = () => {
       >
         <Plus className="h-6 w-6" />
       </button>
+
+      {/* Entry actions */}
+      <JournalEntryActions
+        entry={selectedEntry}
+        isOpen={showActions}
+        onClose={() => setShowActions(false)}
+        onEntryUpdated={loadEntries}
+      />
     </div>
   );
 };
