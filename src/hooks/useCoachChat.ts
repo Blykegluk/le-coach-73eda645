@@ -115,8 +115,10 @@ export function useCoachChat(onNavigateAway?: () => void) {
 
   // Scroll to bottom when messages change or history finishes loading
   useEffect(() => {
-    // Use setTimeout to ensure DOM has updated
+    // Use multiple delays to catch both immediate renders and drawer animations
     setTimeout(scrollToBottom, 50);
+    setTimeout(scrollToBottom, 300);
+    setTimeout(scrollToBottom, 600);
   }, [messages, isLoadingHistory, scrollToBottom]);
 
   /**
