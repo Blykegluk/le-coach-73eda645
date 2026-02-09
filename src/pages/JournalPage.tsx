@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { format, startOfDay, isToday, isYesterday, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Dumbbell, Droplets, ChevronLeft, ChevronRight, Plus, Calendar, Zap, UtensilsCrossed } from 'lucide-react';
@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { getMealIcon, getMealColorClasses } from '@/utils/mealColors';
+import JournalEntryActions from '@/components/journal/JournalEntryActions';
 
 interface JournalEntry {
   id: string;
