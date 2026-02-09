@@ -24,6 +24,8 @@ const JournalPage = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
+  const [showActions, setShowActions] = useState(false);
   const navigate = useNavigate();
   const { onOpenCoach } = useOutletContext<{ onOpenCoach: () => void }>();
 
