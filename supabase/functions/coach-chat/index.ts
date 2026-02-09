@@ -2370,14 +2370,14 @@ Après avoir utilisé un outil, confirme l'action de manière naturelle et encou
       console.log(`Calling AI for follow-up (iteration ${iteration})`);
 
       // Call AI again with updated history
-      const followUpResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const followUpResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${GEMINI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: "gemini-2.5-flash",
           messages: conversationHistory,
           tools: tools,
           tool_choice: "auto",
