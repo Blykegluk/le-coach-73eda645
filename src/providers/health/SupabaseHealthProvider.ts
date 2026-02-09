@@ -22,7 +22,7 @@ export class SupabaseHealthProvider implements HealthProvider {
       .select('steps, sleep_hours, weight, water_ml, calories_in, calories_burned')
       .eq('user_id', this.userId)
       .eq('date', today)
-      .single();
+      .maybeSingle();
     
     if (error || !data) return null;
     

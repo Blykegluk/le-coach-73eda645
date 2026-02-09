@@ -96,7 +96,7 @@ const HomePage = () => {
       .eq('user_id', user.id)
       .order('date', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (dailyData?.weight) {
       setCurrentWeight(dailyData.weight);
@@ -111,7 +111,7 @@ const HomePage = () => {
       .eq('user_id', user.id)
       .order('measured_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (bodyData) {
       if (!dailyData?.weight && bodyData.weight_kg) {
@@ -179,7 +179,7 @@ const HomePage = () => {
       .select('sleep_hours, steps, heart_rate_avg, heart_rate_resting, active_minutes, floors_climbed')
       .eq('user_id', user.id)
       .eq('date', today)
-      .single();
+      .maybeSingle();
 
     if (data) {
       setHealthStats({

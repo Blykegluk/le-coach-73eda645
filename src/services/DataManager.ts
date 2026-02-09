@@ -51,12 +51,12 @@ class DataManager {
       .select('*')
       .eq('user_id', this.userId)
       .eq('date', today)
-      .single();
+      .maybeSingle();
 
     if (existing) return existing as DailyMetrics;
 
     // Create new record if not exists
-    if (fetchError?.code === 'PGRST116') {
+    if (!existing) {
       const { data: created, error: createError } = await supabase
         .from('daily_metrics')
         .insert({
@@ -98,7 +98,7 @@ class DataManager {
       .select('*')
       .eq('user_id', this.userId)
       .eq('date', this.getTodayDate())
-      .single();
+      .maybeSingle();
 
     if (error && error.code !== 'PGRST116') {
       console.error('Error fetching today metrics:', error);
