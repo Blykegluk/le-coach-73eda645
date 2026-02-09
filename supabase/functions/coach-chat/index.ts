@@ -56,6 +56,9 @@ const toolSchemas: Record<string, z.ZodSchema> = {
   delete_activity: z.object({
     activity_id: z.string().uuid(),
   }),
+  delete_workout_session: z.object({
+    session_id: z.string().uuid(),
+  }),
   get_daily_summary: z.object({
     date: dateSchema,
   }),
@@ -801,6 +804,23 @@ const tools = [
           },
         },
         required: ["exercise_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_workout_session",
+      description: "Supprime une séance d'entraînement complète (et tous ses exercices associés). Utiliser get_recent_workout_sessions d'abord pour obtenir l'ID.",
+      parameters: {
+        type: "object",
+        properties: {
+          session_id: {
+            type: "string",
+            description: "ID de la séance à supprimer (obtenu via get_recent_workout_sessions)",
+          },
+        },
+        required: ["session_id"],
       },
     },
   },
@@ -2101,6 +2121,40 @@ IMPORTANT: Retourne un JSON valide avec cette structure exacte:
         };
       }
 
+      case "delete_workout_session": {
+        const { data: session } = await supabase
+          .from("workout_sessions")
+          .select("workout_name, total_duration_seconds")
+          .eq("id", args.session_id)
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (!session) {
+          return { success: false, message: "Séance non trouvée" };
+        }
+
+        // Delete associated exercise logs first
+        await supabase
+          .from("workout_exercise_logs")
+          .delete()
+          .eq("session_id", args.session_id)
+          .eq("user_id", userId);
+
+        // Delete the session
+        const { error } = await supabase
+          .from("workout_sessions")
+          .delete()
+          .eq("id", args.session_id)
+          .eq("user_id", userId);
+
+        if (error) throw error;
+
+        return {
+          success: true,
+          message: `🗑️ Séance "${session.workout_name}" supprimée`,
+        };
+      }
+
       default:
         return { success: false, message: `Outil inconnu: ${name}` };
     }
@@ -2406,7 +2460,7 @@ Exemples:
 AUTRES RÈGLES:
 1. Quand l'utilisateur CORRIGE ou PRÉCISE une entrée précédente → utilise d'abord get_recent_meals ou get_recent_activities pour trouver l'entrée, puis update_meal ou update_activity
 2. Si tu as un DOUTE sur si c'est un nouvel élément ou une correction → DEMANDE à l'utilisateur!
-3. Quand l'utilisateur veut supprimer quelque chose → utilise delete_meal ou delete_activity
+3. Quand l'utilisateur veut supprimer quelque chose → utilise delete_meal, delete_activity, ou delete_workout_session selon le type
 
 CORRECTIONS DE SÉANCES D'ENTRAÎNEMENT (TRÈS IMPORTANT):
 Quand l'utilisateur veut corriger des données d'une séance passée (séries, répétitions, poids utilisé):

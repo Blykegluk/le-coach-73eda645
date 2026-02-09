@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Send, Plus, Camera, Mic, Loader2, X } from 'lucide-react';
+import { Send, Plus, Camera, Mic, Loader2, X, ArrowDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import ImageCapture from '@/components/chat/ImageCapture';
 import VoiceRecorder from '@/components/chat/VoiceRecorder';
@@ -37,6 +37,9 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
     messages,
     isLoading,
     isLoadingHistory,
+    showScrollButton,
+    handleScroll,
+    scrollToBottom,
     handleSend,
     handleImageCaptured,
     handleVoiceTranscription,
@@ -64,7 +67,7 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
           </DrawerHeader>
 
           {/* Messages */}
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 min-h-0">
+          <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 min-h-0">
             {isLoadingHistory ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -126,6 +129,16 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
               </div>
             )}
           </div>
+
+          {/* Scroll to bottom button */}
+          {showScrollButton && (
+            <button
+              onClick={scrollToBottom}
+              className="absolute bottom-44 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-card border border-border/50 shadow-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+            >
+              <ArrowDown className="h-4 w-4" />
+            </button>
+          )}
 
           {/* Actions overlay */}
           {showActions && (

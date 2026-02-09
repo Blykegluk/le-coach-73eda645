@@ -23,8 +23,22 @@ export function useCoachChat(onNavigateAway?: () => void) {
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [showScrollButton, setShowScrollButton] = useState(false);
   const { setGeneratedWorkout } = useWorkout();
   const navigate = useNavigate();
+
+  const scrollToBottom = useCallback(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    if (scrollRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+      setShowScrollButton(scrollTop < scrollHeight - clientHeight - 80);
+    }
+  }, []);
 
   const loadChatHistory = useCallback(async (uid: string) => {
     setIsLoadingHistory(true);
@@ -99,11 +113,11 @@ export function useCoachChat(onNavigateAway?: () => void) {
     return () => subscription.unsubscribe();
   }, [loadChatHistory]);
 
+  // Scroll to bottom when messages change or history finishes loading
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
+    // Use setTimeout to ensure DOM has updated
+    setTimeout(scrollToBottom, 50);
+  }, [messages, isLoadingHistory, scrollToBottom]);
 
   /**
    * Get a valid user access token. Tries refreshSession first, falls back to getSession.
@@ -231,6 +245,9 @@ export function useCoachChat(onNavigateAway?: () => void) {
     messages,
     isLoading,
     isLoadingHistory,
+    showScrollButton,
+    handleScroll,
+    scrollToBottom,
     handleSend,
     handleImageCaptured,
     handleVoiceTranscription,

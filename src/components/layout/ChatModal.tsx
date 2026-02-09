@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Send, Plus, Camera, Mic, Loader2 } from 'lucide-react';
+import { X, Send, Plus, Camera, Mic, Loader2, ArrowDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import ImageCapture from '@/components/chat/ImageCapture';
 import VoiceRecorder from '@/components/chat/VoiceRecorder';
@@ -30,6 +30,9 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
     messages,
     isLoading,
     isLoadingHistory,
+    showScrollButton,
+    handleScroll,
+    scrollToBottom,
     handleSend,
     handleImageCaptured,
     handleVoiceTranscription,
@@ -55,7 +58,7 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
       </header>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4">
         {isLoadingHistory ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -98,6 +101,16 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
           </div>
         )}
       </div>
+
+      {/* Scroll to bottom button */}
+      {showScrollButton && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute bottom-32 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-card border border-border/50 shadow-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+        >
+          <ArrowDown className="h-4 w-4" />
+        </button>
+      )}
 
       {/* Actions modal */}
       {showActions && (
