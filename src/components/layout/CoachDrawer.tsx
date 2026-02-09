@@ -1,17 +1,15 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { Send, Plus, Camera, Mic, Loader2, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 import ImageCapture from '@/components/chat/ImageCapture';
 import VoiceRecorder from '@/components/chat/VoiceRecorder';
-import { useWorkout } from '@/contexts/WorkoutContext';
-import { useNavigate } from 'react-router-dom';
+import { useCoachChat } from '@/hooks/useCoachChat';
 import {
   Drawer,
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
+  DrawerDescription,
 } from '@/components/ui/drawer';
 
 const suggestions = [
@@ -21,212 +19,29 @@ const suggestions = [
   { emoji: '💧', label: 'Eau' },
 ];
 
-type Message = { 
-  id?: string;
-  role: "user" | "assistant"; 
-  content: string;
-  imageUrl?: string;
-};
-
-const WELCOME_MESSAGE: Message = { 
-  role: "assistant", 
-  content: "Salut ! 👋 Je suis ton Perfect Coach. Comment puis-je t'aider ?" 
-};
-
 interface CoachDrawerProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
 const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [inputMessage, setInputMessage] = useState('');
   const [showActions, setShowActions] = useState(false);
   const [showImageCapture, setShowImageCapture] = useState(false);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const { setGeneratedWorkout } = useWorkout();
-  const navigate = useNavigate();
 
-  const loadChatHistory = useCallback(async (uid: string) => {
-    setIsLoadingHistory(true);
-    try {
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('id, role, content, image_url, created_at')
-        .eq('user_id', uid)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        const loadedMessages: Message[] = data.map(msg => ({
-          id: msg.id,
-          role: msg.role as "user" | "assistant",
-          content: msg.content,
-          imageUrl: msg.image_url || undefined,
-        }));
-        setMessages(loadedMessages);
-      } else {
-        setMessages([WELCOME_MESSAGE]);
-      }
-    } catch (error) {
-      console.error('Error loading chat history:', error);
-      setMessages([WELCOME_MESSAGE]);
-    } finally {
-      setIsLoadingHistory(false);
-    }
-  }, []);
-
-  const saveMessage = useCallback(async (uid: string, message: Message) => {
-    try {
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .insert({
-          user_id: uid,
-          role: message.role,
-          content: message.content,
-          image_url: message.imageUrl || null,
-        })
-        .select('id')
-        .single();
-
-      if (error) throw error;
-      return data.id;
-    } catch (error) {
-      console.error('Error saving message:', error);
-      return null;
-    }
-  }, []);
-
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.id) {
-        setUserId(user.id);
-        loadChatHistory(user.id);
-      }
-    };
-    getUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      const uid = session?.user?.id || null;
-      setUserId(uid);
-      if (uid) {
-        loadChatHistory(uid);
-      } else {
-        setMessages([WELCOME_MESSAGE]);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [loadChatHistory]);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
-
-  const handleSend = async (text?: string, imageUrl?: string) => {
-    const messageText = text || inputMessage.trim();
-    if ((!messageText && !imageUrl) || isLoading || !userId) return;
-
-    const userMsg: Message = { 
-      role: "user", 
-      content: messageText || (imageUrl ? "Analyse cette image" : ""),
-      imageUrl 
-    };
-    
-    setMessages(prev => [...prev, userMsg]);
-    setInputMessage('');
-    setIsLoading(true);
-
-    await saveMessage(userId, userMsg);
-
-    try {
-      const response = await fetch(
-        `https://ldllojtzoetwcwbjmfib.supabase.co/functions/v1/coach-chat`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxkbGxvanR6b2V0d2N3YmptZmliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4OTkzNzQsImV4cCI6MjA4NTQ3NTM3NH0.NAINuQt1vmut_ILrp-YFsrgRZYXx3nJmIZ77Alnn2sw`,
-          },
-          body: JSON.stringify({
-            messages: [...messages, { role: userMsg.role, content: userMsg.content }].map(m => ({
-              role: m.role,
-              content: m.content,
-            })),
-            userId,
-            imageUrl,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Erreur ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (data.actions && data.actions.length > 0) {
-        data.actions.forEach((action: { name: string; result: { success: boolean; message: string; data?: { workout?: unknown; type?: string } } }) => {
-          if (action.result.success) {
-            toast.success(action.result.message);
-            
-            if (action.name === "generate_workout" && action.result.data?.workout) {
-              setGeneratedWorkout(action.result.data.workout as import('@/components/training/NextWorkoutCard').Workout);
-              setTimeout(() => {
-                onClose();
-                navigate('/training');
-              }, 1500);
-            }
-          }
-        });
-      }
-
-      const assistantMsg: Message = { role: "assistant", content: data.content };
-      setMessages(prev => [...prev, assistantMsg]);
-      
-      await saveMessage(userId, assistantMsg);
-
-    } catch (error) {
-      console.error("Chat error:", error);
-      toast.error(error instanceof Error ? error.message : "Erreur de connexion");
-      
-      const errorMsg: Message = { 
-        role: "assistant", 
-        content: "Désolé, je rencontre un problème technique. Réessaie dans un instant ! 🔧" 
-      };
-      setMessages(prev => [...prev, errorMsg]);
-      await saveMessage(userId, errorMsg);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleImageCaptured = (imageUrl: string) => {
-    handleSend("Analyse cette image", imageUrl);
-  };
-
-  const handleVoiceTranscription = (text: string) => {
-    handleSend(text);
-  };
-
-  const handleSuggestion = (label: string) => {
-    const suggestionMessages: Record<string, string> = {
-      'Ajouter Repas': "Je viens de manger, aide-moi à le noter",
-      'Mon Bilan': "Donne-moi un résumé de ma journée",
-      'Séance': "Propose-moi une séance d'entraînement",
-      'Eau': "J'ai bu un verre d'eau",
-    };
-    handleSend(suggestionMessages[label] || label);
-  };
+  const {
+    scrollRef,
+    inputMessage,
+    setInputMessage,
+    userId,
+    messages,
+    isLoading,
+    isLoadingHistory,
+    handleSend,
+    handleImageCaptured,
+    handleVoiceTranscription,
+    handleSuggestion,
+  } = useCoachChat(onClose);
 
   return (
     <>
@@ -241,9 +56,9 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
               </div>
               <div className="flex-1">
                 <DrawerTitle className="text-left">Coach IA</DrawerTitle>
-                <p className="text-xs text-muted-foreground text-left">
+                <DrawerDescription className="text-left">
                   {isLoading ? "Réfléchit..." : "En ligne"}
-                </p>
+                </DrawerDescription>
               </div>
             </div>
           </DrawerHeader>
@@ -260,8 +75,8 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
                 {messages.map((msg, index) => {
                   const isCoach = msg.role === 'assistant';
                   return (
-                    <div 
-                      key={msg.id || index} 
+                    <div
+                      key={msg.id || index}
                       className={`flex gap-2 ${isCoach ? 'justify-start' : 'justify-end'}`}
                     >
                       {isCoach && (
@@ -272,11 +87,7 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
                       <div className={`flex max-w-[80%] flex-col ${isCoach ? 'items-start' : 'items-end'}`}>
                         {msg.imageUrl && (
                           <div className="mb-2 overflow-hidden rounded-xl border border-border/50">
-                            <img 
-                              src={msg.imageUrl} 
-                              alt="Uploaded" 
-                              className="max-h-32 w-auto object-cover"
-                            />
+                            <img src={msg.imageUrl} alt="Uploaded" className="max-h-32 w-auto object-cover" />
                           </div>
                         )}
                         <div
@@ -318,46 +129,27 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
 
           {/* Actions overlay */}
           {showActions && (
-            <div 
+            <div
               className="absolute inset-0 z-10 flex items-end bg-background/60 backdrop-blur-sm rounded-t-[10px]"
               onClick={() => setShowActions(false)}
             >
-              <div 
+              <div
                 className="mb-4 mx-4 w-full glass-card rounded-2xl p-4"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="mb-4 flex items-center justify-between">
                   <h3 className="font-semibold text-foreground">Ajouter</h3>
-                  <button 
-                    onClick={() => setShowActions(false)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/50 hover:bg-muted"
-                  >
+                  <button onClick={() => setShowActions(false)} className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/50 hover:bg-muted">
                     <X className="h-4 w-4 text-muted-foreground" />
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <button 
-                    onClick={() => {
-                      setShowActions(false);
-                      setShowImageCapture(true);
-                    }}
-                    className="flex flex-col items-center gap-2 rounded-xl bg-muted/50 p-4 hover:bg-muted"
-                  >
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                      <Camera className="h-6 w-6 text-primary" />
-                    </div>
+                  <button onClick={() => { setShowActions(false); setShowImageCapture(true); }} className="flex flex-col items-center gap-2 rounded-xl bg-muted/50 p-4 hover:bg-muted">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10"><Camera className="h-6 w-6 text-primary" /></div>
                     <span className="text-sm font-medium">Photo</span>
                   </button>
-                  <button 
-                    onClick={() => {
-                      setShowActions(false);
-                      setShowVoiceRecorder(true);
-                    }}
-                    className="flex flex-col items-center gap-2 rounded-xl bg-muted/50 p-4 hover:bg-muted"
-                  >
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                      <Mic className="h-6 w-6 text-primary" />
-                    </div>
+                  <button onClick={() => { setShowActions(false); setShowVoiceRecorder(true); }} className="flex flex-col items-center gap-2 rounded-xl bg-muted/50 p-4 hover:bg-muted">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10"><Mic className="h-6 w-6 text-primary" /></div>
                     <span className="text-sm font-medium">Vocal</span>
                   </button>
                 </div>
@@ -367,43 +159,19 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
 
           {/* Input area */}
           <div className="flex-shrink-0 border-t border-border/50 px-4 pb-4 pt-3">
-            {/* Suggestions */}
             <div className="scrollbar-hide mb-3 flex gap-2 overflow-x-auto">
               {suggestions.map((s) => (
-                <button
-                  key={s.label}
-                  onClick={() => handleSuggestion(s.label)}
-                  disabled={isLoading}
-                  className="flex flex-shrink-0 items-center gap-1.5 rounded-full border border-border/50 bg-card/50 px-3 py-1.5 text-sm font-medium hover:border-primary disabled:opacity-50"
-                >
-                  <span>{s.emoji}</span>
-                  <span>{s.label}</span>
+                <button key={s.label} onClick={() => handleSuggestion(s.label)} disabled={isLoading} className="flex flex-shrink-0 items-center gap-1.5 rounded-full border border-border/50 bg-card/50 px-3 py-1.5 text-sm font-medium hover:border-primary disabled:opacity-50">
+                  <span>{s.emoji}</span><span>{s.label}</span>
                 </button>
               ))}
             </div>
-
-            {/* Input */}
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowActions(true)}
-                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-muted/50 text-muted-foreground hover:bg-primary/10 hover:text-primary"
-              >
+              <button onClick={() => setShowActions(true)} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-muted/50 text-muted-foreground hover:bg-primary/10 hover:text-primary">
                 <Plus className="h-5 w-5" />
               </button>
-              <input
-                type="text"
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                placeholder="Message..."
-                disabled={isLoading}
-                className="h-10 flex-1 rounded-full border border-border/50 bg-card/50 px-4 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none disabled:opacity-50"
-              />
-              <button
-                onClick={() => handleSend()}
-                disabled={!inputMessage.trim() || isLoading}
-                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-primary to-primary-glow text-primary-foreground disabled:opacity-50"
-              >
+              <input type="text" value={inputMessage} onChange={(e) => setInputMessage(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} placeholder="Message..." disabled={isLoading} className="h-10 flex-1 rounded-full border border-border/50 bg-card/50 px-4 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none disabled:opacity-50" />
+              <button onClick={() => handleSend()} disabled={!inputMessage.trim() || isLoading} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-primary to-primary-glow text-primary-foreground disabled:opacity-50">
                 {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
               </button>
             </div>
@@ -411,18 +179,8 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
         </DrawerContent>
       </Drawer>
 
-      <ImageCapture
-        isOpen={showImageCapture}
-        onClose={() => setShowImageCapture(false)}
-        onImageCaptured={handleImageCaptured}
-        userId={userId}
-      />
-
-      <VoiceRecorder
-        isOpen={showVoiceRecorder}
-        onClose={() => setShowVoiceRecorder(false)}
-        onTranscription={handleVoiceTranscription}
-      />
+      <ImageCapture isOpen={showImageCapture} onClose={() => setShowImageCapture(false)} onImageCaptured={handleImageCaptured} userId={userId} />
+      <VoiceRecorder isOpen={showVoiceRecorder} onClose={() => setShowVoiceRecorder(false)} onTranscription={handleVoiceTranscription} />
     </>
   );
 };
