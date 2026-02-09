@@ -2143,8 +2143,7 @@ serve(async (req) => {
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
       throw new Error("Supabase configuration missing");
     }
 
@@ -2169,9 +2168,12 @@ serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
 
-    // Use service role to validate the user token
-    const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { data: { user }, error: authError } = await adminClient.auth.getUser(token);
+    // Create client with user's auth header and validate JWT
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
       console.error("Auth error:", authError);
       return new Response(
@@ -2181,11 +2183,6 @@ serve(async (req) => {
     }
 
     const userId = user.id;
-
-    // Create RLS-scoped client for data queries (uses user's token for RLS)
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
 
     // Get user profile for context
     let userContext = "";
