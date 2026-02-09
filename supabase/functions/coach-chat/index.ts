@@ -800,7 +800,8 @@ async function executeToolCall(
           normalizedMealType = hour >= 14 ? "afternoon_snack" : "morning_snack";
         }
 
-        const loggedAt = `${today}T${timeToUse}:00`;
+        const dateToUse = args.date || today;
+        const loggedAt = `${dateToUse}T${timeToUse}:00`;
         
         const { error } = await supabase.from("nutrition_logs").insert({
           user_id: userId,
