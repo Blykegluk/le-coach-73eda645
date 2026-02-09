@@ -807,6 +807,23 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "delete_workout_session",
+      description: "Supprime une séance d'entraînement complète (et tous ses exercices associés). Utiliser get_recent_workout_sessions d'abord pour obtenir l'ID.",
+      parameters: {
+        type: "object",
+        properties: {
+          session_id: {
+            type: "string",
+            description: "ID de la séance à supprimer (obtenu via get_recent_workout_sessions)",
+          },
+        },
+        required: ["session_id"],
+      },
+    },
+  },
 ];
 
 // Execute tool calls
