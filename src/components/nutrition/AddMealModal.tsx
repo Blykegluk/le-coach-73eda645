@@ -122,7 +122,6 @@ export default function AddMealModal({
           description: null,
           imageUrl: urlData.publicUrl,
           mealType,
-          userId,
         },
       });
 
