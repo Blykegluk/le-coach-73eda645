@@ -51,7 +51,7 @@ class DataManager {
       .select('*')
       .eq('user_id', this.userId)
       .eq('date', today)
-      .single();
+      .maybeSingle();
 
     if (existing) return existing as DailyMetrics;
 
