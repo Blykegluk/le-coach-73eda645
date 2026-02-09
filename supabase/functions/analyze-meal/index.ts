@@ -30,6 +30,13 @@ serve(async (req) => {
       );
     }
 
+    // Parse body first (can only call req.json() once)
+    const { description, mealType, imageUrl } = await req.json();
+
+    if (!description && !imageUrl) {
+      throw new Error("Description ou image requise");
+    }
+
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -45,12 +52,6 @@ serve(async (req) => {
     }
 
     const userId = user.id;
-
-    const { description, mealType, imageUrl } = await req.json();
-
-    if (!description && !imageUrl) {
-      throw new Error("Description ou image requise");
-    }
 
     console.log(`Analyzing meal for user ${userId}: ${description || 'image'}`);
 
