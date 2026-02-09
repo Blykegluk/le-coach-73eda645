@@ -148,21 +148,32 @@ const CoachPage = () => {
         throw new Error("Session expirée, reconnecte-toi");
       }
 
-      const { data, error: fnError } = await supabase.functions.invoke('coach-chat', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: {
-          messages: [...messages, { role: userMsg.role, content: userMsg.content }].map(m => ({
-            role: m.role,
-            content: m.content,
-          })),
-          imageUrl,
-        },
-      });
+      // Use fetch() directly to guarantee the correct token is sent
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/coach-chat`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({
+            messages: [...messages, { role: userMsg.role, content: userMsg.content }].map(m => ({
+              role: m.role,
+              content: m.content,
+            })),
+            imageUrl,
+          }),
+        }
+      );
 
-      if (fnError) {
-        throw new Error(fnError.message || `Erreur de connexion`);
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(errorBody || `Erreur ${response.status}`);
+      }
+
+      const data = await response.json();
       }
       
       if (data.actions && data.actions.length > 0) {
