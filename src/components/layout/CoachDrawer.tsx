@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Plus, Camera, Mic, Loader2, X, ArrowDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import ImageCapture from '@/components/chat/ImageCapture';
@@ -28,6 +28,7 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
   const [showActions, setShowActions] = useState(false);
   const [showImageCapture, setShowImageCapture] = useState(false);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   const {
     scrollRef,
@@ -46,10 +47,38 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
     handleSuggestion,
   } = useCoachChat(onClose);
 
+  // Robust scroll to bottom using anchor element
+  const scrollToEnd = useCallback(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'instant' });
+  }, []);
+
+  // Scroll to bottom when drawer opens or messages change
+  useEffect(() => {
+    if (!isOpen) return;
+    // Multiple delays to catch drawer animation completion
+    const timers = [0, 100, 300, 600, 1000].map(ms =>
+      setTimeout(scrollToEnd, ms)
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [isOpen, messages, isLoadingHistory, scrollToEnd]);
+
+  // Handle visual viewport resize (keyboard open/close)
+  useEffect(() => {
+    if (!isOpen) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      // Force layout recalc - the dvh unit should handle it but we scroll to keep position
+      setTimeout(scrollToEnd, 50);
+    };
+    vv.addEventListener('resize', onResize);
+    return () => vv.removeEventListener('resize', onResize);
+  }, [isOpen, scrollToEnd]);
+
   return (
     <>
       <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DrawerContent className="h-[85dvh] max-h-[85dvh] flex flex-col">
+        <DrawerContent className="h-[85dvh] max-h-[85dvh] flex flex-col" style={{ height: '85dvh' }}>
           <DrawerHeader className="flex-shrink-0 border-b border-border/50 pb-3">
             <div className="flex items-center gap-3">
               <div className="relative">
@@ -126,6 +155,7 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
                     </div>
                   </div>
                 )}
+                <div ref={bottomRef} />
               </div>
             )}
           </div>
@@ -133,7 +163,7 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
           {/* Scroll to bottom button */}
           {showScrollButton && (
             <button
-              onClick={scrollToBottom}
+              onClick={scrollToEnd}
               className="absolute bottom-44 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-card border border-border/50 shadow-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
             >
               <ArrowDown className="h-4 w-4" />
