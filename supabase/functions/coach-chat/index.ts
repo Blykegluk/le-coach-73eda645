@@ -1966,6 +1966,21 @@ IMPORTANT: Retourne un JSON valide avec cette structure exacte:
           }
         }
 
+        // Persist workout to user_context so it shows in the preview
+        try {
+          await supabase
+            .from("user_context")
+            .upsert({
+              user_id: userId,
+              key: "prepared_workout",
+              value: JSON.stringify(workout),
+              updated_at: new Date().toISOString(),
+            }, { onConflict: "user_id,key" });
+          console.log("Workout saved to user_context for preview");
+        } catch (saveErr) {
+          console.error("Error saving workout to user_context:", saveErr);
+        }
+
         return {
           success: true,
           message: `💪 Séance générée: ${workout.workout_name} (~${workout.estimated_duration_min} min, ${workout.exercises?.length || 0} exercices)`,
