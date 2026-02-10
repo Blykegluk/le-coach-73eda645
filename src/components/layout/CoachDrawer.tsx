@@ -4,13 +4,6 @@ import ReactMarkdown from 'react-markdown';
 import ImageCapture from '@/components/chat/ImageCapture';
 import VoiceRecorder from '@/components/chat/VoiceRecorder';
 import { useCoachChat } from '@/hooks/useCoachChat';
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerDescription,
-} from '@/components/ui/drawer';
 
 const suggestions = [
   { emoji: '🍽️', label: 'Ajouter Repas' },
