@@ -23,8 +23,7 @@ export function useCoachChat(onNavigateAway?: () => void) {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
-  const { setGeneratedWorkout } = useWorkout();
-  const navigate = useNavigate();
+  
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
