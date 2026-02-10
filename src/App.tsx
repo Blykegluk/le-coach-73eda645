@@ -11,6 +11,8 @@ import OnboardingGate from "@/components/layout/OnboardingGate";
 import AppLayout from "./components/layout/AppLayout";
 import HomePage from "./pages/HomePage";
 import JournalPage from "./pages/JournalPage";
+import TrainingPage from "./pages/TrainingPage";
+import PerformancePage from "./pages/PerformancePage";
 import ProfilePage from "./pages/ProfilePage";
 import AuthPage from "./pages/AuthPage";
 import OnboardingPage from "./pages/OnboardingPage";
@@ -41,6 +43,8 @@ const App = () => (
                     <Route element={<AppLayout />}>
                       <Route path="/" element={<HomePage />} />
                       <Route path="/journal" element={<JournalPage />} />
+                      <Route path="/training" element={<TrainingPage />} />
+                      <Route path="/performance" element={<PerformancePage />} />
                       <Route path="/profile" element={<ProfilePage />} />
                     </Route>
                   </Route>
