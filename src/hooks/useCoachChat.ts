@@ -191,11 +191,8 @@ export function useCoachChat(onNavigateAway?: () => void) {
             toast.success(action.result.message);
 
             if (action.name === "generate_workout" && action.result.data?.workout) {
-              setGeneratedWorkout(action.result.data.workout as import('@/components/training/NextWorkoutCard').Workout);
-              setTimeout(() => {
-                onNavigateAway?.();
-                navigate('/training');
-              }, 1500);
+              // Workout is already saved to user_context by the edge function
+              // Realtime subscriptions will pick it up automatically
             }
           }
         });
