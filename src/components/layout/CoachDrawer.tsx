@@ -53,152 +53,148 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
     return () => timers.forEach(clearTimeout);
   }, [isOpen, messages, isLoadingHistory, scrollToEnd]);
 
+  if (!isOpen) return (
+    <>
+      <ImageCapture isOpen={showImageCapture} onClose={() => setShowImageCapture(false)} onImageCaptured={handleImageCaptured} userId={userId} />
+      <VoiceRecorder isOpen={showVoiceRecorder} onClose={() => setShowVoiceRecorder(false)} onTranscription={handleVoiceTranscription} />
+    </>
+  );
+
   return (
     <>
-      <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DrawerContent className="flex flex-col overflow-hidden h-[85vh] max-h-[85vh]">
-          <DrawerHeader className="flex-shrink-0 border-b border-border/50 pb-3">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow font-bold text-primary-foreground shadow-glow-sm">
-                  H
-                </div>
-              </div>
-              <div className="flex-1">
-                <DrawerTitle className="text-left">Coach IA</DrawerTitle>
-                <DrawerDescription className="text-left">
-                  {isLoading ? "Réfléchit..." : "En ligne"}
-                </DrawerDescription>
-              </div>
-            </div>
-          </DrawerHeader>
+      {/* Backdrop */}
+      <div className="fixed inset-0 z-50 bg-black/60" onClick={onClose} />
 
-          {/* Messages */}
-          <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 min-h-0">
-            {isLoadingHistory ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                <span className="ml-2 text-sm text-muted-foreground">Chargement...</span>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {messages.map((msg, index) => {
-                  const isCoach = msg.role === 'assistant';
-                  return (
-                    <div
-                      key={msg.id || index}
-                      className={`flex gap-2 ${isCoach ? 'justify-start' : 'justify-end'}`}
-                    >
-                      {isCoach && (
-                        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-xs font-bold text-primary-foreground">
-                          H
+      {/* Panel */}
+      <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col bg-background rounded-t-2xl border-t border-border/50" style={{ height: '85vh' }}>
+        {/* Drag handle */}
+        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+          <div className="h-1.5 w-12 rounded-full bg-muted" />
+        </div>
+
+        {/* Header */}
+        <div className="flex-shrink-0 border-b border-border/50 px-4 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow font-bold text-primary-foreground shadow-glow-sm">
+              H
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold leading-none">Coach IA</h2>
+              <p className="text-sm text-muted-foreground">{isLoading ? "Réfléchit..." : "En ligne"}</p>
+            </div>
+            <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/50 hover:bg-muted">
+              <X className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 min-h-0">
+          {isLoadingHistory ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <span className="ml-2 text-sm text-muted-foreground">Chargement...</span>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {messages.map((msg, index) => {
+                const isCoach = msg.role === 'assistant';
+                return (
+                  <div key={msg.id || index} className={`flex gap-2 ${isCoach ? 'justify-start' : 'justify-end'}`}>
+                    {isCoach && (
+                      <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-xs font-bold text-primary-foreground">
+                        H
+                      </div>
+                    )}
+                    <div className={`flex max-w-[80%] flex-col ${isCoach ? 'items-start' : 'items-end'}`}>
+                      {msg.imageUrl && (
+                        <div className="mb-2 overflow-hidden rounded-xl border border-border/50">
+                          <img src={msg.imageUrl} alt="Uploaded" className="max-h-32 w-auto object-cover" />
                         </div>
                       )}
-                      <div className={`flex max-w-[80%] flex-col ${isCoach ? 'items-start' : 'items-end'}`}>
-                        {msg.imageUrl && (
-                          <div className="mb-2 overflow-hidden rounded-xl border border-border/50">
-                            <img src={msg.imageUrl} alt="Uploaded" className="max-h-32 w-auto object-cover" />
+                      <div className={`rounded-2xl px-3 py-2 text-sm ${isCoach ? 'rounded-tl-md bg-muted/50' : 'rounded-tr-md bg-gradient-to-r from-primary to-primary-glow text-primary-foreground'}`}>
+                        {isCoach ? (
+                          <div className="coach-message-content text-sm">
+                            <ReactMarkdown>{msg.content}</ReactMarkdown>
                           </div>
+                        ) : (
+                          <p className="text-sm">{msg.content}</p>
                         )}
-                        <div
-                          className={`rounded-2xl px-3 py-2 text-sm ${
-                            isCoach
-                              ? 'rounded-tl-md bg-muted/50'
-                              : 'rounded-tr-md bg-gradient-to-r from-primary to-primary-glow text-primary-foreground'
-                          }`}
-                        >
-                          {isCoach ? (
-                            <div className="coach-message-content text-sm">
-                              <ReactMarkdown>{msg.content}</ReactMarkdown>
-                            </div>
-                          ) : (
-                            <p className="text-sm">{msg.content}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {isLoading && (
-                  <div className="flex gap-2 justify-start">
-                    <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-xs font-bold text-primary-foreground">
-                      H
-                    </div>
-                    <div className="rounded-2xl rounded-tl-md bg-muted/50 px-3 py-2">
-                      <div className="flex gap-1">
-                        <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                        <span className="h-2 w-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0.2s' }} />
-                        <span className="h-2 w-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0.4s' }} />
                       </div>
                     </div>
                   </div>
-                )}
-                <div ref={bottomRef} />
-              </div>
-            )}
-          </div>
-
-          {/* Scroll to bottom button */}
-          {showScrollButton && (
-            <button
-              onClick={scrollToEnd}
-              className="absolute bottom-44 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-card border border-border/50 shadow-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-            >
-              <ArrowDown className="h-4 w-4" />
-            </button>
-          )}
-
-          {/* Actions overlay */}
-          {showActions && (
-            <div
-              className="absolute inset-0 z-10 flex items-end bg-background/60 backdrop-blur-sm rounded-t-[10px]"
-              onClick={() => setShowActions(false)}
-            >
-              <div
-                className="mb-4 mx-4 w-full glass-card rounded-2xl p-4"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="mb-4 flex items-center justify-between">
-                  <h3 className="font-semibold text-foreground">Ajouter</h3>
-                  <button onClick={() => setShowActions(false)} className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/50 hover:bg-muted">
-                    <X className="h-4 w-4 text-muted-foreground" />
-                  </button>
+                );
+              })}
+              {isLoading && (
+                <div className="flex gap-2 justify-start">
+                  <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-xs font-bold text-primary-foreground">
+                    H
+                  </div>
+                  <div className="rounded-2xl rounded-tl-md bg-muted/50 px-3 py-2">
+                    <div className="flex gap-1">
+                      <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                      <span className="h-2 w-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0.2s' }} />
+                      <span className="h-2 w-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0.4s' }} />
+                    </div>
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <button onClick={() => { setShowActions(false); setShowImageCapture(true); }} className="flex flex-col items-center gap-2 rounded-xl bg-muted/50 p-4 hover:bg-muted">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10"><Camera className="h-6 w-6 text-primary" /></div>
-                    <span className="text-sm font-medium">Photo</span>
-                  </button>
-                  <button onClick={() => { setShowActions(false); setShowVoiceRecorder(true); }} className="flex flex-col items-center gap-2 rounded-xl bg-muted/50 p-4 hover:bg-muted">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10"><Mic className="h-6 w-6 text-primary" /></div>
-                    <span className="text-sm font-medium">Vocal</span>
-                  </button>
-                </div>
-              </div>
+              )}
+              <div ref={bottomRef} />
             </div>
           )}
+        </div>
 
-          {/* Input area */}
-          <div className="flex-shrink-0 border-t border-border/50 px-4 pb-4 pt-3">
-            <div className="scrollbar-hide mb-3 flex gap-2 overflow-x-auto">
-              {suggestions.map((s) => (
-                <button key={s.label} onClick={() => handleSuggestion(s.label)} disabled={isLoading} className="flex flex-shrink-0 items-center gap-1.5 rounded-full border border-border/50 bg-card/50 px-3 py-1.5 text-sm font-medium hover:border-primary disabled:opacity-50">
-                  <span>{s.emoji}</span><span>{s.label}</span>
+        {/* Scroll to bottom button */}
+        {showScrollButton && (
+          <button onClick={scrollToEnd} className="absolute bottom-44 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-card border border-border/50 shadow-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all">
+            <ArrowDown className="h-4 w-4" />
+          </button>
+        )}
+
+        {/* Actions overlay */}
+        {showActions && (
+          <div className="absolute inset-0 z-10 flex items-end bg-background/60 backdrop-blur-sm rounded-t-2xl" onClick={() => setShowActions(false)}>
+            <div className="mb-4 mx-4 w-full glass-card rounded-2xl p-4" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="font-semibold text-foreground">Ajouter</h3>
+                <button onClick={() => setShowActions(false)} className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/50 hover:bg-muted">
+                  <X className="h-4 w-4 text-muted-foreground" />
                 </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setShowActions(true)} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-muted/50 text-muted-foreground hover:bg-primary/10 hover:text-primary">
-                <Plus className="h-5 w-5" />
-              </button>
-              <input type="text" value={inputMessage} onChange={(e) => setInputMessage(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} placeholder="Message..." disabled={isLoading} className="h-10 flex-1 rounded-full border border-border/50 bg-card/50 px-4 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none disabled:opacity-50" />
-              <button onClick={() => handleSend()} disabled={!inputMessage.trim() || isLoading} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-primary to-primary-glow text-primary-foreground disabled:opacity-50">
-                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-              </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => { setShowActions(false); setShowImageCapture(true); }} className="flex flex-col items-center gap-2 rounded-xl bg-muted/50 p-4 hover:bg-muted">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10"><Camera className="h-6 w-6 text-primary" /></div>
+                  <span className="text-sm font-medium">Photo</span>
+                </button>
+                <button onClick={() => { setShowActions(false); setShowVoiceRecorder(true); }} className="flex flex-col items-center gap-2 rounded-xl bg-muted/50 p-4 hover:bg-muted">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10"><Mic className="h-6 w-6 text-primary" /></div>
+                  <span className="text-sm font-medium">Vocal</span>
+                </button>
+              </div>
             </div>
           </div>
-        </DrawerContent>
-      </Drawer>
+        )}
+
+        {/* Input area */}
+        <div className="flex-shrink-0 border-t border-border/50 px-4 pb-[env(safe-area-inset-bottom,8px)] pt-3">
+          <div className="scrollbar-hide mb-3 flex gap-2 overflow-x-auto">
+            {suggestions.map((s) => (
+              <button key={s.label} onClick={() => handleSuggestion(s.label)} disabled={isLoading} className="flex flex-shrink-0 items-center gap-1.5 rounded-full border border-border/50 bg-card/50 px-3 py-1.5 text-sm font-medium hover:border-primary disabled:opacity-50">
+                <span>{s.emoji}</span><span>{s.label}</span>
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowActions(true)} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-muted/50 text-muted-foreground hover:bg-primary/10 hover:text-primary">
+              <Plus className="h-5 w-5" />
+            </button>
+            <input type="text" value={inputMessage} onChange={(e) => setInputMessage(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} placeholder="Message..." disabled={isLoading} className="h-10 flex-1 rounded-full border border-border/50 bg-card/50 px-4 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none disabled:opacity-50" />
+            <button onClick={() => handleSend()} disabled={!inputMessage.trim() || isLoading} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-primary to-primary-glow text-primary-foreground disabled:opacity-50">
+              {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+            </button>
+          </div>
+        </div>
+      </div>
 
       <ImageCapture isOpen={showImageCapture} onClose={() => setShowImageCapture(false)} onImageCaptured={handleImageCaptured} userId={userId} />
       <VoiceRecorder isOpen={showVoiceRecorder} onClose={() => setShowVoiceRecorder(false)} onTranscription={handleVoiceTranscription} />
