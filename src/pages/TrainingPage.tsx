@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Dumbbell, Clock, Flame, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useWorkout } from '@/contexts/WorkoutContext';
+
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, isToday } from 'date-fns';
@@ -56,7 +56,7 @@ const estimateCalories = (activity: Activity, weightKg: number = 70): number => 
 
 const TrainingPage = () => {
   const { user } = useAuth();
-  const { generatedWorkout, clearWorkout } = useWorkout();
+  
   const [searchParams] = useSearchParams();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [userWeight, setUserWeight] = useState<number>(70);
@@ -244,10 +244,7 @@ const TrainingPage = () => {
         <p className="text-xs text-muted-foreground mb-3">
           💡 Dis au coach "Je veux focus le haut du corps" pour adapter la séance
         </p>
-        <NextWorkoutCard 
-          externalWorkout={generatedWorkout} 
-          onWorkoutGenerated={() => clearWorkout()}
-        />
+        <NextWorkoutCard />
       </div>
 
 

@@ -1,8 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useWorkout } from '@/contexts/WorkoutContext';
-import { useNavigate } from 'react-router-dom';
+
 
 export type Message = {
   id?: string;
@@ -24,8 +23,7 @@ export function useCoachChat(onNavigateAway?: () => void) {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
-  const { setGeneratedWorkout } = useWorkout();
-  const navigate = useNavigate();
+  
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -193,11 +191,8 @@ export function useCoachChat(onNavigateAway?: () => void) {
             toast.success(action.result.message);
 
             if (action.name === "generate_workout" && action.result.data?.workout) {
-              setGeneratedWorkout(action.result.data.workout as import('@/components/training/NextWorkoutCard').Workout);
-              setTimeout(() => {
-                onNavigateAway?.();
-                navigate('/training');
-              }, 1500);
+              // Workout is already saved to user_context by the edge function
+              // Realtime subscriptions will pick it up automatically
             }
           }
         });

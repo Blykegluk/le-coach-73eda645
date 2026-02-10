@@ -29,12 +29,7 @@ export interface Workout {
 
 const WORKOUT_STORAGE_KEY = 'prepared_workout';
 
-interface NextWorkoutCardProps {
-  externalWorkout?: Workout | null;
-  onWorkoutGenerated?: (workout: Workout) => void;
-}
-
-export const NextWorkoutCard = ({ externalWorkout, onWorkoutGenerated }: NextWorkoutCardProps) => {
+export const NextWorkoutCard = () => {
   const { user } = useAuth();
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -123,40 +118,25 @@ export const NextWorkoutCard = ({ externalWorkout, onWorkoutGenerated }: NextWor
 
       setWorkout(data);
       await saveWorkout(data);
-      onWorkoutGenerated?.(data);
     } catch (err) {
       console.error("Error fetching workout:", err);
       setError("Impossible de générer la séance");
     } finally {
       setIsRefreshing(false);
     }
-  }, [onWorkoutGenerated, saveWorkout]);
+  }, [saveWorkout]);
 
-  // Use external workout if provided (from coach)
-  useEffect(() => {
-    if (externalWorkout) {
-      setWorkout(externalWorkout);
-      saveWorkout(externalWorkout);
-      setIsLoading(false);
-      setError(null);
-    }
-  }, [externalWorkout, saveWorkout]);
-
-  // On mount: try to load saved workout first, only generate if none exists
+  // On mount: load saved workout from DB, only generate if none exists
   useEffect(() => {
     const initWorkout = async () => {
-      if (externalWorkout) return; // Skip if external workout provided
-      
       setIsLoading(true);
       
-      // First, try to load saved workout
       const saved = await loadSavedWorkout();
       
       if (saved) {
         setWorkout(saved);
         setIsLoading(false);
       } else {
-        // No saved workout, generate a new one
         await generateNewWorkout();
         setIsLoading(false);
       }
@@ -165,7 +145,32 @@ export const NextWorkoutCard = ({ externalWorkout, onWorkoutGenerated }: NextWor
     if (user) {
       initWorkout();
     }
-  }, [user, externalWorkout, loadSavedWorkout, generateNewWorkout]);
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Subscribe to realtime changes on user_context (e.g. coach updates workout)
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('nextworkout_context')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'user_context',
+        filter: `user_id=eq.${user.id}`,
+      }, () => {
+        loadSavedWorkout().then(saved => {
+          if (saved) {
+            setWorkout(saved);
+          }
+        });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, loadSavedWorkout]);
 
   const handleRefresh = async () => {
     await generateNewWorkout();
