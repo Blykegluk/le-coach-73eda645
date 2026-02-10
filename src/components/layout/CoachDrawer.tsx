@@ -156,6 +156,7 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
                   </div>
                 )}
                 <div ref={bottomRef} />
+              </div>
             )}
           </div>
 
