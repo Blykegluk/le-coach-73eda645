@@ -29,7 +29,6 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
   const [showImageCapture, setShowImageCapture] = useState(false);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const drawerContentRef = useRef<HTMLDivElement>(null);
 
   const {
     scrollRef,
@@ -48,57 +47,23 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
     handleSuggestion,
   } = useCoachChat(onClose);
 
-  // Robust scroll to bottom using anchor element
   const scrollToEnd = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'instant' });
-  }, []);
-
-  // Dynamically adjust drawer height based on visual viewport
-  // This ensures the input bar stays at the bottom when the keyboard opens/closes
-  const updateDrawerHeight = useCallback(() => {
-    const el = drawerContentRef.current;
-    if (!el) return;
-    const vv = window.visualViewport;
-    const viewportHeight = vv ? vv.height : window.innerHeight;
-    const drawerHeight = Math.min(viewportHeight * 0.85, viewportHeight - 40);
-    el.style.height = `${drawerHeight}px`;
-    el.style.maxHeight = `${drawerHeight}px`;
   }, []);
 
   // Scroll to bottom when drawer opens or messages change
   useEffect(() => {
     if (!isOpen) return;
-    updateDrawerHeight();
-    const timers = [0, 100, 300, 600, 1000].map(ms =>
-      setTimeout(() => {
-        updateDrawerHeight();
-        scrollToEnd();
-      }, ms)
+    const timers = [0, 100, 300, 500].map(ms =>
+      setTimeout(scrollToEnd, ms)
     );
     return () => timers.forEach(clearTimeout);
-  }, [isOpen, messages, isLoadingHistory, scrollToEnd, updateDrawerHeight]);
-
-  // Handle visual viewport resize (keyboard open/close)
-  useEffect(() => {
-    if (!isOpen) return;
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const onResize = () => {
-      updateDrawerHeight();
-      setTimeout(scrollToEnd, 50);
-    };
-    vv.addEventListener('resize', onResize);
-    vv.addEventListener('scroll', onResize);
-    return () => {
-      vv.removeEventListener('resize', onResize);
-      vv.removeEventListener('scroll', onResize);
-    };
-  }, [isOpen, scrollToEnd, updateDrawerHeight]);
+  }, [isOpen, messages, isLoadingHistory, scrollToEnd]);
 
   return (
     <>
       <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DrawerContent ref={drawerContentRef} className="flex flex-col overflow-hidden" style={{ height: '85dvh', maxHeight: '85dvh' }}>
+        <DrawerContent className="flex flex-col overflow-hidden h-[85vh] max-h-[85vh]">
           <DrawerHeader className="flex-shrink-0 border-b border-border/50 pb-3">
             <div className="flex items-center gap-3">
               <div className="relative">
