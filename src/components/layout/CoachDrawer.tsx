@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Plus, Camera, Mic, Loader2, X, ArrowDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import ImageCapture from '@/components/chat/ImageCapture';
