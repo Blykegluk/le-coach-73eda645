@@ -156,19 +156,6 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
                   </div>
                 )}
                 <div ref={bottomRef} />
-              </div>
-                      H
-                    </div>
-                    <div className="rounded-2xl rounded-tl-md bg-muted/50 px-3 py-2">
-                      <div className="flex gap-1">
-                        <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                        <span className="h-2 w-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0.2s' }} />
-                        <span className="h-2 w-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0.4s' }} />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
             )}
           </div>
 
