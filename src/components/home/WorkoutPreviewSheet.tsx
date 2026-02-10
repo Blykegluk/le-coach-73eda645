@@ -46,7 +46,7 @@ const WorkoutPreviewSheet = ({
   return (
     <>
       <Sheet open={isOpen} onOpenChange={onClose}>
-        <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl p-0 overflow-hidden">
+        <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl p-0 overflow-hidden flex flex-col">
           {/* Header with gradient */}
           <div className="sticky top-0 z-10 bg-gradient-to-r from-primary/10 to-primary/5 p-4 pr-12 border-b border-border/50">
             <SheetHeader className="text-left mb-3">
@@ -91,7 +91,7 @@ const WorkoutPreviewSheet = ({
           </div>
 
           {/* Scrollable content */}
-          <div className="flex-1 overflow-y-auto p-4 pb-32">
+          <div className="flex-1 overflow-y-auto min-h-0 p-4 pb-32">
             {/* Warmup notes */}
             {workout.warmup_notes && (
               <div className="mb-4 rounded-xl bg-energy/10 border border-energy/20 p-3">
