@@ -2518,6 +2518,25 @@ Après avoir utilisé un outil, confirme l'action de manière naturelle et encou
       return msg;
     });
 
+    // Detect if last user message is about workouts - inject a reminder
+    const lastUserMsg = preparedMessages[preparedMessages.length - 1];
+    const lastContent = typeof lastUserMsg?.content === 'string' ? lastUserMsg.content.toLowerCase() : '';
+    const workoutKeywords = ['séance', 'seance', 'entraînement', 'entrainement', 'programme', 'workout', 'preview', 'exercice', 'musculation', 'lancer'];
+    const isWorkoutRequest = workoutKeywords.some(k => lastContent.includes(k));
+
+    const finalMessages = [
+      { role: "system", content: systemPrompt },
+      ...preparedMessages,
+    ];
+
+    // If workout-related, inject a strong reminder right before the last message
+    if (isWorkoutRequest) {
+      finalMessages.splice(finalMessages.length - 1, 0, {
+        role: "system",
+        content: "RAPPEL CRITIQUE: L'utilisateur parle de séance/entraînement. Tu DOIS appeler l'outil generate_workout. NE JAMAIS écrire un programme en texte. L'outil sauvegarde automatiquement la séance dans l'app."
+      });
+    }
+
     // First API call - may include tool calls
     const response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
@@ -2527,8 +2546,8 @@ Après avoir utilisé un outil, confirme l'action de manière naturelle et encou
       },
       body: JSON.stringify({
         model: "gemini-2.5-flash",
-        messages: [{ role: "system", content: systemPrompt }, ...preparedMessages],
-        tools: userId ? tools : undefined, // Only enable tools if user is logged in
+        messages: finalMessages,
+        tools: userId ? tools : undefined,
         tool_choice: userId ? "auto" : undefined,
       }),
     });
