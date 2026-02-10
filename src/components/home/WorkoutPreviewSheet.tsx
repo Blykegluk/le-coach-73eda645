@@ -46,7 +46,7 @@ const WorkoutPreviewSheet = ({
   return (
     <>
       <Sheet open={isOpen} onOpenChange={onClose}>
-        <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl p-0 overflow-hidden">
+        <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl p-0 overflow-hidden flex flex-col">
           {/* Header with gradient */}
           <div className="sticky top-0 z-10 bg-gradient-to-r from-primary/10 to-primary/5 p-4 pr-12 border-b border-border/50">
             <SheetHeader className="text-left mb-3">
