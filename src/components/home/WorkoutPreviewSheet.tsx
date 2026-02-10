@@ -91,7 +91,7 @@ const WorkoutPreviewSheet = ({
           </div>
 
           {/* Scrollable content */}
-          <div className="flex-1 overflow-y-auto p-4 pb-32">
+          <div className="flex-1 overflow-y-auto min-h-0 p-4 pb-32">
             {/* Warmup notes */}
             {workout.warmup_notes && (
               <div className="mb-4 rounded-xl bg-energy/10 border border-energy/20 p-3">
