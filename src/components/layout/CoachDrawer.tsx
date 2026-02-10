@@ -98,7 +98,7 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
   return (
     <>
       <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DrawerContent className="h-[85dvh] max-h-[85dvh] flex flex-col" style={{ height: '85dvh' }}>
+        <DrawerContent ref={drawerContentRef} className="flex flex-col overflow-hidden" style={{ height: '85dvh', maxHeight: '85dvh' }}>
           <DrawerHeader className="flex-shrink-0 border-b border-border/50 pb-3">
             <div className="flex items-center gap-3">
               <div className="relative">
