@@ -29,6 +29,7 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
   const [showImageCapture, setShowImageCapture] = useState(false);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const drawerContentRef = useRef<HTMLDivElement>(null);
 
   const {
     scrollRef,
@@ -52,15 +53,30 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
     bottomRef.current?.scrollIntoView({ behavior: 'instant' });
   }, []);
 
+  // Dynamically adjust drawer height based on visual viewport
+  // This ensures the input bar stays at the bottom when the keyboard opens/closes
+  const updateDrawerHeight = useCallback(() => {
+    const el = drawerContentRef.current;
+    if (!el) return;
+    const vv = window.visualViewport;
+    const viewportHeight = vv ? vv.height : window.innerHeight;
+    const drawerHeight = Math.min(viewportHeight * 0.85, viewportHeight - 40);
+    el.style.height = `${drawerHeight}px`;
+    el.style.maxHeight = `${drawerHeight}px`;
+  }, []);
+
   // Scroll to bottom when drawer opens or messages change
   useEffect(() => {
     if (!isOpen) return;
-    // Multiple delays to catch drawer animation completion
+    updateDrawerHeight();
     const timers = [0, 100, 300, 600, 1000].map(ms =>
-      setTimeout(scrollToEnd, ms)
+      setTimeout(() => {
+        updateDrawerHeight();
+        scrollToEnd();
+      }, ms)
     );
     return () => timers.forEach(clearTimeout);
-  }, [isOpen, messages, isLoadingHistory, scrollToEnd]);
+  }, [isOpen, messages, isLoadingHistory, scrollToEnd, updateDrawerHeight]);
 
   // Handle visual viewport resize (keyboard open/close)
   useEffect(() => {
@@ -68,12 +84,16 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
     const vv = window.visualViewport;
     if (!vv) return;
     const onResize = () => {
-      // Force layout recalc - the dvh unit should handle it but we scroll to keep position
+      updateDrawerHeight();
       setTimeout(scrollToEnd, 50);
     };
     vv.addEventListener('resize', onResize);
-    return () => vv.removeEventListener('resize', onResize);
-  }, [isOpen, scrollToEnd]);
+    vv.addEventListener('scroll', onResize);
+    return () => {
+      vv.removeEventListener('resize', onResize);
+      vv.removeEventListener('scroll', onResize);
+    };
+  }, [isOpen, scrollToEnd, updateDrawerHeight]);
 
   return (
     <>
