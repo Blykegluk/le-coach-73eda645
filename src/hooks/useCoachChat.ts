@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useWorkout } from '@/contexts/WorkoutContext';
 import { useNavigate } from 'react-router-dom';
 
 export type Message = {
