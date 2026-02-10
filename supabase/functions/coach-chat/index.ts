@@ -1899,12 +1899,12 @@ ${args.special_request ? `\nDEMANDE SPÉCIALE: ${args.special_request}` : ""}
 ${args.exclude_exercises?.length ? `\nEXERCICES À ÉVITER: ${args.exclude_exercises.join(", ")}` : ""}
 ${args.duration_min ? `\nDURÉE SOUHAITÉE: ${args.duration_min} minutes` : ""}
 
-RÈGLES:
-1. Propose 4-6 exercices adaptés
-2. Pour chaque exercice: nom, séries, répétitions, poids recommandé
-3. Équilibre les groupes musculaires selon l'historique et le focus demandé
-4. Adapte l'intensité au niveau de récupération
-5. Respecte ABSOLUMENT les contraintes de santé
+RÈGLE ABSOLUE - RESPECTER LA DEMANDE DE L'UTILISATEUR:
+⚠️ Tu DOIS respecter le FOCUS et l'INTENSITÉ demandés. Si l'utilisateur demande "bas du corps intense", tu génères une séance BAS DU CORPS INTENSE — PAS un full body doux.
+- Si le focus est "lower_body", TOUS les exercices doivent cibler les jambes/fessiers/mollets. ZÉRO exercice pour le haut du corps (pas de pompes, pas de tirage, pas de développé).
+- Si l'intensité est "intense", propose des charges lourdes (80-90% du max), des techniques d'intensification, des séries courtes et lourdes.
+- Les contraintes de santé servent à ADAPTER les exercices (ex: éviter la compression vertébrale), PAS à ignorer la demande de l'utilisateur.
+- Le nom de la séance DOIT refléter le focus et l'intensité demandés (ex: "Bas du Corps Intense" et non "Reprise Douce").
 
 IMPORTANT: Retourne un JSON valide avec cette structure exacte:
 {
