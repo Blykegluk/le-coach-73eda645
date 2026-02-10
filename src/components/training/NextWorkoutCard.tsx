@@ -29,12 +29,7 @@ export interface Workout {
 
 const WORKOUT_STORAGE_KEY = 'prepared_workout';
 
-interface NextWorkoutCardProps {
-  externalWorkout?: Workout | null;
-  onWorkoutGenerated?: (workout: Workout) => void;
-}
-
-export const NextWorkoutCard = ({ externalWorkout, onWorkoutGenerated }: NextWorkoutCardProps) => {
+export const NextWorkoutCard = () => {
   const { user } = useAuth();
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [isLoading, setIsLoading] = useState(true);

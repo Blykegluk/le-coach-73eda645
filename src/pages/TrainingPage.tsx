@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Dumbbell, Clock, Flame, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useWorkout } from '@/contexts/WorkoutContext';
+
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, isToday } from 'date-fns';
