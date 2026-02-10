@@ -56,7 +56,7 @@ const estimateCalories = (activity: Activity, weightKg: number = 70): number => 
 
 const TrainingPage = () => {
   const { user } = useAuth();
-  const { generatedWorkout, clearWorkout } = useWorkout();
+  
   const [searchParams] = useSearchParams();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [userWeight, setUserWeight] = useState<number>(70);
