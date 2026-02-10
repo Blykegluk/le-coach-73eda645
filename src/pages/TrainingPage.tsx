@@ -244,10 +244,7 @@ const TrainingPage = () => {
         <p className="text-xs text-muted-foreground mb-3">
           💡 Dis au coach "Je veux focus le haut du corps" pour adapter la séance
         </p>
-        <NextWorkoutCard 
-          externalWorkout={generatedWorkout} 
-          onWorkoutGenerated={() => clearWorkout()}
-        />
+        <NextWorkoutCard />
       </div>
 
 
