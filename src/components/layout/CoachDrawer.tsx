@@ -28,6 +28,7 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
   const [showActions, setShowActions] = useState(false);
   const [showImageCapture, setShowImageCapture] = useState(false);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   const {
     scrollRef,
@@ -46,10 +47,38 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
     handleSuggestion,
   } = useCoachChat(onClose);
 
+  // Robust scroll to bottom using anchor element
+  const scrollToEnd = useCallback(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'instant' });
+  }, []);
+
+  // Scroll to bottom when drawer opens or messages change
+  useEffect(() => {
+    if (!isOpen) return;
+    // Multiple delays to catch drawer animation completion
+    const timers = [0, 100, 300, 600, 1000].map(ms =>
+      setTimeout(scrollToEnd, ms)
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [isOpen, messages, isLoadingHistory, scrollToEnd]);
+
+  // Handle visual viewport resize (keyboard open/close)
+  useEffect(() => {
+    if (!isOpen) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      // Force layout recalc - the dvh unit should handle it but we scroll to keep position
+      setTimeout(scrollToEnd, 50);
+    };
+    vv.addEventListener('resize', onResize);
+    return () => vv.removeEventListener('resize', onResize);
+  }, [isOpen, scrollToEnd]);
+
   return (
     <>
       <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DrawerContent className="h-[85dvh] max-h-[85dvh] flex flex-col">
+        <DrawerContent className="h-[85dvh] max-h-[85dvh] flex flex-col" style={{ height: '85dvh' }}>
           <DrawerHeader className="flex-shrink-0 border-b border-border/50 pb-3">
             <div className="flex items-center gap-3">
               <div className="relative">
