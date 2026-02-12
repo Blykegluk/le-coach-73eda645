@@ -2405,6 +2405,10 @@ ${parsedContexts.map((c: any) => `- ${categoryLabels[c.category] || c.category}:
 - **Date d'hier:** ${yesterday}
 - **Heure:** ${currentTime}
 
+TIMESTAMPS DES MESSAGES:
+- Chaque message utilisateur est préfixé par son timestamp [jour date heure] entre crochets. Utilise ces timestamps pour comprendre le contexte temporel de la conversation.
+- Quand l'utilisateur dit "ce matin", "tout à l'heure", "il y a 2h", réfère-toi au timestamp de son message pour calculer la bonne date/heure.
+
 GESTION DES DATES (CRITIQUE):
 - Quand l'utilisateur parle d'"hier", utilise la date: ${yesterday}
 - Quand l'utilisateur parle d'"aujourd'hui", utilise la date: ${today}
