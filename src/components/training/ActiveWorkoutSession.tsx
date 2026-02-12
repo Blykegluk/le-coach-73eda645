@@ -617,8 +617,9 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
           </Button>
         )}
       </div>
+    </div>
 
-      {/* Edit Dialog */}
+      {/* Edit Dialog - outside fixed container for proper z-index */}
       <Dialog open={editingExercise !== null} onOpenChange={() => setEditingExercise(null)}>
         <DialogContent>
           <DialogHeader>
@@ -654,7 +655,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
         </DialogContent>
       </Dialog>
 
-      {/* Exercise Detail Sheet */}
+      {/* Exercise Detail Sheet - outside fixed container for proper z-index */}
       <ExerciseDetailSheet
         isOpen={viewingExerciseIndex !== null}
         onClose={() => setViewingExerciseIndex(null)}
@@ -664,7 +665,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
         weight={viewingExerciseIndex !== null ? exerciseLogs[viewingExerciseIndex]?.actual_weight : undefined}
         notes={viewingExerciseIndex !== null ? workout.exercises[viewingExerciseIndex]?.notes : undefined}
       />
-    </div>
+    </>
   );
 };
 
