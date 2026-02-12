@@ -427,7 +427,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
   const ExerciseIcon = currentExercise ? getExerciseIcon(currentExercise.name) : Dumbbell;
 
   return (
-    <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col">
+    <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col" style={{ zIndex: 50 }}>
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border bg-card/80 backdrop-blur-xl">
         <Button variant="ghost" size="sm" onClick={handleAbort}>
