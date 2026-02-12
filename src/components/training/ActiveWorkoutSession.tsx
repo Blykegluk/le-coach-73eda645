@@ -655,16 +655,16 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
               onClick={handleSetDone}
             >
               <Check className="h-5 w-5 mr-2" />
-              Terminé
+              Série terminée
             </Button>
           </>
         ) : (
           <Button 
             className="flex-1"
-            onClick={handleNextExercise}
+            onClick={handleRestComplete}
           >
             <SkipForward className="h-5 w-5 mr-2" />
-            Exercice suivant
+            {currentSet < totalSets ? 'Série suivante' : 'Exercice suivant'}
           </Button>
         )}
       </div>
