@@ -43,6 +43,7 @@ const formatTime = (seconds: number): string => {
 export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWorkoutSessionProps) => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
+  const [currentSet, setCurrentSet] = useState(1);
   const [phase, setPhase] = useState<SessionPhase>('exercise');
   const [isPaused, setIsPaused] = useState(false);
   const [globalTime, setGlobalTime] = useState(0);
@@ -75,7 +76,10 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
 
   const currentExercise = workout.exercises[currentExerciseIndex];
   const currentLog = exerciseLogs[currentExerciseIndex];
-  const progress = ((currentExerciseIndex + (phase === 'rest' ? 0.5 : 0)) / workout.exercises.length) * 100;
+  const totalSets = currentLog?.actual_sets || 1;
+  const totalExerciseSets = workout.exercises.reduce((sum, ex) => sum + ex.sets, 0);
+  const completedSets = workout.exercises.slice(0, currentExerciseIndex).reduce((sum, ex) => sum + ex.sets, 0) + (currentSet - 1) + (phase === 'rest' ? 1 : 0);
+  const progress = (completedSets / totalExerciseSets) * 100;
 
   // Create session on mount
   useEffect(() => {
