@@ -480,7 +480,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
       {/* Progress */}
       <div className="px-4 py-2">
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-          <span>Exercice {currentExerciseIndex + 1}/{workout.exercises.length}</span>
+          <span>Exercice {currentExerciseIndex + 1}/{workout.exercises.length} · Série {currentSet}/{totalSets}</span>
           <span>{Math.round(progress)}%</span>
         </div>
         <Progress value={progress} className="h-2" />
