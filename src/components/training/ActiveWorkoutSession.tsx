@@ -446,7 +446,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 overflow-y-auto min-h-0">
         {phase === 'exercise' ? (
           <>
             <button
