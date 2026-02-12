@@ -1804,6 +1804,10 @@ async function executeToolCall(
       }
 
       case "generate_workout": {
+        console.log("=== GENERATE_WORKOUT CALLED ===");
+        console.log("Args received:", JSON.stringify(args));
+        console.log("Focus:", args.focus, "Intensity:", args.intensity);
+        
         // Get user profile and goals
         const { data: profile } = await supabase
           .from("profiles")
