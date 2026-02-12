@@ -156,7 +156,17 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
     setPhase('exercise');
     setPhaseTime(0);
     setRestTimeRemaining(0);
+    setFeedbackMessage(null);
   }, [currentExerciseIndex, workout.exercises.length]);
+
+  const handlePreviousExercise = useCallback(() => {
+    if (currentExerciseIndex <= 0) return;
+    setCurrentExerciseIndex(i => i - 1);
+    setPhase('exercise');
+    setPhaseTime(0);
+    setRestTimeRemaining(0);
+    setFeedbackMessage(null);
+  }, [currentExerciseIndex]);
 
   const handleSkipExercise = useCallback(() => {
     setExerciseLogs(logs => logs.map((log, i) => 
