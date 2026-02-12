@@ -102,10 +102,11 @@ const toolSchemas: Record<string, z.ZodSchema> = {
   }),
   get_health_context: z.object({}),
   generate_workout: z.object({
-    target_muscles: z.array(z.string().max(50)).optional(),
+    focus: z.enum(["upper_body", "lower_body", "full_body", "push", "pull", "cardio", "core"]).default("full_body"),
+    intensity: z.enum(["light", "moderate", "intense"]).default("moderate"),
     duration_min: z.number().positive().max(180).optional(),
-    difficulty: z.string().max(20).optional(),
-    equipment: z.array(z.string().max(50)).optional(),
+    exclude_exercises: z.array(z.string().max(50)).optional(),
+    special_request: z.string().max(500).optional(),
   }),
 };
 
@@ -681,18 +682,35 @@ const tools = [
     type: "function",
     function: {
       name: "generate_workout",
-      description: "Génère un programme d'entraînement personnalisé pour la prochaine séance. Utiliser quand l'utilisateur demande une séance, veut changer de focus (haut du corps, bas du corps, cardio, etc.), ou demande des adaptations.",
+      description: `Génère un programme d'entraînement personnalisé. OBLIGATOIRE: tu DOIS toujours remplir les paramètres "focus" et "intensity" en fonction de ce que l'utilisateur demande.
+
+Mapping OBLIGATOIRE:
+- "haut du corps" / "pecs" / "dos" / "épaules" / "bras" → focus: "upper_body"
+- "bas du corps" / "jambes" / "cuisses" / "fessiers" → focus: "lower_body"  
+- "full body" / "corps entier" → focus: "full_body"
+- "push" / "poussée" → focus: "push"
+- "pull" / "tirage" → focus: "pull"
+- "cardio" → focus: "cardio"
+- "abdos" / "core" / "gainage" → focus: "core"
+
+- "intense" / "lourd" / "costaud" / "hardcore" → intensity: "intense"
+- "léger" / "récupération" / "doux" → intensity: "light"
+- Sinon → intensity: "moderate"
+
+Si l'utilisateur ne précise pas, utilise focus: "full_body" et intensity: "moderate".
+NE JAMAIS appeler cet outil avec des paramètres vides.`,
       parameters: {
         type: "object",
         properties: {
           focus: {
             type: "string",
-            description: "Focus de la séance: 'upper_body' (haut du corps), 'lower_body' (bas du corps), 'full_body' (corps entier), 'push' (poussée), 'pull' (tirage), 'cardio', 'core' (abdos), ou un groupe musculaire spécifique",
+            enum: ["upper_body", "lower_body", "full_body", "push", "pull", "cardio", "core"],
+            description: "OBLIGATOIRE. Focus musculaire de la séance. Déduis-le du message de l'utilisateur.",
           },
           intensity: {
             type: "string",
             enum: ["light", "moderate", "intense"],
-            description: "Intensité souhaitée: light (récupération), moderate (normal), intense (dépassement)",
+            description: "OBLIGATOIRE. Intensité souhaitée. Déduis-la du message de l'utilisateur.",
           },
           duration_min: {
             type: "number",
@@ -708,7 +726,7 @@ const tools = [
             description: "Demande spéciale de l'utilisateur (ex: 'plus de cardio', 'exercices sans machine', 'focus biceps')",
           },
         },
-        required: [],
+        required: ["focus", "intensity"],
       },
     },
   },
@@ -1786,6 +1804,10 @@ async function executeToolCall(
       }
 
       case "generate_workout": {
+        console.log("=== GENERATE_WORKOUT CALLED ===");
+        console.log("Args received:", JSON.stringify(args));
+        console.log("Focus:", args.focus, "Intensity:", args.intensity);
+        
         // Get user profile and goals
         const { data: profile } = await supabase
           .from("profiles")
@@ -2010,6 +2032,40 @@ IMPORTANT: Retourne un JSON valide avec cette structure exacte:
             workout = JSON.parse(jsonMatch[0]);
           } else {
             return { success: false, message: "Format de réponse invalide" };
+          }
+        }
+
+        // SERVER-SIDE EXERCISE VALIDATION: Filter out exercises that don't match the focus
+        if (args.focus && workout.exercises && Array.isArray(workout.exercises)) {
+          const upperBodyKeywords = ["pec", "chest", "bench", "développé", "dips", "pompe", "push", "épaule", "shoulder", "press", "dos", "back", "row", "tirage", "pull", "lat", "bicep", "tricep", "curl", "bras", "arm", "shrug", "trapèz"];
+          const lowerBodyKeywords = ["squat", "jambe", "leg", "fente", "lunge", "mollet", "calf", "cuisse", "quad", "ischio", "hamstring", "fessier", "glute", "hip", "hanche", "deadlift", "soulevé", "presse"];
+          const coreKeywords = ["gainage", "plank", "bird dog", "crunch", "abdo", "oblique", "core", "pallof"];
+
+          const matchesFocus = (exerciseName: string, focus: string): boolean => {
+            const name = exerciseName.toLowerCase();
+            switch (focus) {
+              case "upper_body":
+              case "push":
+              case "pull":
+                // Reject lower body and pure core exercises
+                if (lowerBodyKeywords.some(k => name.includes(k))) return false;
+                if (coreKeywords.some(k => name.includes(k)) && !upperBodyKeywords.some(k => name.includes(k))) return false;
+                return true;
+              case "lower_body":
+                // Reject upper body exercises
+                if (upperBodyKeywords.some(k => name.includes(k)) && !lowerBodyKeywords.some(k => name.includes(k))) return false;
+                if (coreKeywords.some(k => name.includes(k)) && !lowerBodyKeywords.some(k => name.includes(k))) return false;
+                return true;
+              default:
+                return true;
+            }
+          };
+
+          const originalCount = workout.exercises.length;
+          workout.exercises = workout.exercises.filter((ex: any) => matchesFocus(ex.name, args.focus));
+          const filteredCount = originalCount - workout.exercises.length;
+          if (filteredCount > 0) {
+            console.log(`SERVER FILTER: Removed ${filteredCount} exercises that didn't match focus "${args.focus}"`);
           }
         }
 
@@ -2569,11 +2625,25 @@ Après avoir utilisé un outil, confirme l'action de manière naturelle et encou
       return msg;
     });
 
-    // Detect if last user message is about workouts - inject a reminder
+    // Detect if last user message is about workouts - inject a reminder with extracted params
     const lastUserMsg = preparedMessages[preparedMessages.length - 1];
     const lastContent = typeof lastUserMsg?.content === 'string' ? lastUserMsg.content.toLowerCase() : '';
-    const workoutKeywords = ['séance', 'seance', 'entraînement', 'entrainement', 'programme', 'workout', 'preview', 'exercice', 'musculation', 'lancer'];
+    const workoutKeywords = ['séance', 'seance', 'entraînement', 'entrainement', 'programme', 'workout', 'preview', 'musculation', 'lancer la séance', 'prépare'];
     const isWorkoutRequest = workoutKeywords.some(k => lastContent.includes(k));
+
+    // Extract focus from message
+    let detectedFocus = "full_body";
+    let detectedIntensity = "moderate";
+    if (lastContent.includes("haut du corps") || lastContent.includes("upper")) detectedFocus = "upper_body";
+    else if (lastContent.includes("bas du corps") || lastContent.includes("lower") || lastContent.includes("jambes") || lastContent.includes("cuisses")) detectedFocus = "lower_body";
+    else if (lastContent.includes("push") || lastContent.includes("poussée")) detectedFocus = "push";
+    else if (lastContent.includes("pull") || lastContent.includes("tirage")) detectedFocus = "pull";
+    else if (lastContent.includes("cardio")) detectedFocus = "cardio";
+    else if (lastContent.includes("abdos") || lastContent.includes("core")) detectedFocus = "core";
+    else if (lastContent.includes("pec") || lastContent.includes("dos") || lastContent.includes("épaule") || lastContent.includes("bras") || lastContent.includes("biceps")) detectedFocus = "upper_body";
+    
+    if (lastContent.includes("intense") || lastContent.includes("lourd") || lastContent.includes("costaud") || lastContent.includes("hardcore")) detectedIntensity = "intense";
+    else if (lastContent.includes("léger") || lastContent.includes("récup") || lastContent.includes("doux")) detectedIntensity = "light";
 
     const finalMessages = [
       { role: "system", content: systemPrompt },
@@ -2584,7 +2654,11 @@ Après avoir utilisé un outil, confirme l'action de manière naturelle et encou
     if (isWorkoutRequest) {
       finalMessages.splice(finalMessages.length - 1, 0, {
         role: "system",
-        content: "RAPPEL CRITIQUE: L'utilisateur parle de séance/entraînement. Tu DOIS appeler l'outil generate_workout. NE JAMAIS écrire un programme en texte. L'outil sauvegarde automatiquement la séance dans l'app."
+        content: `RAPPEL CRITIQUE: L'utilisateur demande une séance. Tu DOIS appeler generate_workout avec les paramètres:
+- focus: "${detectedFocus}"
+- intensity: "${detectedIntensity}"
+NE JAMAIS appeler generate_workout sans focus et intensity.
+NE JAMAIS écrire un programme en texte. L'outil sauvegarde automatiquement la séance dans l'app.`
       });
     }
 
