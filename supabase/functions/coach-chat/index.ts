@@ -102,10 +102,11 @@ const toolSchemas: Record<string, z.ZodSchema> = {
   }),
   get_health_context: z.object({}),
   generate_workout: z.object({
-    target_muscles: z.array(z.string().max(50)).optional(),
+    focus: z.enum(["upper_body", "lower_body", "full_body", "push", "pull", "cardio", "core"]).default("full_body"),
+    intensity: z.enum(["light", "moderate", "intense"]).default("moderate"),
     duration_min: z.number().positive().max(180).optional(),
-    difficulty: z.string().max(20).optional(),
-    equipment: z.array(z.string().max(50)).optional(),
+    exclude_exercises: z.array(z.string().max(50)).optional(),
+    special_request: z.string().max(500).optional(),
   }),
 };
 
