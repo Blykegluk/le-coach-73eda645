@@ -43,6 +43,7 @@ const formatTime = (seconds: number): string => {
 export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWorkoutSessionProps) => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
+  const [currentSet, setCurrentSet] = useState(1);
   const [phase, setPhase] = useState<SessionPhase>('exercise');
   const [isPaused, setIsPaused] = useState(false);
   const [globalTime, setGlobalTime] = useState(0);
@@ -75,7 +76,10 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
 
   const currentExercise = workout.exercises[currentExerciseIndex];
   const currentLog = exerciseLogs[currentExerciseIndex];
-  const progress = ((currentExerciseIndex + (phase === 'rest' ? 0.5 : 0)) / workout.exercises.length) * 100;
+  const totalSets = currentLog?.actual_sets || 1;
+  const totalExerciseSets = workout.exercises.reduce((sum, ex) => sum + ex.sets, 0);
+  const completedSets = workout.exercises.slice(0, currentExerciseIndex).reduce((sum, ex) => sum + ex.sets, 0) + (currentSet - 1) + (phase === 'rest' ? 1 : 0);
+  const progress = (completedSets / totalExerciseSets) * 100;
 
   // Create session on mount
   useEffect(() => {
@@ -128,8 +132,8 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
       } else if (phase === 'rest') {
         setRestTimeRemaining(t => {
           if (t <= 1) {
-            // Auto-advance to next exercise
-            handleNextExercise();
+            // Auto-advance: next set or next exercise
+            handleRestComplete();
             return 0;
           }
           return t - 1;
@@ -140,12 +144,36 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
     return () => clearInterval(interval);
   }, [isPaused, phase, currentExerciseIndex]);
 
-  const handleStartRest = useCallback(() => {
+  // Complete a set → start rest
+  const handleSetDone = useCallback(() => {
     const restTime = currentLog?.rest_seconds || 60;
     setRestTimeRemaining(restTime);
     setPhase('rest');
     setPhaseTime(0);
   }, [currentLog]);
+
+  // After rest: go to next set or next exercise
+  const handleRestComplete = useCallback(() => {
+    if (currentSet < totalSets) {
+      // More sets remaining → next set
+      setCurrentSet(s => s + 1);
+      setPhase('exercise');
+      setPhaseTime(0);
+      setRestTimeRemaining(0);
+    } else {
+      // All sets done → next exercise
+      if (currentExerciseIndex >= workout.exercises.length - 1) {
+        setPhase('completed');
+      } else {
+        setCurrentExerciseIndex(i => i + 1);
+        setCurrentSet(1);
+        setPhase('exercise');
+        setPhaseTime(0);
+        setRestTimeRemaining(0);
+        setFeedbackMessage(null);
+      }
+    }
+  }, [currentSet, totalSets, currentExerciseIndex, workout.exercises.length]);
 
   const handleNextExercise = useCallback(() => {
     if (currentExerciseIndex >= workout.exercises.length - 1) {
@@ -153,6 +181,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
       return;
     }
     setCurrentExerciseIndex(i => i + 1);
+    setCurrentSet(1);
     setPhase('exercise');
     setPhaseTime(0);
     setRestTimeRemaining(0);
@@ -162,6 +191,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
   const handlePreviousExercise = useCallback(() => {
     if (currentExerciseIndex <= 0) return;
     setCurrentExerciseIndex(i => i - 1);
+    setCurrentSet(1);
     setPhase('exercise');
     setPhaseTime(0);
     setRestTimeRemaining(0);
@@ -450,7 +480,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
       {/* Progress */}
       <div className="px-4 py-2">
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-          <span>Exercice {currentExerciseIndex + 1}/{workout.exercises.length}</span>
+          <span>Exercice {currentExerciseIndex + 1}/{workout.exercises.length} · Série {currentSet}/{totalSets}</span>
           <span>{Math.round(progress)}%</span>
         </div>
         <Progress value={progress} className="h-2" />
@@ -470,11 +500,27 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
               </div>
             </button>
             
-            <h2 className="text-xl font-bold text-center mb-2">{currentExercise?.name}</h2>
+            <h2 className="text-xl font-bold text-center mb-1">{currentExercise?.name}</h2>
             
-            <div className="flex items-center gap-4 text-lg mb-6">
-              <span className="text-primary font-semibold">{currentLog?.actual_sets} séries</span>
-              <span className="text-muted-foreground">×</span>
+            {/* Set indicator */}
+            <div className="flex items-center gap-2 mb-4">
+              {Array.from({ length: totalSets }, (_, i) => (
+                <div
+                  key={i}
+                  className={`h-2.5 w-8 rounded-full transition-all ${
+                    i < currentSet - 1
+                      ? 'bg-green-500'
+                      : i === currentSet - 1
+                        ? 'bg-primary shadow-glow-sm'
+                        : 'bg-muted'
+                  }`}
+                />
+              ))}
+            </div>
+            
+            <div className="flex items-center gap-4 text-lg mb-4">
+              <span className="text-primary font-semibold">Série {currentSet}/{totalSets}</span>
+              <span className="text-muted-foreground">·</span>
               <span className="text-primary font-semibold">{currentLog?.actual_reps} reps</span>
             </div>
             
@@ -526,7 +572,12 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
             </div>
             
             <h2 className="text-xl font-bold text-center mb-2">Repos</h2>
-            <p className="text-muted-foreground mb-6">Prochain : {workout.exercises[currentExerciseIndex + 1]?.name || 'Fin'}</p>
+            <p className="text-muted-foreground mb-6">
+              {currentSet < totalSets
+                ? `Série suivante : ${currentSet + 1}/${totalSets}`
+                : `Prochain : ${workout.exercises[currentExerciseIndex + 1]?.name || 'Fin'}`
+              }
+            </p>
             
             <div className="card-premium px-8 py-4 mb-8 border-energy/30">
               <p className="font-mono text-4xl font-bold text-energy">{formatTime(restTimeRemaining)}</p>
@@ -601,19 +652,19 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
             </Button>
             <Button 
               className="flex-1"
-              onClick={handleStartRest}
+              onClick={handleSetDone}
             >
               <Check className="h-5 w-5 mr-2" />
-              Terminé
+              Série terminée
             </Button>
           </>
         ) : (
           <Button 
             className="flex-1"
-            onClick={handleNextExercise}
+            onClick={handleRestComplete}
           >
             <SkipForward className="h-5 w-5 mr-2" />
-            Exercice suivant
+            {currentSet < totalSets ? 'Série suivante' : 'Exercice suivant'}
           </Button>
         )}
       </div>
