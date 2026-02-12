@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Play, Pause, SkipForward, Check, X, Edit2, Timer, Dumbbell, Info, AlertTriangle } from 'lucide-react';
+import { Play, Pause, SkipForward, SkipBack, Check, X, Edit2, Timer, Dumbbell, Info, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -156,7 +156,17 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
     setPhase('exercise');
     setPhaseTime(0);
     setRestTimeRemaining(0);
+    setFeedbackMessage(null);
   }, [currentExerciseIndex, workout.exercises.length]);
+
+  const handlePreviousExercise = useCallback(() => {
+    if (currentExerciseIndex <= 0) return;
+    setCurrentExerciseIndex(i => i - 1);
+    setPhase('exercise');
+    setPhaseTime(0);
+    setRestTimeRemaining(0);
+    setFeedbackMessage(null);
+  }, [currentExerciseIndex]);
 
   const handleSkipExercise = useCallback(() => {
     setExerciseLogs(logs => logs.map((log, i) => 
@@ -417,6 +427,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
   const ExerciseIcon = currentExercise ? getExerciseIcon(currentExercise.name) : Dumbbell;
 
   return (
+    <>
     <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border bg-card/80 backdrop-blur-xl">
@@ -566,7 +577,18 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
       </div>
 
       {/* Footer actions */}
-      <div className="p-4 border-t border-border bg-card/80 backdrop-blur-xl flex gap-3">
+      <div className="p-4 border-t border-border bg-card/80 backdrop-blur-xl flex gap-2">
+        {/* Previous button - always visible */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handlePreviousExercise}
+          disabled={currentExerciseIndex <= 0}
+          className="flex-shrink-0"
+        >
+          <SkipBack className="h-5 w-5" />
+        </Button>
+
         {phase === 'exercise' ? (
           <>
             <Button 
@@ -587,7 +609,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
           </>
         ) : (
           <Button 
-            className="w-full"
+            className="flex-1"
             onClick={handleNextExercise}
           >
             <SkipForward className="h-5 w-5 mr-2" />
@@ -595,8 +617,9 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
           </Button>
         )}
       </div>
+    </div>
 
-      {/* Edit Dialog */}
+      {/* Edit Dialog - outside fixed container for proper z-index */}
       <Dialog open={editingExercise !== null} onOpenChange={() => setEditingExercise(null)}>
         <DialogContent>
           <DialogHeader>
@@ -632,7 +655,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
         </DialogContent>
       </Dialog>
 
-      {/* Exercise Detail Sheet */}
+      {/* Exercise Detail Sheet - outside fixed container for proper z-index */}
       <ExerciseDetailSheet
         isOpen={viewingExerciseIndex !== null}
         onClose={() => setViewingExerciseIndex(null)}
@@ -642,7 +665,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
         weight={viewingExerciseIndex !== null ? exerciseLogs[viewingExerciseIndex]?.actual_weight : undefined}
         notes={viewingExerciseIndex !== null ? workout.exercises[viewingExerciseIndex]?.notes : undefined}
       />
-    </div>
+    </>
   );
 };
 
