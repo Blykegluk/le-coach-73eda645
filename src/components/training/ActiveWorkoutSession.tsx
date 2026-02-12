@@ -132,8 +132,8 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
       } else if (phase === 'rest') {
         setRestTimeRemaining(t => {
           if (t <= 1) {
-            // Auto-advance to next exercise
-            handleNextExercise();
+            // Auto-advance: next set or next exercise
+            handleRestComplete();
             return 0;
           }
           return t - 1;
@@ -144,12 +144,36 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
     return () => clearInterval(interval);
   }, [isPaused, phase, currentExerciseIndex]);
 
-  const handleStartRest = useCallback(() => {
+  // Complete a set → start rest
+  const handleSetDone = useCallback(() => {
     const restTime = currentLog?.rest_seconds || 60;
     setRestTimeRemaining(restTime);
     setPhase('rest');
     setPhaseTime(0);
   }, [currentLog]);
+
+  // After rest: go to next set or next exercise
+  const handleRestComplete = useCallback(() => {
+    if (currentSet < totalSets) {
+      // More sets remaining → next set
+      setCurrentSet(s => s + 1);
+      setPhase('exercise');
+      setPhaseTime(0);
+      setRestTimeRemaining(0);
+    } else {
+      // All sets done → next exercise
+      if (currentExerciseIndex >= workout.exercises.length - 1) {
+        setPhase('completed');
+      } else {
+        setCurrentExerciseIndex(i => i + 1);
+        setCurrentSet(1);
+        setPhase('exercise');
+        setPhaseTime(0);
+        setRestTimeRemaining(0);
+        setFeedbackMessage(null);
+      }
+    }
+  }, [currentSet, totalSets, currentExerciseIndex, workout.exercises.length]);
 
   const handleNextExercise = useCallback(() => {
     if (currentExerciseIndex >= workout.exercises.length - 1) {
@@ -157,6 +181,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
       return;
     }
     setCurrentExerciseIndex(i => i + 1);
+    setCurrentSet(1);
     setPhase('exercise');
     setPhaseTime(0);
     setRestTimeRemaining(0);
@@ -166,6 +191,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
   const handlePreviousExercise = useCallback(() => {
     if (currentExerciseIndex <= 0) return;
     setCurrentExerciseIndex(i => i - 1);
+    setCurrentSet(1);
     setPhase('exercise');
     setPhaseTime(0);
     setRestTimeRemaining(0);
