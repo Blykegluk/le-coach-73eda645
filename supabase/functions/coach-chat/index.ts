@@ -1820,11 +1820,23 @@ async function executeToolCall(
           c.key.includes("injury") || c.key.includes("limitation") || c.key.includes("blessure")
         ) || [];
 
-        const recentWorkoutTypes = activities?.map((a: { activity_type: string }) => a.activity_type) || [];
-        const lastWorkout = activities?.[0];
+        const recentWorkoutTypes = recentSessions?.map((s: { workout_name: string }) => s.workout_name) || [];
+        const lastWorkout = recentSessions?.[0];
         const daysSinceLastWorkout = lastWorkout 
-          ? Math.floor((Date.now() - new Date(lastWorkout.performed_at).getTime()) / (1000 * 60 * 60 * 24))
+          ? Math.floor((Date.now() - new Date(lastWorkout.started_at).getTime()) / (1000 * 60 * 60 * 24))
           : 7;
+        
+        // Get exercise details of last few sessions for smarter programming
+        const lastSessionIds = (recentSessions || []).slice(0, 3).map((s: any) => s.id);
+        let recentExercises: any[] = [];
+        if (lastSessionIds.length > 0) {
+          const { data: exercises } = await supabase
+            .from("workout_exercise_logs")
+            .select("exercise_name, planned_sets, planned_reps, planned_weight, actual_weight, session_id")
+            .eq("user_id", userId)
+            .in("session_id", lastSessionIds);
+          recentExercises = exercises || [];
+        }
 
         // Count workout types in last 2 weeks for balance
         const workoutCounts: Record<string, number> = {};
