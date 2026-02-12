@@ -458,169 +458,130 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
 
   return (
     <>
-    <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border bg-card/80 backdrop-blur-xl">
-        <Button variant="ghost" size="sm" onClick={handleAbort}>
-          <X className="h-5 w-5" />
+    <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col" style={{ height: '100dvh' }}>
+      {/* Compact Header */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-card/80 backdrop-blur-xl">
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleAbort}>
+          <X className="h-4 w-4" />
         </Button>
         <div className="text-center">
-          <p className="text-xs text-muted-foreground">Temps total</p>
-          <p className="font-mono text-lg font-bold">{formatTime(globalTime)}</p>
+          <p className="font-mono text-sm font-bold">{formatTime(globalTime)}</p>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setIsPaused(!isPaused)}
-        >
-          {isPaused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsPaused(!isPaused)}>
+          {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
         </Button>
       </div>
 
-      {/* Progress */}
-      <div className="px-4 py-2">
-        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+      {/* Progress bar */}
+      <div className="px-3 py-1.5">
+        <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
           <span>Exercice {currentExerciseIndex + 1}/{workout.exercises.length} · Série {currentSet}/{totalSets}</span>
           <span>{Math.round(progress)}%</span>
         </div>
-        <Progress value={progress} className="h-2" />
+        <Progress value={progress} className="h-1.5" />
       </div>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 overflow-y-auto min-h-0">
+      {/* Main content — fills remaining space */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 min-h-0">
         {phase === 'exercise' ? (
-          <>
-            <button
-              onClick={() => setViewingExerciseIndex(currentExerciseIndex)}
-              className="h-32 w-32 rounded-2xl card-premium flex items-center justify-center mb-6 transition-all hover:border-primary/50 hover:shadow-glow-sm active:scale-95 relative group"
-            >
-              <ExerciseIcon className="h-24 w-24 text-primary" />
-              <div className="absolute bottom-1 right-1 h-6 w-6 rounded-full bg-primary/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <Info className="h-3 w-3 text-primary" />
+          <div className="flex flex-col items-center w-full max-w-sm">
+            {/* Exercise icon + name row */}
+            <div className="flex items-center gap-3 mb-3 w-full">
+              <button
+                onClick={() => setViewingExerciseIndex(currentExerciseIndex)}
+                className="h-14 w-14 rounded-xl card-premium flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
+              >
+                <ExerciseIcon className="h-9 w-9 text-primary" />
+              </button>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-base font-bold truncate">{currentExercise?.name}</h2>
+                <p className="text-xs text-muted-foreground">{currentLog?.actual_weight}</p>
               </div>
-            </button>
-            
-            <h2 className="text-xl font-bold text-center mb-1">{currentExercise?.name}</h2>
-            
-            {/* Set indicator */}
-            <div className="flex items-center gap-2 mb-4">
+              <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => handleEditExercise(currentExerciseIndex)}>
+                <Edit2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+
+            {/* Set indicator pills */}
+            <div className="flex items-center gap-1.5 mb-3">
               {Array.from({ length: totalSets }, (_, i) => (
                 <div
                   key={i}
-                  className={`h-2.5 w-8 rounded-full transition-all ${
+                  className={`h-2 w-6 rounded-full transition-all ${
                     i < currentSet - 1
                       ? 'bg-green-500'
                       : i === currentSet - 1
-                        ? 'bg-primary shadow-glow-sm'
+                        ? 'bg-primary'
                         : 'bg-muted'
                   }`}
                 />
               ))}
             </div>
-            
-            <div className="flex items-center gap-4 text-lg mb-4">
+
+            {/* Series + reps */}
+            <div className="flex items-center gap-3 text-base mb-3">
               <span className="text-primary font-semibold">Série {currentSet}/{totalSets}</span>
               <span className="text-muted-foreground">·</span>
               <span className="text-primary font-semibold">{currentLog?.actual_reps} reps</span>
             </div>
-            
-            <p className="text-muted-foreground mb-2">{currentLog?.actual_weight}</p>
-            
-            <div className="card-premium px-6 py-3 mb-8">
-              <p className="font-mono text-3xl font-bold">{formatTime(phaseTime)}</p>
+
+            {/* Timer */}
+            <div className="card-premium px-5 py-2 mb-4">
+              <p className="font-mono text-2xl font-bold">{formatTime(phaseTime)}</p>
             </div>
 
-            {/* Feedback Message */}
+            {/* Feedback message */}
             {feedbackMessage && (
-              <div className="mb-4 px-4 py-2 rounded-xl bg-primary/10 border border-primary/30 animate-fade-in">
-                <p className="text-sm text-center">{feedbackMessage}</p>
+              <div className="mb-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/30 w-full">
+                <p className="text-xs text-center">{feedbackMessage}</p>
               </div>
             )}
 
-            {/* In-Flow Feedback Buttons */}
-            <div className="mb-4 w-full max-w-xs">
-              <p className="text-xs text-muted-foreground text-center mb-2">Comment te sens-tu ?</p>
-              <ExerciseFeedbackButtons 
-                onFeedback={handleFeedback} 
-                isLoading={isProcessingFeedback}
-              />
+            {/* Feedback buttons */}
+            <div className="w-full mb-2">
+              <ExerciseFeedbackButtons onFeedback={handleFeedback} isLoading={isProcessingFeedback} />
             </div>
-
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setViewingExerciseIndex(currentExerciseIndex)}
-              >
-                <Info className="h-4 w-4 mr-2" />
-                Voir l'exercice
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => handleEditExercise(currentExerciseIndex)}
-              >
-                <Edit2 className="h-4 w-4 mr-2" />
-                Modifier
-              </Button>
-            </div>
-          </>
+          </div>
         ) : (
-          <>
-            <div className="h-32 w-32 rounded-full bg-energy/20 border border-energy/30 flex items-center justify-center mb-6 animate-pulse shadow-glow-md">
-              <Timer className="h-16 w-16 text-energy" />
+          <div className="flex flex-col items-center">
+            <div className="h-24 w-24 rounded-full bg-energy/20 border border-energy/30 flex items-center justify-center mb-4 animate-pulse">
+              <Timer className="h-12 w-12 text-energy" />
             </div>
-            
-            <h2 className="text-xl font-bold text-center mb-2">Repos</h2>
-            <p className="text-muted-foreground mb-6">
+            <h2 className="text-lg font-bold text-center mb-1">Repos</h2>
+            <p className="text-sm text-muted-foreground mb-4">
               {currentSet < totalSets
                 ? `Série suivante : ${currentSet + 1}/${totalSets}`
                 : `Prochain : ${workout.exercises[currentExerciseIndex + 1]?.name || 'Fin'}`
               }
             </p>
-            
-            <div className="card-premium px-8 py-4 mb-8 border-energy/30">
-              <p className="font-mono text-4xl font-bold text-energy">{formatTime(restTimeRemaining)}</p>
+            <div className="card-premium px-6 py-3 mb-4 border-energy/30">
+              <p className="font-mono text-3xl font-bold text-energy">{formatTime(restTimeRemaining)}</p>
             </div>
-
-            {/* Button to preview next exercise during rest */}
-            {workout.exercises[currentExerciseIndex + 1] && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setViewingExerciseIndex(currentExerciseIndex + 1)}
-                className="text-muted-foreground"
-              >
-                <Info className="h-4 w-4 mr-2" />
-                Voir l'exercice suivant
-              </Button>
-            )}
-          </>
+          </div>
         )}
       </div>
 
-      {/* Exercise list (collapsed) */}
-      <div className="px-4 pb-2">
-        <div className="flex gap-2 overflow-x-auto pb-2">
+      {/* Exercise carousel strip */}
+      <div className="px-3 pb-1">
+        <div className="flex gap-1.5 overflow-x-auto py-1">
           {workout.exercises.map((ex, index) => {
             const Icon = getExerciseIcon(ex.name);
             const isActive = index === currentExerciseIndex;
             const isDone = index < currentExerciseIndex;
             const log = exerciseLogs[index];
-            
             return (
               <button
                 key={index}
                 onClick={() => !isDone && handleEditExercise(index)}
-                className={`flex-shrink-0 p-2 rounded-lg border transition-all ${
-                  isActive 
-                    ? 'bg-primary/20 border-primary ring-2 ring-primary shadow-glow-sm' 
-                    : isDone 
-                      ? log?.skipped ? 'bg-muted/20 border-border/50 opacity-40' : 'bg-green-500/20 border-green-500/30' 
-                      : 'bg-card border-border hover:border-primary/50'
+                className={`flex-shrink-0 p-1.5 rounded-lg border transition-all ${
+                  isActive
+                    ? 'bg-primary/20 border-primary ring-1 ring-primary'
+                    : isDone
+                      ? log?.skipped ? 'bg-muted/20 border-border/50 opacity-40' : 'bg-green-500/20 border-green-500/30'
+                      : 'bg-card border-border'
                 }`}
               >
-                <Icon className="h-8 w-8" />
+                <Icon className="h-6 w-6" />
               </button>
             );
           })}
@@ -628,42 +589,24 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
       </div>
 
       {/* Footer actions */}
-      <div className="p-4 border-t border-border bg-card/80 backdrop-blur-xl flex gap-2">
-        {/* Previous button - always visible */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handlePreviousExercise}
-          disabled={currentExerciseIndex <= 0}
-          className="flex-shrink-0"
-        >
-          <SkipBack className="h-5 w-5" />
+      <div className="px-3 pb-3 pt-1 flex gap-2">
+        <Button variant="ghost" size="icon" className="h-10 w-10 flex-shrink-0" onClick={handlePreviousExercise} disabled={currentExerciseIndex <= 0}>
+          <SkipBack className="h-4 w-4" />
         </Button>
-
         {phase === 'exercise' ? (
           <>
-            <Button 
-              variant="outline" 
-              className="flex-1"
-              onClick={handleSkipExercise}
-            >
-              <SkipForward className="h-5 w-5 mr-2" />
+            <Button variant="outline" className="flex-1 h-10" onClick={handleSkipExercise}>
+              <SkipForward className="h-4 w-4 mr-1.5" />
               Passer
             </Button>
-            <Button 
-              className="flex-1"
-              onClick={handleSetDone}
-            >
-              <Check className="h-5 w-5 mr-2" />
+            <Button className="flex-1 h-10" onClick={handleSetDone}>
+              <Check className="h-4 w-4 mr-1.5" />
               Série terminée
             </Button>
           </>
         ) : (
-          <Button 
-            className="flex-1"
-            onClick={handleRestComplete}
-          >
-            <SkipForward className="h-5 w-5 mr-2" />
+          <Button className="flex-1 h-10" onClick={handleRestComplete}>
+            <SkipForward className="h-4 w-4 mr-1.5" />
             {currentSet < totalSets ? 'Série suivante' : 'Exercice suivant'}
           </Button>
         )}
