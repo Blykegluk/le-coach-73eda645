@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Play, Pause, SkipForward, Check, X, Edit2, Timer, Dumbbell, Info, AlertTriangle } from 'lucide-react';
+import { Play, Pause, SkipForward, SkipBack, Check, X, Edit2, Timer, Dumbbell, Info, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
