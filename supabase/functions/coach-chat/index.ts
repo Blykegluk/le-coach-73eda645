@@ -2621,11 +2621,25 @@ Après avoir utilisé un outil, confirme l'action de manière naturelle et encou
       return msg;
     });
 
-    // Detect if last user message is about workouts - inject a reminder
+    // Detect if last user message is about workouts - inject a reminder with extracted params
     const lastUserMsg = preparedMessages[preparedMessages.length - 1];
     const lastContent = typeof lastUserMsg?.content === 'string' ? lastUserMsg.content.toLowerCase() : '';
-    const workoutKeywords = ['séance', 'seance', 'entraînement', 'entrainement', 'programme', 'workout', 'preview', 'exercice', 'musculation', 'lancer'];
+    const workoutKeywords = ['séance', 'seance', 'entraînement', 'entrainement', 'programme', 'workout', 'preview', 'musculation', 'lancer la séance', 'prépare'];
     const isWorkoutRequest = workoutKeywords.some(k => lastContent.includes(k));
+
+    // Extract focus from message
+    let detectedFocus = "full_body";
+    let detectedIntensity = "moderate";
+    if (lastContent.includes("haut du corps") || lastContent.includes("upper")) detectedFocus = "upper_body";
+    else if (lastContent.includes("bas du corps") || lastContent.includes("lower") || lastContent.includes("jambes") || lastContent.includes("cuisses")) detectedFocus = "lower_body";
+    else if (lastContent.includes("push") || lastContent.includes("poussée")) detectedFocus = "push";
+    else if (lastContent.includes("pull") || lastContent.includes("tirage")) detectedFocus = "pull";
+    else if (lastContent.includes("cardio")) detectedFocus = "cardio";
+    else if (lastContent.includes("abdos") || lastContent.includes("core")) detectedFocus = "core";
+    else if (lastContent.includes("pec") || lastContent.includes("dos") || lastContent.includes("épaule") || lastContent.includes("bras") || lastContent.includes("biceps")) detectedFocus = "upper_body";
+    
+    if (lastContent.includes("intense") || lastContent.includes("lourd") || lastContent.includes("costaud") || lastContent.includes("hardcore")) detectedIntensity = "intense";
+    else if (lastContent.includes("léger") || lastContent.includes("récup") || lastContent.includes("doux")) detectedIntensity = "light";
 
     const finalMessages = [
       { role: "system", content: systemPrompt },
@@ -2636,7 +2650,11 @@ Après avoir utilisé un outil, confirme l'action de manière naturelle et encou
     if (isWorkoutRequest) {
       finalMessages.splice(finalMessages.length - 1, 0, {
         role: "system",
-        content: "RAPPEL CRITIQUE: L'utilisateur parle de séance/entraînement. Tu DOIS appeler l'outil generate_workout. NE JAMAIS écrire un programme en texte. L'outil sauvegarde automatiquement la séance dans l'app."
+        content: `RAPPEL CRITIQUE: L'utilisateur demande une séance. Tu DOIS appeler generate_workout avec les paramètres:
+- focus: "${detectedFocus}"
+- intensity: "${detectedIntensity}"
+NE JAMAIS appeler generate_workout sans focus et intensity.
+NE JAMAIS écrire un programme en texte. L'outil sauvegarde automatiquement la séance dans l'app.`
       });
     }
 
