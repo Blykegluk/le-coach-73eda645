@@ -576,7 +576,18 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
       </div>
 
       {/* Footer actions */}
-      <div className="p-4 border-t border-border bg-card/80 backdrop-blur-xl flex gap-3">
+      <div className="p-4 border-t border-border bg-card/80 backdrop-blur-xl flex gap-2">
+        {/* Previous button - always visible */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handlePreviousExercise}
+          disabled={currentExerciseIndex <= 0}
+          className="flex-shrink-0"
+        >
+          <SkipBack className="h-5 w-5" />
+        </Button>
+
         {phase === 'exercise' ? (
           <>
             <Button 
@@ -597,7 +608,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
           </>
         ) : (
           <Button 
-            className="w-full"
+            className="flex-1"
             onClick={handleNextExercise}
           >
             <SkipForward className="h-5 w-5 mr-2" />
