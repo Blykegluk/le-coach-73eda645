@@ -2031,6 +2031,40 @@ IMPORTANT: Retourne un JSON valide avec cette structure exacte:
           }
         }
 
+        // SERVER-SIDE EXERCISE VALIDATION: Filter out exercises that don't match the focus
+        if (args.focus && workout.exercises && Array.isArray(workout.exercises)) {
+          const upperBodyKeywords = ["pec", "chest", "bench", "développé", "dips", "pompe", "push", "épaule", "shoulder", "press", "dos", "back", "row", "tirage", "pull", "lat", "bicep", "tricep", "curl", "bras", "arm", "shrug", "trapèz"];
+          const lowerBodyKeywords = ["squat", "jambe", "leg", "fente", "lunge", "mollet", "calf", "cuisse", "quad", "ischio", "hamstring", "fessier", "glute", "hip", "hanche", "deadlift", "soulevé", "presse"];
+          const coreKeywords = ["gainage", "plank", "bird dog", "crunch", "abdo", "oblique", "core", "pallof"];
+
+          const matchesFocus = (exerciseName: string, focus: string): boolean => {
+            const name = exerciseName.toLowerCase();
+            switch (focus) {
+              case "upper_body":
+              case "push":
+              case "pull":
+                // Reject lower body and pure core exercises
+                if (lowerBodyKeywords.some(k => name.includes(k))) return false;
+                if (coreKeywords.some(k => name.includes(k)) && !upperBodyKeywords.some(k => name.includes(k))) return false;
+                return true;
+              case "lower_body":
+                // Reject upper body exercises
+                if (upperBodyKeywords.some(k => name.includes(k)) && !lowerBodyKeywords.some(k => name.includes(k))) return false;
+                if (coreKeywords.some(k => name.includes(k)) && !lowerBodyKeywords.some(k => name.includes(k))) return false;
+                return true;
+              default:
+                return true;
+            }
+          };
+
+          const originalCount = workout.exercises.length;
+          workout.exercises = workout.exercises.filter((ex: any) => matchesFocus(ex.name, args.focus));
+          const filteredCount = originalCount - workout.exercises.length;
+          if (filteredCount > 0) {
+            console.log(`SERVER FILTER: Removed ${filteredCount} exercises that didn't match focus "${args.focus}"`);
+          }
+        }
+
         // Persist workout to user_context so it shows in the preview
         try {
           await supabase
