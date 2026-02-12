@@ -1842,16 +1842,18 @@ async function executeToolCall(
         const workoutCounts: Record<string, number> = {};
         recentWorkoutTypes.forEach((type: string) => {
           const normalized = type.toLowerCase();
-          if (normalized.includes("jambes") || normalized.includes("leg") || normalized.includes("squat")) {
+          if (normalized.includes("jambes") || normalized.includes("leg") || normalized.includes("squat") || normalized.includes("bas du corps") || normalized.includes("lower")) {
             workoutCounts["legs"] = (workoutCounts["legs"] || 0) + 1;
-          } else if (normalized.includes("dos") || normalized.includes("back") || normalized.includes("tirage")) {
+          } else if (normalized.includes("dos") || normalized.includes("back") || normalized.includes("tirage") || normalized.includes("pull")) {
             workoutCounts["back"] = (workoutCounts["back"] || 0) + 1;
-          } else if (normalized.includes("pec") || normalized.includes("chest") || normalized.includes("poitrine")) {
+          } else if (normalized.includes("pec") || normalized.includes("chest") || normalized.includes("poitrine") || normalized.includes("push")) {
             workoutCounts["chest"] = (workoutCounts["chest"] || 0) + 1;
           } else if (normalized.includes("épaule") || normalized.includes("shoulder")) {
             workoutCounts["shoulders"] = (workoutCounts["shoulders"] || 0) + 1;
           } else if (normalized.includes("bras") || normalized.includes("biceps") || normalized.includes("triceps") || normalized.includes("arm")) {
             workoutCounts["arms"] = (workoutCounts["arms"] || 0) + 1;
+          } else if (normalized.includes("haut du corps") || normalized.includes("upper")) {
+            workoutCounts["upper_body"] = (workoutCounts["upper_body"] || 0) + 1;
           } else if (normalized.includes("cardio") || normalized.includes("course") || normalized.includes("vélo")) {
             workoutCounts["cardio"] = (workoutCounts["cardio"] || 0) + 1;
           } else {
