@@ -159,6 +159,27 @@ export function useCoachChat(onNavigateAway?: () => void) {
 
       console.log("Sending coach-chat with token length:", accessToken.length);
 
+      // Add Paris timestamp to each message for temporal context
+      const formatParisTimestamp = (date: Date) => {
+        return new Intl.DateTimeFormat("fr-FR", {
+          timeZone: "Europe/Paris",
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        }).format(date);
+      };
+
+      const now = new Date();
+      const messagesWithTimestamps = [...messages, { role: userMsg.role, content: userMsg.content }].map(m => ({
+        role: m.role,
+        content: m.content,
+      }));
+      // Tag the last user message with current timestamp
+      const lastIdx = messagesWithTimestamps.length - 1;
+      messagesWithTimestamps[lastIdx].content = `[${formatParisTimestamp(now)}] ${messagesWithTimestamps[lastIdx].content}`;
+
       const response = await fetch(
         `https://ldllojtzoetwcwbjmfib.supabase.co/functions/v1/coach-chat`,
         {
@@ -169,10 +190,7 @@ export function useCoachChat(onNavigateAway?: () => void) {
             'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxkbGxvanR6b2V0d2N3YmptZmliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4OTkzNzQsImV4cCI6MjA4NTQ3NTM3NH0.NAINuQt1vmut_ILrp-YFsrgRZYXx3nJmIZ77Alnn2sw',
           },
           body: JSON.stringify({
-            messages: [...messages, { role: userMsg.role, content: userMsg.content }].map(m => ({
-              role: m.role,
-              content: m.content,
-            })),
+            messages: messagesWithTimestamps,
             imageUrl,
           }),
         }
