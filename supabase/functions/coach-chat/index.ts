@@ -681,18 +681,35 @@ const tools = [
     type: "function",
     function: {
       name: "generate_workout",
-      description: "Génère un programme d'entraînement personnalisé pour la prochaine séance. Utiliser quand l'utilisateur demande une séance, veut changer de focus (haut du corps, bas du corps, cardio, etc.), ou demande des adaptations.",
+      description: `Génère un programme d'entraînement personnalisé. OBLIGATOIRE: tu DOIS toujours remplir les paramètres "focus" et "intensity" en fonction de ce que l'utilisateur demande.
+
+Mapping OBLIGATOIRE:
+- "haut du corps" / "pecs" / "dos" / "épaules" / "bras" → focus: "upper_body"
+- "bas du corps" / "jambes" / "cuisses" / "fessiers" → focus: "lower_body"  
+- "full body" / "corps entier" → focus: "full_body"
+- "push" / "poussée" → focus: "push"
+- "pull" / "tirage" → focus: "pull"
+- "cardio" → focus: "cardio"
+- "abdos" / "core" / "gainage" → focus: "core"
+
+- "intense" / "lourd" / "costaud" / "hardcore" → intensity: "intense"
+- "léger" / "récupération" / "doux" → intensity: "light"
+- Sinon → intensity: "moderate"
+
+Si l'utilisateur ne précise pas, utilise focus: "full_body" et intensity: "moderate".
+NE JAMAIS appeler cet outil avec des paramètres vides.`,
       parameters: {
         type: "object",
         properties: {
           focus: {
             type: "string",
-            description: "Focus de la séance: 'upper_body' (haut du corps), 'lower_body' (bas du corps), 'full_body' (corps entier), 'push' (poussée), 'pull' (tirage), 'cardio', 'core' (abdos), ou un groupe musculaire spécifique",
+            enum: ["upper_body", "lower_body", "full_body", "push", "pull", "cardio", "core"],
+            description: "OBLIGATOIRE. Focus musculaire de la séance. Déduis-le du message de l'utilisateur.",
           },
           intensity: {
             type: "string",
             enum: ["light", "moderate", "intense"],
-            description: "Intensité souhaitée: light (récupération), moderate (normal), intense (dépassement)",
+            description: "OBLIGATOIRE. Intensité souhaitée. Déduis-la du message de l'utilisateur.",
           },
           duration_min: {
             type: "number",
@@ -708,7 +725,7 @@ const tools = [
             description: "Demande spéciale de l'utilisateur (ex: 'plus de cardio', 'exercices sans machine', 'focus biceps')",
           },
         },
-        required: [],
+        required: ["focus", "intensity"],
       },
     },
   },
