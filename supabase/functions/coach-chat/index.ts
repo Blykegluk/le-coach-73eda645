@@ -1793,16 +1793,16 @@ async function executeToolCall(
           .eq("user_id", userId)
           .maybeSingle();
 
-        // Get recent activities (last 2 weeks)
+        // Get recent workout sessions (last 2 weeks)
         const twoWeeksAgo = new Date();
         twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
         
-        const { data: activities } = await supabase
-          .from("activities")
-          .select("*")
+        const { data: recentSessions } = await supabase
+          .from("workout_sessions")
+          .select("id, workout_name, started_at, completed_at, status, target_muscles, total_duration_seconds, calories_burned, notes")
           .eq("user_id", userId)
-          .gte("performed_at", twoWeeksAgo.toISOString())
-          .order("performed_at", { ascending: false });
+          .gte("started_at", twoWeeksAgo.toISOString())
+          .order("started_at", { ascending: false });
 
         // Get health context (injuries, limitations)
         const { data: healthContext } = await supabase
