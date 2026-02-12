@@ -90,12 +90,6 @@ serve(async (req) => {
             { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        if (imageResponse.status === 402) {
-          return new Response(
-            JSON.stringify({ error: "Crédits IA épuisés." }),
-            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
         const errorText = await imageResponse.text();
         console.error("Image generation error:", imageResponse.status, errorText);
         throw new Error(`Image generation failed: ${imageResponse.status}`);
@@ -103,20 +97,9 @@ serve(async (req) => {
 
       const imageData = await imageResponse.json();
       
-      // Check for error in the response
-      const choiceError = imageData.choices?.[0]?.error;
-      if (choiceError) {
-        console.error("Image generation error in response:", JSON.stringify(choiceError));
-        if (choiceError.code === 429 || choiceError.code === 502) {
-          return new Response(
-            JSON.stringify({ error: "Service temporairement surchargé. Réessaie dans quelques secondes." }),
-            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        throw new Error(choiceError.message || "Image generation failed");
-      }
-
-      const generatedImage = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      // Extract base64 image from Gemini response
+      const imagePart = imageData.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+      const generatedImage = imagePart ? `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}` : null;
 
       if (!generatedImage) {
         console.error("No image generated for phase:", phase.name);
