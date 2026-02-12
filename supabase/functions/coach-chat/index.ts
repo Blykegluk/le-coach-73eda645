@@ -1793,16 +1793,16 @@ async function executeToolCall(
           .eq("user_id", userId)
           .maybeSingle();
 
-        // Get recent activities (last 2 weeks)
+        // Get recent workout sessions (last 2 weeks)
         const twoWeeksAgo = new Date();
         twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
         
-        const { data: activities } = await supabase
-          .from("activities")
-          .select("*")
+        const { data: recentSessions } = await supabase
+          .from("workout_sessions")
+          .select("id, workout_name, started_at, completed_at, status, target_muscles, total_duration_seconds, calories_burned, notes")
           .eq("user_id", userId)
-          .gte("performed_at", twoWeeksAgo.toISOString())
-          .order("performed_at", { ascending: false });
+          .gte("started_at", twoWeeksAgo.toISOString())
+          .order("started_at", { ascending: false });
 
         // Get health context (injuries, limitations)
         const { data: healthContext } = await supabase
@@ -1820,26 +1820,40 @@ async function executeToolCall(
           c.key.includes("injury") || c.key.includes("limitation") || c.key.includes("blessure")
         ) || [];
 
-        const recentWorkoutTypes = activities?.map((a: { activity_type: string }) => a.activity_type) || [];
-        const lastWorkout = activities?.[0];
+        const recentWorkoutTypes = recentSessions?.map((s: { workout_name: string }) => s.workout_name) || [];
+        const lastWorkout = recentSessions?.[0];
         const daysSinceLastWorkout = lastWorkout 
-          ? Math.floor((Date.now() - new Date(lastWorkout.performed_at).getTime()) / (1000 * 60 * 60 * 24))
+          ? Math.floor((Date.now() - new Date(lastWorkout.started_at).getTime()) / (1000 * 60 * 60 * 24))
           : 7;
+        
+        // Get exercise details of last few sessions for smarter programming
+        const lastSessionIds = (recentSessions || []).slice(0, 3).map((s: any) => s.id);
+        let recentExercises: any[] = [];
+        if (lastSessionIds.length > 0) {
+          const { data: exercises } = await supabase
+            .from("workout_exercise_logs")
+            .select("exercise_name, planned_sets, planned_reps, planned_weight, actual_weight, session_id")
+            .eq("user_id", userId)
+            .in("session_id", lastSessionIds);
+          recentExercises = exercises || [];
+        }
 
         // Count workout types in last 2 weeks for balance
         const workoutCounts: Record<string, number> = {};
         recentWorkoutTypes.forEach((type: string) => {
           const normalized = type.toLowerCase();
-          if (normalized.includes("jambes") || normalized.includes("leg") || normalized.includes("squat")) {
+          if (normalized.includes("jambes") || normalized.includes("leg") || normalized.includes("squat") || normalized.includes("bas du corps") || normalized.includes("lower")) {
             workoutCounts["legs"] = (workoutCounts["legs"] || 0) + 1;
-          } else if (normalized.includes("dos") || normalized.includes("back") || normalized.includes("tirage")) {
+          } else if (normalized.includes("dos") || normalized.includes("back") || normalized.includes("tirage") || normalized.includes("pull")) {
             workoutCounts["back"] = (workoutCounts["back"] || 0) + 1;
-          } else if (normalized.includes("pec") || normalized.includes("chest") || normalized.includes("poitrine")) {
+          } else if (normalized.includes("pec") || normalized.includes("chest") || normalized.includes("poitrine") || normalized.includes("push")) {
             workoutCounts["chest"] = (workoutCounts["chest"] || 0) + 1;
           } else if (normalized.includes("épaule") || normalized.includes("shoulder")) {
             workoutCounts["shoulders"] = (workoutCounts["shoulders"] || 0) + 1;
           } else if (normalized.includes("bras") || normalized.includes("biceps") || normalized.includes("triceps") || normalized.includes("arm")) {
             workoutCounts["arms"] = (workoutCounts["arms"] || 0) + 1;
+          } else if (normalized.includes("haut du corps") || normalized.includes("upper")) {
+            workoutCounts["upper_body"] = (workoutCounts["upper_body"] || 0) + 1;
           } else if (normalized.includes("cardio") || normalized.includes("course") || normalized.includes("vélo")) {
             workoutCounts["cardio"] = (workoutCounts["cardio"] || 0) + 1;
           } else {
@@ -1877,7 +1891,27 @@ async function executeToolCall(
           intensityInstruction = `\nINTENSITÉ: ${intensityMap[args.intensity] || args.intensity}`;
         }
 
+        // Build recent exercises summary for context
+        const recentExerciseSummary = recentSessions?.slice(0, 3).map((s: any) => {
+          const sessionExercises = recentExercises.filter((e: any) => e.session_id === s.id);
+          return `- ${s.workout_name} (${getTimeAgo(s.started_at)}): ${sessionExercises.map((e: any) => e.exercise_name).join(", ") || "détails non disponibles"}`;
+        }).join("\n") || "Aucune séance récente";
+
+        // Get current date/time for the workout generation context
+        const workoutNow = new Date();
+        const workoutTime = new Intl.DateTimeFormat("fr-FR", {
+          timeZone: "Europe/Paris",
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }).format(workoutNow);
+
         const systemPrompt = `Tu es un coach fitness expert. Tu dois générer un programme d'entraînement personnalisé.
+
+⏰ NOUS SOMMES LE: ${workoutTime} (Europe/Paris)
 
 PROFIL UTILISATEUR:
 - Objectif: ${goal === "lose_fat" ? "Perte de gras" : goal === "build_muscle" ? "Prise de muscle" : goal === "maintain" ? "Maintien" : "Forme générale"}
@@ -1886,25 +1920,38 @@ PROFIL UTILISATEUR:
 
 CONTRAINTES DE SANTÉ:
 ${injuries.length > 0 ? injuries.map((i: { value: string }) => `- ${i.value}`).join("\n") : "Aucune contrainte particulière"}
+⚠️ Les contraintes de santé servent à ADAPTER le choix d'exercices (ex: remplacer un exercice dangereux par un équivalent sûr), JAMAIS à changer le focus ou l'intensité demandés.
 
 ÉQUIPEMENT DISPONIBLE:
 ${availableEquipment}
 
 HISTORIQUE RÉCENT (2 semaines):
-- Dernière séance: ${lastWorkout ? `${lastWorkout.activity_type} il y a ${daysSinceLastWorkout} jour(s)` : "Aucune séance récente"}
+- Dernière séance: ${lastWorkout ? `${lastWorkout.workout_name} il y a ${daysSinceLastWorkout} jour(s)` : "Aucune séance récente"}
 - Répartition: ${Object.entries(workoutCounts).map(([k, v]) => `${k}: ${v}x`).join(", ") || "Aucune donnée"}
+- Détail des dernières séances:
+${recentExerciseSummary}
 ${focusInstruction}
 ${intensityInstruction}
 ${args.special_request ? `\nDEMANDE SPÉCIALE: ${args.special_request}` : ""}
 ${args.exclude_exercises?.length ? `\nEXERCICES À ÉVITER: ${args.exclude_exercises.join(", ")}` : ""}
 ${args.duration_min ? `\nDURÉE SOUHAITÉE: ${args.duration_min} minutes` : ""}
 
-RÈGLE ABSOLUE - RESPECTER LA DEMANDE DE L'UTILISATEUR:
-⚠️ Tu DOIS respecter le FOCUS et l'INTENSITÉ demandés. Si l'utilisateur demande "bas du corps intense", tu génères une séance BAS DU CORPS INTENSE — PAS un full body doux.
-- Si le focus est "lower_body", TOUS les exercices doivent cibler les jambes/fessiers/mollets. ZÉRO exercice pour le haut du corps (pas de pompes, pas de tirage, pas de développé).
-- Si l'intensité est "intense", propose des charges lourdes (80-90% du max), des techniques d'intensification, des séries courtes et lourdes.
-- Les contraintes de santé servent à ADAPTER les exercices (ex: éviter la compression vertébrale), PAS à ignorer la demande de l'utilisateur.
-- Le nom de la séance DOIT refléter le focus et l'intensité demandés (ex: "Bas du Corps Intense" et non "Reprise Douce").
+═══════════════════════════════════════════════
+RÈGLES ABSOLUES - VIOLATION = ÉCHEC TOTAL:
+═══════════════════════════════════════════════
+
+1. **FOCUS** = LOI. Si focus = "upper_body" → 100% exercices haut du corps (pecs, dos, épaules, bras). ZÉRO squat, ZÉRO fente, ZÉRO leg press, ZÉRO glute bridge, ZÉRO mollets.
+   Si focus = "lower_body" → 100% exercices bas du corps (quadriceps, ischio-jambiers, fessiers, mollets). ZÉRO pompes, ZÉRO tirage, ZÉRO développé, ZÉRO curl biceps.
+   Si focus = "push" → pecs, épaules, triceps uniquement. Si focus = "pull" → dos, biceps uniquement.
+
+2. **INTENSITÉ** = LOI. Si intensité = "intense" → charges 80-90% du max, séries de 4-8 reps, repos courts (60-90s), techniques d'intensification (drop sets, supersets, rest-pause). PAS de séries de 15-20 reps légères.
+   Si intensité = "light" → récupération active, charges légères, séries de 15-20 reps, repos longs.
+
+3. **NOM DE LA SÉANCE** doit refléter le focus + intensité (ex: "Haut du Corps Intense", "Bas du Corps Récupération").
+
+4. **VARIÉTÉ**: Évite de reproposer les mêmes exercices que les 2-3 dernières séances. Propose des alternatives et des variantes.
+
+5. **COHÉRENCE PROGRAMME**: La séance doit s'intégrer logiquement dans le programme global de l'utilisateur (objectif, historique, récupération).
 
 IMPORTANT: Retourne un JSON valide avec cette structure exacte:
 {
