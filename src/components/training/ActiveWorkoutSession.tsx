@@ -572,7 +572,12 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
             </div>
             
             <h2 className="text-xl font-bold text-center mb-2">Repos</h2>
-            <p className="text-muted-foreground mb-6">Prochain : {workout.exercises[currentExerciseIndex + 1]?.name || 'Fin'}</p>
+            <p className="text-muted-foreground mb-6">
+              {currentSet < totalSets
+                ? `Série suivante : ${currentSet + 1}/${totalSets}`
+                : `Prochain : ${workout.exercises[currentExerciseIndex + 1]?.name || 'Fin'}`
+              }
+            </p>
             
             <div className="card-premium px-8 py-4 mb-8 border-energy/30">
               <p className="font-mono text-4xl font-bold text-energy">{formatTime(restTimeRemaining)}</p>
