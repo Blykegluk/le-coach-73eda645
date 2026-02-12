@@ -497,6 +497,10 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
                 <h2 className="text-base font-bold truncate">{currentExercise?.name}</h2>
                 <p className="text-xs text-muted-foreground">{currentLog?.actual_weight}</p>
               </div>
+              <Button variant="ghost" size="sm" className="h-8 px-2 flex-shrink-0 text-xs gap-1" onClick={() => setViewingExerciseIndex(currentExerciseIndex)}>
+                <Info className="h-3.5 w-3.5" />
+                Détail
+              </Button>
               <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => handleEditExercise(currentExerciseIndex)}>
                 <Edit2 className="h-3.5 w-3.5" />
               </Button>

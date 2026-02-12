@@ -312,29 +312,13 @@ export const ExerciseDetailSheet = ({
                 </div>
               )}
 
-              {/* Generate images button (if no images yet) */}
+              {/* Exercise pictogram */}
               {!detail.images && !detail.video_url && (
                 <div className="rounded-2xl bg-muted/30 border border-border p-4 flex flex-col items-center">
-                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-                    <Play className="h-6 w-6 text-primary" />
+                  <div className="h-20 w-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-2">
+                    <ExerciseIcon className="h-14 w-14 text-primary" />
                   </div>
-                  <p className="text-sm text-muted-foreground text-center mb-3">
-                    Génère 3 images montrant l'enchaînement
-                  </p>
-                  <Button onClick={generateVideo} disabled={isGeneratingVideo} size="sm" className="gap-2">
-                    {isGeneratingVideo ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                        Génération...
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-4 w-4" />
-                        Générer les images
-                      </>
-                    )}
-                  </Button>
-                  {videoError && <p className="text-xs text-destructive mt-2">{videoError}</p>}
+                  <p className="text-xs text-muted-foreground text-center">Pictogramme de l'exercice</p>
                 </div>
               )}
 
