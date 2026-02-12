@@ -500,11 +500,27 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
               </div>
             </button>
             
-            <h2 className="text-xl font-bold text-center mb-2">{currentExercise?.name}</h2>
+            <h2 className="text-xl font-bold text-center mb-1">{currentExercise?.name}</h2>
             
-            <div className="flex items-center gap-4 text-lg mb-6">
-              <span className="text-primary font-semibold">{currentLog?.actual_sets} séries</span>
-              <span className="text-muted-foreground">×</span>
+            {/* Set indicator */}
+            <div className="flex items-center gap-2 mb-4">
+              {Array.from({ length: totalSets }, (_, i) => (
+                <div
+                  key={i}
+                  className={`h-2.5 w-8 rounded-full transition-all ${
+                    i < currentSet - 1
+                      ? 'bg-green-500'
+                      : i === currentSet - 1
+                        ? 'bg-primary shadow-glow-sm'
+                        : 'bg-muted'
+                  }`}
+                />
+              ))}
+            </div>
+            
+            <div className="flex items-center gap-4 text-lg mb-4">
+              <span className="text-primary font-semibold">Série {currentSet}/{totalSets}</span>
+              <span className="text-muted-foreground">·</span>
               <span className="text-primary font-semibold">{currentLog?.actual_reps} reps</span>
             </div>
             
