@@ -631,7 +631,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
             </Button>
             <Button 
               className="flex-1"
-              onClick={handleStartRest}
+              onClick={handleSetDone}
             >
               <Check className="h-5 w-5 mr-2" />
               Terminé
