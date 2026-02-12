@@ -14,15 +14,9 @@ serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error("Supabase configuration missing");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !GEMINI_API_KEY) {
+      throw new Error("Supabase or GEMINI_API_KEY configuration missing");
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -77,30 +71,23 @@ serve(async (req) => {
     for (const phase of phases) {
       console.log(`Generating ${phase.name} phase image...`);
 
-      const imageResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash-image",
-          messages: [{ role: "user", content: phase.prompt }],
-          modalities: ["image", "text"],
-        }),
-      });
+      const imageResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: phase.prompt }] }],
+            generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
+          }),
+        }
+      );
 
       if (!imageResponse.ok) {
         if (imageResponse.status === 429) {
           return new Response(
             JSON.stringify({ error: "Trop de requêtes, réessaie dans un moment." }),
             { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        if (imageResponse.status === 402) {
-          return new Response(
-            JSON.stringify({ error: "Crédits IA épuisés." }),
-            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
         const errorText = await imageResponse.text();
@@ -110,20 +97,9 @@ serve(async (req) => {
 
       const imageData = await imageResponse.json();
       
-      // Check for error in the response
-      const choiceError = imageData.choices?.[0]?.error;
-      if (choiceError) {
-        console.error("Image generation error in response:", JSON.stringify(choiceError));
-        if (choiceError.code === 429 || choiceError.code === 502) {
-          return new Response(
-            JSON.stringify({ error: "Service temporairement surchargé. Réessaie dans quelques secondes." }),
-            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        throw new Error(choiceError.message || "Image generation failed");
-      }
-
-      const generatedImage = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      // Extract base64 image from Gemini response
+      const imagePart = imageData.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+      const generatedImage = imagePart ? `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}` : null;
 
       if (!generatedImage) {
         console.error("No image generated for phase:", phase.name);
