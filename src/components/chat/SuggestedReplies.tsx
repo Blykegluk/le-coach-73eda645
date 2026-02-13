@@ -55,7 +55,7 @@ function extractSuggestions(content: string | undefined): string[] {
     return options;
   }
 
-  // Fallback: if it's a yes/no question
+  // Fallback: if it's a yes/no or open question
   const questionLine = lastLines.find(l => l.endsWith('?'));
   if (questionLine) {
     const yesNoPatterns = [
@@ -65,8 +65,36 @@ function extractSuggestions(content: string | undefined): string[] {
       return ['Oui, vas-y !', 'Non, pas maintenant'];
     }
 
-    // Generic question - offer simple replies
-    return ['Oui 👍', 'Non merci'];
+    // Feeling / sentiment questions
+    const feelingPatterns = [
+      /comment (?:te sens|tu te sens|vas|tu vas|ça va)/i,
+      /qu['']en (?:penses|dis)/i,
+      /ton avis/i,
+      /ça te (?:convient|plaît|parle)/i,
+    ];
+    if (feelingPatterns.some(p => p.test(questionLine))) {
+      return ['Très bien, merci ! 💪', 'Ça pourrait être mieux', 'J\'ai une question'];
+    }
+
+    // Workout / activity questions
+    const workoutPatterns = [
+      /(?:séance|entraînement|sport|exercice|activité)/i,
+      /(?:fait|fais) (?:du sport|ta séance)/i,
+    ];
+    if (workoutPatterns.some(p => p.test(questionLine))) {
+      return ['Oui, j\'ai fait ma séance !', 'Pas encore', 'Propose-moi une séance'];
+    }
+
+    // Meal / nutrition questions
+    const mealPatterns = [
+      /(?:mangé|repas|dîner|souper|goûter|snack|collation)/i,
+    ];
+    if (mealPatterns.some(p => p.test(questionLine))) {
+      return ['Oui, je vais le noter', 'Pas encore mangé', 'Propose-moi un repas'];
+    }
+
+    // Generic question - offer contextual replies
+    return ['Oui 👍', 'Non merci', 'Dis-moi en plus'];
   }
 
   return [];
