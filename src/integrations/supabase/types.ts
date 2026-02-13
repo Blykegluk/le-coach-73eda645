@@ -263,14 +263,18 @@ export type Database = {
       profiles: {
         Row: {
           activity_level: string | null
+          allergies: string | null
           birth_date: string | null
           created_at: string
           current_body_fat_pct: number | null
+          dietary_preferences: string[] | null
           first_name: string | null
           gender: string | null
           goal: string | null
           height_cm: number | null
           id: string
+          last_name: string | null
+          notifications_enabled: boolean | null
           onboarding_complete: boolean | null
           target_body_fat_pct: number | null
           target_calories: number | null
@@ -288,14 +292,18 @@ export type Database = {
         }
         Insert: {
           activity_level?: string | null
+          allergies?: string | null
           birth_date?: string | null
           created_at?: string
           current_body_fat_pct?: number | null
+          dietary_preferences?: string[] | null
           first_name?: string | null
           gender?: string | null
           goal?: string | null
           height_cm?: number | null
           id?: string
+          last_name?: string | null
+          notifications_enabled?: boolean | null
           onboarding_complete?: boolean | null
           target_body_fat_pct?: number | null
           target_calories?: number | null
@@ -313,14 +321,18 @@ export type Database = {
         }
         Update: {
           activity_level?: string | null
+          allergies?: string | null
           birth_date?: string | null
           created_at?: string
           current_body_fat_pct?: number | null
+          dietary_preferences?: string[] | null
           first_name?: string | null
           gender?: string | null
           goal?: string | null
           height_cm?: number | null
           id?: string
+          last_name?: string | null
+          notifications_enabled?: boolean | null
           onboarding_complete?: boolean | null
           target_body_fat_pct?: number | null
           target_calories?: number | null

@@ -19,6 +19,9 @@ export interface Profile {
   target_sleep_hours: number | null;
   current_body_fat_pct: number | null;
   target_body_fat_pct: number | null;
+  dietary_preferences: string[] | null;
+  allergies: string | null;
+  notifications_enabled: boolean | null;
   onboarding_complete: boolean | null;
   created_at: string;
   updated_at: string;
