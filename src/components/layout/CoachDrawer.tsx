@@ -3,6 +3,7 @@ import { Send, Plus, Camera, Mic, Loader2, X, ArrowDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import ImageCapture from '@/components/chat/ImageCapture';
 import VoiceRecorder from '@/components/chat/VoiceRecorder';
+import SuggestedReplies from '@/components/chat/SuggestedReplies';
 import { useCoachChat } from '@/hooks/useCoachChat';
 
 const suggestions = [
@@ -174,6 +175,13 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
             </div>
           </div>
         )}
+
+        {/* Suggested replies */}
+        <SuggestedReplies
+          lastAssistantMessage={messages.filter(m => m.role === 'assistant').at(-1)?.content}
+          onReply={(text) => handleSend(text)}
+          disabled={isLoading}
+        />
 
         {/* Input area */}
         <div className="flex-shrink-0 border-t border-border/50 px-4 pb-[env(safe-area-inset-bottom,8px)] pt-3">
