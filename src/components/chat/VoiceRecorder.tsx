@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Mic, Square, Send, X, Loader2 } from 'lucide-react';
+import { Mic, Square, X } from 'lucide-react';
 
 interface VoiceRecorderProps {
   isOpen: boolean;
@@ -10,85 +10,85 @@ interface VoiceRecorderProps {
 export default function VoiceRecorder({ isOpen, onClose, onTranscription }: VoiceRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [transcript, setTranscript] = useState('');
+  const [status, setStatus] = useState<'idle' | 'recording' | 'processing'>('idle');
 
-  // Web Speech API for transcription
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
-  const [transcript, setTranscript] = useState('');
+  const finalTranscriptRef = useRef('');
 
+  const hasSpeechRecognition = typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
+
+  // Cleanup on unmount / close
   useEffect(() => {
-    // Initialize Speech Recognition
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = 'fr-FR';
-
-      recognitionRef.current.onresult = (event) => {
-        let finalTranscript = '';
-        let interimTranscript = '';
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i];
-          if (result.isFinal) {
-            finalTranscript += result[0].transcript;
-          } else {
-            interimTranscript += result[0].transcript;
-          }
-        }
-
-        setTranscript(prev => {
-          // Remove interim and add final
-          const baseTranscript = prev.replace(/\[interim\].*$/, '');
-          return baseTranscript + finalTranscript + (interimTranscript ? `[interim]${interimTranscript}` : '');
-        });
-      };
-
-      recognitionRef.current.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
-      };
-    }
-
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
+      cleanup();
     };
+  }, []);
+
+  const cleanup = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try { mediaRecorderRef.current.stop(); } catch {}
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
   }, []);
 
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunksRef.current.push(e.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        setAudioBlob(blob);
-        stream.getTracks().forEach(track => track.stop());
-      };
-
       mediaRecorder.start();
+
       setIsRecording(true);
+      setStatus('recording');
       setRecordingTime(0);
       setTranscript('');
+      finalTranscriptRef.current = '';
 
       // Start speech recognition
-      if (recognitionRef.current) {
-        recognitionRef.current.start();
+      if (hasSpeechRecognition) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognitionRef.current = recognition;
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'fr-FR';
+
+        recognition.onresult = (event: { resultIndex: number; results: { length: number; [key: number]: { isFinal: boolean; 0: { transcript: string } } } }) => {
+          let final = finalTranscriptRef.current;
+          let interim = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            if (event.results[i].isFinal) {
+              final += event.results[i][0].transcript;
+              finalTranscriptRef.current = final;
+            } else {
+              interim += event.results[i][0].transcript;
+            }
+          }
+          setTranscript(final + interim);
+        };
+
+        recognition.onerror = (event: { error: string }) => {
+          console.error('Speech recognition error:', event.error);
+        };
+
+        recognition.start();
       }
 
       // Timer
@@ -96,44 +96,54 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
         setRecordingTime(prev => prev + 1);
       }, 1000);
     } catch (error) {
-      console.error('Recording error:', error);
+      console.error('Microphone access error:', error);
+      setStatus('idle');
     }
-  }, []);
+  }, [hasSpeechRecognition]);
 
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && isRecording) {
+  const stopAndSend = useCallback(() => {
+    setIsRecording(false);
+    setStatus('processing');
+
+    // Stop recognition
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+    }
+
+    // Stop timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    // Stop media
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-
-      // Stop speech recognition
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
     }
-  }, [isRecording]);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
 
-  const handleSend = () => {
-    // Clean up transcript (remove interim markers)
-    const cleanTranscript = transcript.replace(/\[interim\].*$/, '').trim();
-    
-    if (cleanTranscript) {
-      onTranscription(cleanTranscript);
+    // Small delay to let final recognition results arrive
+    setTimeout(() => {
+      const finalText = finalTranscriptRef.current.trim();
+      if (finalText) {
+        onTranscription(finalText);
+      }
       handleClose();
-    }
-  };
+    }, 400);
+  }, [onTranscription]);
 
-  const handleClose = () => {
-    stopRecording();
-    setAudioBlob(null);
+  const handleClose = useCallback(() => {
+    cleanup();
+    setIsRecording(false);
+    setStatus('idle');
     setTranscript('');
     setRecordingTime(0);
+    finalTranscriptRef.current = '';
     onClose();
-  };
+  }, [cleanup, onClose]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -141,20 +151,16 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Clean transcript for display (remove interim markers)
-  const displayTranscript = transcript.replace(/\[interim\]/g, ' ').trim();
-
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
-      <div 
-        className="w-full max-w-md rounded-t-3xl bg-background p-6"
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={handleClose}>
+      <div
+        className="w-full max-w-md rounded-t-3xl bg-background p-6 pb-8 animate-in slide-in-from-bottom duration-300"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-foreground">Message vocal</h3>
+        {/* Close */}
+        <div className="mb-4 flex justify-end">
           <button
             onClick={handleClose}
             className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground"
@@ -163,95 +169,74 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
           </button>
         </div>
 
-        {/* Recording indicator */}
-        <div className="mb-6 flex flex-col items-center">
-          {isRecording && (
-            <div className="mb-4 flex items-center gap-2">
+        {/* Status & Transcript */}
+        <div className="mb-6 flex flex-col items-center gap-3">
+          {status === 'recording' && (
+            <div className="flex items-center gap-2">
               <div className="h-3 w-3 animate-pulse rounded-full bg-red-500" />
-              <span className="text-lg font-medium text-foreground">{formatTime(recordingTime)}</span>
+              <span className="text-lg font-semibold tabular-nums text-foreground">{formatTime(recordingTime)}</span>
             </div>
           )}
 
-          {/* Waveform visualization placeholder */}
-          <div className="mb-4 flex h-16 w-full items-center justify-center gap-1">
-            {isRecording ? (
-              Array.from({ length: 20 }).map((_, i) => (
+          {status === 'processing' && (
+            <span className="text-sm text-muted-foreground">Envoi en cours…</span>
+          )}
+
+          {/* Waveform */}
+          {status === 'recording' && (
+            <div className="flex h-12 w-full items-end justify-center gap-[3px]">
+              {Array.from({ length: 24 }).map((_, i) => (
                 <div
                   key={i}
-                  className="w-1 animate-pulse rounded-full bg-primary"
+                  className="w-1 rounded-full bg-primary animate-pulse"
                   style={{
-                    height: `${Math.random() * 100}%`,
-                    animationDelay: `${i * 50}ms`,
+                    height: `${20 + Math.random() * 80}%`,
+                    animationDelay: `${i * 60}ms`,
+                    animationDuration: `${600 + Math.random() * 400}ms`,
                   }}
                 />
-              ))
-            ) : audioBlob ? (
-              <span className="text-muted-foreground">Enregistrement terminé</span>
-            ) : (
-              <span className="text-muted-foreground">Appuie pour enregistrer</span>
-            )}
-          </div>
-
-          {/* Transcript preview */}
-          {displayTranscript && (
-            <div className="w-full rounded-xl bg-muted/50 p-3 mb-4">
-              <p className="text-sm text-foreground">{displayTranscript}</p>
+              ))}
             </div>
           )}
+
+          {/* Live transcript */}
+          {transcript && (
+            <div className="w-full rounded-xl bg-muted/50 p-3 max-h-24 overflow-y-auto">
+              <p className="text-sm text-foreground leading-relaxed">{transcript}</p>
+            </div>
+          )}
+
+          {/* Idle hint */}
+          {status === 'idle' && !transcript && (
+            <p className="text-sm text-muted-foreground">
+              {hasSpeechRecognition
+                ? 'Appuie sur le micro pour parler'
+                : 'Reconnaissance vocale non supportée par ce navigateur'}
+            </p>
+          )}
         </div>
 
-        {/* Controls */}
-        <div className="flex items-center justify-center gap-6">
-          {!isRecording && !audioBlob && (
+        {/* Main button */}
+        <div className="flex justify-center">
+          {status === 'idle' && (
             <button
               onClick={startRecording}
-              className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all active:scale-95"
+              disabled={!hasSpeechRecognition}
+              className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95 disabled:opacity-40"
             >
-              <Mic className="h-8 w-8" />
+              <Mic className="h-7 w-7" />
             </button>
           )}
 
-          {isRecording && (
+          {status === 'recording' && (
             <button
-              onClick={stopRecording}
-              className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500 text-white shadow-lg transition-all active:scale-95"
+              onClick={stopAndSend}
+              className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500 text-white shadow-lg transition-transform active:scale-95"
             >
-              <Square className="h-6 w-6" />
+              <Square className="h-6 w-6 fill-current" />
             </button>
-          )}
-
-          {audioBlob && !isRecording && (
-            <>
-              <button
-                onClick={() => {
-                  setAudioBlob(null);
-                  setTranscript('');
-                }}
-                className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground"
-              >
-                <X className="h-5 w-5" />
-              </button>
-              <button
-                onClick={handleSend}
-                disabled={isTranscribing || !displayTranscript}
-                className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all active:scale-95 disabled:opacity-50"
-              >
-                {isTranscribing ? (
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                ) : (
-                  <Send className="h-6 w-6" />
-                )}
-              </button>
-            </>
           )}
         </div>
-
-        {/* Help text */}
-        {!recognitionRef.current && (
-          <p className="mt-4 text-center text-xs text-muted-foreground">
-            La reconnaissance vocale n'est pas supportée par ce navigateur
-      </p>
-        )}
       </div>
     </div>
   );
