@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { Flame, Beef, Wheat, Droplet, Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -60,7 +60,7 @@ function getDatePart(iso: string): string {
 }
 
 const MealDetailSheet = ({ isOpen, onClose, mealName, logs, onChanged }: MealDetailSheetProps) => {
-  const { toast } = useToast();
+  
   const [editing, setEditing] = useState<NutritionLog | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState({
@@ -122,19 +122,12 @@ const MealDetailSheet = ({ isOpen, onClose, mealName, logs, onChanged }: MealDet
 
       if (error) throw error;
 
-      toast({
-        title: 'Aliment mis à jour',
-        description: 'Les changements ont été enregistrés.',
-      });
+      toast.success('Aliment mis à jour');
       setEditing(null);
       onChanged?.();
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      toast({
-        title: 'Erreur',
-        description: e?.message || "Impossible de modifier l'aliment.",
-        variant: 'destructive',
-      });
+      toast.error(e instanceof Error ? e.message : "Impossible de modifier l'aliment.");
     } finally {
       setIsSaving(false);
     }
@@ -145,18 +138,11 @@ const MealDetailSheet = ({ isOpen, onClose, mealName, logs, onChanged }: MealDet
       const { error } = await supabase.from('nutrition_logs').delete().eq('id', logId);
       if (error) throw error;
 
-      toast({
-        title: 'Aliment supprimé',
-        description: 'La ligne a été supprimée.',
-      });
+      toast.success('Aliment supprimé');
       onChanged?.();
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      toast({
-        title: 'Erreur',
-        description: e?.message || "Impossible de supprimer l'aliment.",
-        variant: 'destructive',
-      });
+      toast.error(e instanceof Error ? e.message : "Impossible de supprimer l'aliment.");
     }
   };
 
