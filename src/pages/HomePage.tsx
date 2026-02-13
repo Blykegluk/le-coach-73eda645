@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { ChevronRight, Target, Plus, Dumbbell } from 'lucide-react';
+import { Target } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { healthProvider } from '@/providers/health';
@@ -413,64 +413,6 @@ const HomePage = () => {
         <DailyTipsCard />
       </div>
 
-
-      {/* Quick actions */}
-      <div className="mb-4">
-        <p className="mb-3 text-sm font-medium text-foreground">Accès rapide</p>
-        <div className="space-y-2">
-          <button
-            onClick={() => navigate('/journal')}
-            className="flex w-full items-center justify-between card-premium p-4"
-          >
-            <div className="flex items-center gap-3">
-              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                <Plus className="h-5 w-5 text-primary" />
-              </div>
-              <div className="text-left">
-                <p className="font-medium text-foreground">Ajouter au journal</p>
-                <p className="text-sm text-muted-foreground">Repas, séances, hydratation</p>
-              </div>
-            </div>
-            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-          </button>
-
-          <button
-            onClick={() => navigate('/journal')}
-            className="flex w-full items-center justify-between card-premium p-4"
-          >
-            <div className="flex items-center gap-3">
-              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                <Dumbbell className="h-5 w-5 text-primary" />
-              </div>
-              <div className="text-left">
-                <p className="font-medium text-foreground">Voir le journal</p>
-                <p className="text-sm text-muted-foreground">Historique unifié</p>
-              </div>
-            </div>
-            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-          </button>
-
-          <button
-            onClick={() => setIsGoalModalOpen(true)}
-            className="flex w-full items-center justify-between card-premium p-4"
-          >
-            <div className="flex items-center gap-3">
-              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                <Target className="h-5 w-5 text-primary" />
-              </div>
-              <div className="text-left">
-                <p className="font-medium text-foreground">
-                  {profile?.goal ? 'Ajuster l\'objectif' : 'Définir un objectif'}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {profile?.goal ? 'Modifie tes objectifs fitness' : 'Fixe tes objectifs fitness'}
-                </p>
-              </div>
-            </div>
-            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-          </button>
-        </div>
-      </div>
 
       {/* Health Stats Section */}
       <HealthStatsCard 
