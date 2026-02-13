@@ -5,6 +5,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { Skeleton } from '@/components/ui/skeleton';
 import GoalEditorModal from '@/components/profile/GoalEditorModal';
+import ProfileEditModal from '@/components/profile/ProfileEditModal';
+import ObjectivesModal from '@/components/profile/ObjectivesModal';
+import DietaryPreferencesModal from '@/components/profile/DietaryPreferencesModal';
+import NotificationsModal from '@/components/profile/NotificationsModal';
+import PrivacyModal from '@/components/profile/PrivacyModal';
+import HelpModal from '@/components/profile/HelpModal';
 
 const GOAL_LABELS: Record<string, string> = {
   weight_loss: 'Perdre du poids',
@@ -15,40 +21,37 @@ const GOAL_LABELS: Record<string, string> = {
   wellness: 'Bien-être général',
 };
 
+type ModalType = 'goal' | 'profile' | 'objectives' | 'dietary' | 'notifications' | 'privacy' | 'help' | null;
+
 const ProfilePage = () => {
   const { user, signOut } = useAuth();
   const { profile, isLoading } = useProfile();
   const { theme, setTheme } = useTheme();
-  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
+  const [openModal, setOpenModal] = useState<ModalType>(null);
 
-  const settingsItems = [
-    { icon: Target, label: 'Mes objectifs' },
-    { icon: Apple, label: 'Préférences alimentaires' },
-    { icon: Watch, label: 'Appareils connectés' },
-    { icon: Bell, label: 'Notifications' },
-    { icon: Shield, label: 'Confidentialité' },
-    { icon: HelpCircle, label: 'Aide & Support' },
+  const settingsItems: { icon: typeof Target; label: string; modal: ModalType }[] = [
+    { icon: Target, label: 'Mes objectifs', modal: 'objectives' },
+    { icon: Apple, label: 'Préférences alimentaires', modal: 'dietary' },
+    { icon: Watch, label: 'Appareils connectés', modal: null },
+    { icon: Bell, label: 'Notifications', modal: 'notifications' },
+    { icon: Shield, label: 'Confidentialité', modal: 'privacy' },
+    { icon: HelpCircle, label: 'Aide & Support', modal: 'help' },
   ];
 
-  // Calculate age from birth_date
   const calculateAge = (birthDate: string | null): number | null => {
     if (!birthDate) return null;
     const today = new Date();
     const birth = new Date(birthDate);
     let age = today.getFullYear() - birth.getFullYear();
     const monthDiff = today.getMonth() - birth.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-      age--;
-    }
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age--;
     return age;
   };
 
-  // Calculate BMI
   const calculateBMI = (weight: number | null, height: number | null): string => {
     if (!weight || !height) return '-';
     const heightM = height / 100;
-    const bmi = weight / (heightM * heightM);
-    return bmi.toFixed(1);
+    return (weight / (heightM * heightM)).toFixed(1);
   };
 
   const age = calculateAge(profile?.birth_date ?? null);
@@ -66,9 +69,7 @@ const ProfilePage = () => {
         </div>
         <Skeleton className="mb-4 h-24 w-full rounded-2xl" />
         <div className="mb-4 grid grid-cols-4 gap-2">
-          {[1, 2, 3, 4].map(i => (
-            <Skeleton key={i} className="h-16 rounded-2xl" />
-          ))}
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-16 rounded-2xl" />)}
         </div>
         <Skeleton className="mb-4 h-16 w-full rounded-2xl" />
       </div>
@@ -80,59 +81,59 @@ const ProfilePage = () => {
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">Profil</h1>
-        <button className="flex h-10 w-10 items-center justify-center rounded-full bg-muted/50 text-muted-foreground transition-all hover:bg-muted hover:text-foreground">
+        <button 
+          onClick={() => setOpenModal('profile')}
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-muted/50 text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
+        >
           <Settings className="h-5 w-5" />
         </button>
       </div>
 
-      {/* User info - REAL DATA */}
-      <div className="mb-4 card-premium p-4">
+      {/* User info - clickable to edit */}
+      <button 
+        onClick={() => setOpenModal('profile')}
+        className="mb-4 w-full card-premium p-4 text-left"
+      >
         <div className="flex items-center gap-4">
           <div className="relative">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow shadow-glow-md">
               {profile?.avatar_url ? (
-                <img 
-                  src={profile.avatar_url} 
-                  alt="Avatar" 
-                  className="h-14 w-14 rounded-full object-cover"
-                />
+                <img src={profile.avatar_url} alt="Avatar" className="h-14 w-14 rounded-full object-cover" />
               ) : (
                 <User className="h-7 w-7 text-primary-foreground" />
               )}
             </div>
             <div className="absolute inset-0 rounded-full animate-halo-pulse" />
           </div>
-          <div>
+          <div className="flex-1">
             <h2 className="text-lg font-semibold text-foreground">
               {profile?.first_name} {profile?.last_name || ''}
             </h2>
             <p className="text-sm text-muted-foreground">{user?.email}</p>
             <p className="text-xs text-muted-foreground">Membre depuis {memberSince}</p>
           </div>
+          <ChevronRight className="h-5 w-5 text-muted-foreground" />
         </div>
-      </div>
+      </button>
 
-      {/* Stats - REAL DATA */}
+      {/* Stats */}
       <div className="mb-4 grid grid-cols-4 gap-2">
         {[
           { label: 'Taille', value: profile?.height_cm ? `${profile.height_cm}cm` : '-' },
           { label: 'Poids', value: profile?.weight_kg ? `${profile.weight_kg}kg` : '-' },
           { label: 'Âge', value: age ? `${age} ans` : '-' },
           { label: 'IMC', value: bmi },
-        ].map((stat, index) => (
-          <div
-            key={stat.label}
-            className="card-premium p-3 text-center group"
-          >
+        ].map(stat => (
+          <div key={stat.label} className="card-premium p-3 text-center group">
             <p className="text-xs text-muted-foreground">{stat.label}</p>
             <p className="font-bold text-foreground group-hover:text-gradient-primary transition-all">{stat.value}</p>
           </div>
         ))}
       </div>
 
-      {/* Main goal - REAL DATA with edit capability */}
+      {/* Main goal */}
       <button 
-        onClick={() => setIsGoalModalOpen(true)}
+        onClick={() => setOpenModal('goal')}
         className="mb-4 flex w-full items-center justify-between card-premium p-4"
       >
         <div className="flex items-center gap-3">
@@ -150,46 +151,28 @@ const ProfilePage = () => {
         <ChevronRight className="h-5 w-5 text-muted-foreground" />
       </button>
 
-      {/* Goal Editor Modal */}
-      <GoalEditorModal
-        isOpen={isGoalModalOpen}
-        onClose={() => setIsGoalModalOpen(false)}
-        currentGoal={profile?.goal}
-        currentTargetWeight={profile?.target_weight_kg}
-      />
-
       {/* Theme Toggle */}
       <div className="mb-4 card-premium p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-              {theme === 'dark' ? (
-                <Moon className="h-5 w-5 text-primary" />
-              ) : (
-                <Sun className="h-5 w-5 text-primary" />
-              )}
+              {theme === 'dark' ? <Moon className="h-5 w-5 text-primary" /> : <Sun className="h-5 w-5 text-primary" />}
               <div className="absolute inset-0 rounded-full bg-primary/20 blur-sm -z-10" />
             </div>
             <div>
               <p className="font-medium text-foreground">Thème</p>
-              <p className="text-xs text-muted-foreground">
-                {theme === 'dark' ? 'Mode sombre' : 'Mode clair'}
-              </p>
+              <p className="text-xs text-muted-foreground">{theme === 'dark' ? 'Mode sombre' : 'Mode clair'}</p>
             </div>
           </div>
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             className={`relative h-8 w-14 rounded-full transition-all duration-300 ${
-              theme === 'dark' 
-                ? 'bg-gradient-to-r from-primary to-primary-glow shadow-glow-sm' 
-                : 'bg-muted'
+              theme === 'dark' ? 'bg-gradient-to-r from-primary to-primary-glow shadow-glow-sm' : 'bg-muted'
             }`}
           >
-            <div
-              className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow-md transition-all duration-300 ${
-                theme === 'dark' ? 'left-7' : 'left-1'
-              }`}
-            />
+            <div className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow-md transition-all duration-300 ${
+              theme === 'dark' ? 'left-7' : 'left-1'
+            }`} />
           </button>
         </div>
       </div>
@@ -198,16 +181,21 @@ const ProfilePage = () => {
       <div className="mb-4">
         <p className="mb-3 text-sm font-medium text-foreground">Paramètres</p>
         <div className="space-y-1">
-          {settingsItems.map((item, index) => (
+          {settingsItems.map(item => (
             <button
               key={item.label}
-              className="flex w-full items-center justify-between rounded-xl p-3 transition-all hover:bg-muted/50 active:scale-[0.99] group"
+              onClick={() => item.modal && setOpenModal(item.modal)}
+              className={`flex w-full items-center justify-between rounded-xl p-3 transition-all hover:bg-muted/50 active:scale-[0.99] group ${
+                !item.modal ? 'opacity-50' : ''
+              }`}
+              disabled={!item.modal}
             >
               <div className="flex items-center gap-3">
                 <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-muted group-hover:bg-primary/10 transition-colors">
                   <item.icon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>
                 <span className="text-foreground">{item.label}</span>
+                {!item.modal && <span className="text-xs text-muted-foreground">(bientôt)</span>}
               </div>
               <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </button>
@@ -215,7 +203,7 @@ const ProfilePage = () => {
         </div>
       </div>
 
-      {/* Logout - FUNCTIONAL */}
+      {/* Logout */}
       <button 
         onClick={signOut}
         className="flex w-full items-center justify-center gap-2 card-premium py-4 text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 active:scale-[0.99]"
@@ -224,10 +212,16 @@ const ProfilePage = () => {
         <span className="font-medium">Se déconnecter</span>
       </button>
 
-      {/* Version */}
-      <p className="mt-4 text-center text-xs text-muted-foreground">
-        The Perfect Coach v1.0.0
-      </p>
+      <p className="mt-4 text-center text-xs text-muted-foreground">The Perfect Coach v1.0.0</p>
+
+      {/* Modals */}
+      <GoalEditorModal isOpen={openModal === 'goal'} onClose={() => setOpenModal(null)} currentGoal={profile?.goal} currentTargetWeight={profile?.target_weight_kg} />
+      <ProfileEditModal isOpen={openModal === 'profile'} onClose={() => setOpenModal(null)} />
+      <ObjectivesModal isOpen={openModal === 'objectives'} onClose={() => setOpenModal(null)} />
+      <DietaryPreferencesModal isOpen={openModal === 'dietary'} onClose={() => setOpenModal(null)} />
+      <NotificationsModal isOpen={openModal === 'notifications'} onClose={() => setOpenModal(null)} />
+      <PrivacyModal isOpen={openModal === 'privacy'} onClose={() => setOpenModal(null)} />
+      <HelpModal isOpen={openModal === 'help'} onClose={() => setOpenModal(null)} />
     </div>
   );
 };
