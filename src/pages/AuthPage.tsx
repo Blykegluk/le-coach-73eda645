@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { Activity, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useEffect } from 'react';
 
@@ -13,7 +13,7 @@ type AuthMode = 'landing' | 'login' | 'signup';
 const AuthPage = () => {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
-  const { toast } = useToast();
+  
   
   const [mode, setMode] = useState<AuthMode>('landing');
   const [email, setEmail] = useState('');
@@ -39,18 +39,10 @@ const AuthPage = () => {
       });
       
       if (error) {
-        toast({
-          title: "Erreur de connexion",
-          description: error.message || "Impossible de se connecter avec Google",
-          variant: "destructive",
-        });
+        toast.error(error.message || "Impossible de se connecter avec Google");
       }
     } catch (error) {
-      toast({
-        title: "Erreur",
-        description: "Une erreur inattendue s'est produite",
-        variant: "destructive",
-      });
+      toast.error("Une erreur inattendue s'est produite");
     } finally {
       setIsLoading(false);
     }
@@ -72,19 +64,12 @@ const AuthPage = () => {
 
         if (error) {
           if (error.message.includes('already registered')) {
-            toast({
-              title: "Compte existant",
-              description: "Un compte existe déjà avec cet email. Connectez-vous.",
-              variant: "destructive",
-            });
+            toast.error("Un compte existe déjà avec cet email. Connectez-vous.");
           } else {
             throw error;
           }
         } else {
-          toast({
-            title: "Vérifiez votre email",
-            description: "Un lien de confirmation a été envoyé à votre adresse.",
-          });
+          toast.success("Un lien de confirmation a été envoyé à votre adresse.");
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
@@ -94,11 +79,7 @@ const AuthPage = () => {
 
         if (error) {
           if (error.message.includes('Invalid login credentials')) {
-            toast({
-              title: "Identifiants incorrects",
-              description: "Email ou mot de passe invalide.",
-              variant: "destructive",
-            });
+            toast.error("Email ou mot de passe invalide.");
           } else {
             throw error;
           }
@@ -106,12 +87,8 @@ const AuthPage = () => {
           navigate('/', { replace: true });
         }
       }
-    } catch (error: any) {
-      toast({
-        title: "Erreur",
-        description: error.message || "Une erreur s'est produite",
-        variant: "destructive",
-      });
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Une erreur s'est produite");
     } finally {
       setIsLoading(false);
     }
