@@ -94,7 +94,7 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
                   {isLastAssistant && (
                     <div className="mt-2 ml-10">
                       <SuggestedReplies
-                        lastAssistantMessage={msg.content}
+                        suggestions={msg.suggestedReplies || []}
                         onReply={(text) => handleSend(text)}
                         disabled={isLoading}
                       />

@@ -2782,10 +2782,59 @@ NE JAMAIS écrire un programme en texte. L'outil sauvegarde automatiquement la s
     }
 
     // Return final response (either after tool chain completed or no tool calls)
+    const finalContent = assistantMessage.content || executedActions.map((a) => a.result.message).join("\n");
+
+    // Generate suggested replies via Gemini
+    let suggestedReplies: string[] = [];
+    try {
+      const suggestResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${GEMINI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gemini-2.5-flash-lite",
+          messages: [
+            {
+              role: "system",
+              content: `Tu génères des réponses suggérées pour un chat de coaching santé/fitness en français.
+Retourne UNIQUEMENT un tableau JSON de 2 à 4 réponses courtes (max 40 caractères chacune) que l'utilisateur pourrait envoyer en réponse au message du coach.
+Les réponses doivent être naturelles, variées, et contextuelles. Inclus un emoji quand c'est pertinent.
+Exemples de bonnes réponses: "Oui, go ! 💪", "Pas encore mangé", "Montre-moi mes stats", "J'ai une question"
+NE JAMAIS proposer des réponses génériques comme "Oui" / "Non" / "Dis-moi en plus" sauf si c'est vraiment pertinent.
+Réponse format: ["réponse1", "réponse2", "réponse3"]`
+            },
+            {
+              role: "user",
+              content: `Message du coach:\n${finalContent.slice(0, 500)}\n\nGénère 2-4 réponses suggérées pertinentes.`
+            }
+          ],
+        }),
+      });
+
+      if (suggestResponse.ok) {
+        const suggestData = await suggestResponse.json();
+        const raw = suggestData.choices?.[0]?.message?.content || "";
+        // Extract JSON array from response
+        const match = raw.match(/\[[\s\S]*?\]/);
+        if (match) {
+          const parsed = JSON.parse(match[0]);
+          if (Array.isArray(parsed) && parsed.length >= 2) {
+            suggestedReplies = parsed.filter((s: any) => typeof s === "string" && s.length > 1 && s.length < 60).slice(0, 4);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Suggest replies error:", e);
+      // Non-critical, continue without suggestions
+    }
+
     return new Response(
       JSON.stringify({
-        content: assistantMessage.content || executedActions.map((a) => a.result.message).join("\n"),
+        content: finalContent,
         actions: executedActions,
+        suggestedReplies,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
