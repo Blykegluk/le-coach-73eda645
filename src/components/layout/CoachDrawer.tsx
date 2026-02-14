@@ -100,29 +100,41 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
             <div className="flex flex-col gap-3">
               {messages.map((msg, index) => {
                 const isCoach = msg.role === 'assistant';
+                const isLastAssistant = isCoach && !isLoading && messages.slice(index + 1).every(m => m.role !== 'assistant');
                 return (
-                  <div key={msg.id || index} className={`flex gap-2 ${isCoach ? 'justify-start' : 'justify-end'}`}>
-                    {isCoach && (
-                      <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-xs font-bold text-primary-foreground">
-                        H
-                      </div>
-                    )}
-                    <div className={`flex max-w-[80%] flex-col ${isCoach ? 'items-start' : 'items-end'}`}>
-                      {msg.imageUrl && (
-                        <div className="mb-2 overflow-hidden rounded-xl border border-border/50">
-                          <img src={msg.imageUrl} alt="Uploaded" className="max-h-32 w-auto object-cover" />
+                  <div key={msg.id || index}>
+                    <div className={`flex gap-2 ${isCoach ? 'justify-start' : 'justify-end'}`}>
+                      {isCoach && (
+                        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-xs font-bold text-primary-foreground">
+                          H
                         </div>
                       )}
-                      <div className={`rounded-2xl px-3 py-2 text-sm ${isCoach ? 'rounded-tl-md bg-muted/50' : 'rounded-tr-md bg-gradient-to-r from-primary to-primary-glow text-primary-foreground'}`}>
-                        {isCoach ? (
-                          <div className="coach-message-content text-sm">
-                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      <div className={`flex max-w-[80%] flex-col ${isCoach ? 'items-start' : 'items-end'}`}>
+                        {msg.imageUrl && (
+                          <div className="mb-2 overflow-hidden rounded-xl border border-border/50">
+                            <img src={msg.imageUrl} alt="Uploaded" className="max-h-32 w-auto object-cover" />
                           </div>
-                        ) : (
-                          <p className="text-sm">{msg.content}</p>
                         )}
+                        <div className={`rounded-2xl px-3 py-2 text-sm ${isCoach ? 'rounded-tl-md bg-muted/50' : 'rounded-tr-md bg-gradient-to-r from-primary to-primary-glow text-primary-foreground'}`}>
+                          {isCoach ? (
+                            <div className="coach-message-content text-sm">
+                              <ReactMarkdown>{msg.content}</ReactMarkdown>
+                            </div>
+                          ) : (
+                            <p className="text-sm">{msg.content}</p>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    {isLastAssistant && (
+                      <div className="mt-2 ml-9">
+                        <SuggestedReplies
+                          lastAssistantMessage={msg.content}
+                          onReply={(text) => handleSend(text)}
+                          disabled={isLoading}
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -139,13 +151,6 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
                     </div>
                   </div>
                 </div>
-              )}
-              {!isLoading && (
-                <SuggestedReplies
-                  lastAssistantMessage={messages.filter(m => m.role === 'assistant').at(-1)?.content}
-                  onReply={(text) => handleSend(text)}
-                  disabled={isLoading}
-                />
               )}
               <div ref={bottomRef} />
             </div>

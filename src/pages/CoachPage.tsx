@@ -61,31 +61,42 @@ const CoachPage = () => {
           <div className="flex flex-col gap-4">
             {messages.map((msg, index) => {
               const isCoach = msg.role === 'assistant';
+              const isLastAssistant = isCoach && !isLoading && messages.slice(index + 1).every(m => m.role !== 'assistant');
               return (
-                <div
-                  key={msg.id || index}
-                  className={`flex gap-2 ${isCoach ? 'justify-start' : 'justify-end'} animate-slide-up`}
-                  style={{ animationDelay: `${index * 0.05}s` }}
-                >
-                  {isCoach && (
-                    <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-sm font-bold text-primary-foreground shadow-glow-sm">
-                      H
-                    </div>
-                  )}
-                  <div className={`flex max-w-[75%] flex-col ${isCoach ? 'items-start' : 'items-end'}`}>
-                    {msg.imageUrl && (
-                      <div className="mb-2 overflow-hidden rounded-xl border border-border/50 shadow-lg">
-                        <img src={msg.imageUrl} alt="Uploaded" className="max-h-48 w-auto object-cover" />
+                <div key={msg.id || index}>
+                  <div
+                    className={`flex gap-2 ${isCoach ? 'justify-start' : 'justify-end'} animate-slide-up`}
+                    style={{ animationDelay: `${index * 0.05}s` }}
+                  >
+                    {isCoach && (
+                      <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-sm font-bold text-primary-foreground shadow-glow-sm">
+                        H
                       </div>
                     )}
-                    <div className={`rounded-2xl px-4 py-2.5 ${isCoach ? 'rounded-tl-md glass' : 'rounded-tr-md bg-gradient-to-r from-primary to-primary-glow text-primary-foreground shadow-glow-sm'}`}>
-                      {isCoach ? (
-                        <div className="coach-message-content"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
-                      ) : (
-                        <p className="text-sm leading-relaxed">{msg.content}</p>
+                    <div className={`flex max-w-[75%] flex-col ${isCoach ? 'items-start' : 'items-end'}`}>
+                      {msg.imageUrl && (
+                        <div className="mb-2 overflow-hidden rounded-xl border border-border/50 shadow-lg">
+                          <img src={msg.imageUrl} alt="Uploaded" className="max-h-48 w-auto object-cover" />
+                        </div>
                       )}
+                      <div className={`rounded-2xl px-4 py-2.5 ${isCoach ? 'rounded-tl-md glass' : 'rounded-tr-md bg-gradient-to-r from-primary to-primary-glow text-primary-foreground shadow-glow-sm'}`}>
+                        {isCoach ? (
+                          <div className="coach-message-content"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
+                        ) : (
+                          <p className="text-sm leading-relaxed">{msg.content}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
+                  {isLastAssistant && (
+                    <div className="mt-2 ml-10">
+                      <SuggestedReplies
+                        lastAssistantMessage={msg.content}
+                        onReply={(text) => handleSend(text)}
+                        disabled={isLoading}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -100,13 +111,6 @@ const CoachPage = () => {
                   </div>
                 </div>
               </div>
-            )}
-            {!isLoading && (
-              <SuggestedReplies
-                lastAssistantMessage={messages.filter(m => m.role === 'assistant').at(-1)?.content}
-                onReply={(text) => handleSend(text)}
-                disabled={isLoading}
-              />
             )}
           </div>
         )}

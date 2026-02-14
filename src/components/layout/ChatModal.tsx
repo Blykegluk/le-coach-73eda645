@@ -69,25 +69,37 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
           <div className="flex flex-col gap-4">
             {messages.map((msg, index) => {
               const isCoach = msg.role === 'assistant';
+              const isLastAssistant = isCoach && !isLoading && messages.slice(index + 1).every(m => m.role !== 'assistant');
               return (
-                <div key={msg.id || index} className={`flex gap-2 ${isCoach ? 'justify-start' : 'justify-end'}`}>
-                  {isCoach && (
-                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">H</div>
-                  )}
-                  <div className={`flex max-w-[75%] flex-col ${isCoach ? 'items-start' : 'items-end'}`}>
-                    {msg.imageUrl && (
-                      <div className="mb-2 overflow-hidden rounded-xl">
-                        <img src={msg.imageUrl} alt="Uploaded" className="max-h-48 w-auto object-cover" />
-                      </div>
+                <div key={msg.id || index}>
+                  <div className={`flex gap-2 ${isCoach ? 'justify-start' : 'justify-end'}`}>
+                    {isCoach && (
+                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">H</div>
                     )}
-                    <div className={`rounded-2xl px-4 py-2.5 ${isCoach ? 'rounded-tl-md bg-coach-bubble text-coach-bubble-foreground' : 'rounded-tr-md bg-user-bubble text-user-bubble-foreground'}`}>
-                      {isCoach ? (
-                        <div className="coach-message-content"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
-                      ) : (
-                        <p className="text-sm leading-relaxed">{msg.content}</p>
+                    <div className={`flex max-w-[75%] flex-col ${isCoach ? 'items-start' : 'items-end'}`}>
+                      {msg.imageUrl && (
+                        <div className="mb-2 overflow-hidden rounded-xl">
+                          <img src={msg.imageUrl} alt="Uploaded" className="max-h-48 w-auto object-cover" />
+                        </div>
                       )}
+                      <div className={`rounded-2xl px-4 py-2.5 ${isCoach ? 'rounded-tl-md bg-coach-bubble text-coach-bubble-foreground' : 'rounded-tr-md bg-user-bubble text-user-bubble-foreground'}`}>
+                        {isCoach ? (
+                          <div className="coach-message-content"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
+                        ) : (
+                          <p className="text-sm leading-relaxed">{msg.content}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
+                  {isLastAssistant && (
+                    <div className="mt-2 ml-10">
+                      <SuggestedReplies
+                        lastAssistantMessage={msg.content}
+                        onReply={(text) => handleSend(text)}
+                        disabled={isLoading}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -102,13 +114,6 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
                   </div>
                 </div>
               </div>
-            )}
-            {!isLoading && (
-              <SuggestedReplies
-                lastAssistantMessage={messages.filter(m => m.role === 'assistant').at(-1)?.content}
-                onReply={(text) => handleSend(text)}
-                disabled={isLoading}
-              />
             )}
           </div>
         )}
