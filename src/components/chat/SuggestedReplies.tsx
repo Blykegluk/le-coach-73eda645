@@ -7,98 +7,64 @@ interface SuggestedRepliesProps {
 }
 
 /**
- * Parses the last assistant message to extract suggested replies.
- * Detects:
- * - Numbered lists (1. Option, 2. Option)
- * - Bullet lists (- Option, • Option)
- * - Emoji-prefixed options (🏋️ Option)
- * - Yes/No questions
+ * Generates contextual reply suggestions based on the last assistant question.
+ * Only looks for explicit choice options AFTER the last question line.
+ * Falls back to contextual suggestions based on question topic.
  */
 function extractSuggestions(content: string | undefined): string[] {
   if (!content) return [];
 
   const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
 
-  // Check if any of the last lines contains a question mark
-  // The ? may be mid-sentence followed by encouragement text like "Dis-moi ! 💪"
-  const lastLines = lines.slice(-5);
-  const hasQuestion = lastLines.some(l => l.includes('?'));
-  if (!hasQuestion) return [];
+  // Find the LAST line containing a question mark
+  let lastQuestionIndex = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i].includes('?')) {
+      lastQuestionIndex = i;
+      break;
+    }
+  }
 
-  // Try to extract numbered/bullet options
+  // Only consider questions near the end (last 5 lines)
+  if (lastQuestionIndex < 0 || lastQuestionIndex < lines.length - 5) return [];
+
+  const questionLine = lines[lastQuestionIndex];
+
+  // Only extract numbered/bullet options that appear AFTER the question
+  const linesAfterQuestion = lines.slice(lastQuestionIndex + 1);
   const optionPattern = /^(?:\d+[\.\)]\s*|[-•]\s*|[*]\s*)(.+)/;
-  const emojiPattern = /^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F)\s*(.+)/u;
 
   const options: string[] = [];
-
-  for (const line of lines) {
-    const optionMatch = line.match(optionPattern);
-    if (optionMatch) {
-      let text = optionMatch[1].trim();
-      // Remove trailing markdown bold/italic
-      text = text.replace(/\*+/g, '').trim();
-      if (text.length > 2 && text.length < 80) {
-        options.push(text);
-      }
-      continue;
-    }
-
-    const emojiMatch = line.match(emojiPattern);
-    if (emojiMatch) {
-      const text = emojiMatch[2].replace(/\*+/g, '').trim();
-      if (text.length > 2 && text.length < 80) {
-        options.push(text);
-      }
+  for (const line of linesAfterQuestion) {
+    const match = line.match(optionPattern);
+    if (match) {
+      const text = match[1].replace(/\*+/g, '').trim();
+      if (text.length > 2 && text.length < 80) options.push(text);
     }
   }
 
-  if (options.length >= 2 && options.length <= 6) {
-    return options;
+  if (options.length >= 2 && options.length <= 6) return options;
+
+  // Fallback: contextual replies based on question topic
+  const q = questionLine;
+
+  if (/(?:tu veux|on y va|je l['']ajoute|c['']est bon|ça te va|d['']accord|ok pour toi|je confirme|tu confirmes|je le fais|on commence|je te propose|ça te tente|tu préfères|on part|je lance)/i.test(q)) {
+    return ['Oui, vas-y ! 💪', 'Non, pas maintenant'];
   }
 
-  // Fallback: if it's a yes/no or open question
-  const questionLine = lastLines.find(l => l.includes('?'));
-  if (questionLine) {
-    const yesNoPatterns = [
-      /(?:tu veux|on y va|je l['']ajoute|c['']est bon|ça te va|d['']accord|ok pour toi|je confirme|tu confirmes|je le fais)/i,
-    ];
-    if (yesNoPatterns.some(p => p.test(questionLine))) {
-      return ['Oui, vas-y !', 'Non, pas maintenant'];
-    }
-
-    // Feeling / sentiment questions
-    const feelingPatterns = [
-      /comment (?:te sens|tu te sens|vas|tu vas|ça va)/i,
-      /qu['']en (?:penses|dis)/i,
-      /ton avis/i,
-      /ça te (?:convient|plaît|parle)/i,
-    ];
-    if (feelingPatterns.some(p => p.test(questionLine))) {
-      return ['Très bien, merci ! 💪', 'Ça pourrait être mieux', 'J\'ai une question'];
-    }
-
-    // Workout / activity questions
-    const workoutPatterns = [
-      /(?:séance|entraînement|sport|exercice|activité)/i,
-      /(?:fait|fais) (?:du sport|ta séance)/i,
-    ];
-    if (workoutPatterns.some(p => p.test(questionLine))) {
-      return ['Oui, j\'ai fait ma séance !', 'Pas encore', 'Propose-moi une séance'];
-    }
-
-    // Meal / nutrition questions
-    const mealPatterns = [
-      /(?:mangé|repas|dîner|souper|goûter|snack|collation)/i,
-    ];
-    if (mealPatterns.some(p => p.test(questionLine))) {
-      return ['Oui, je vais le noter', 'Pas encore mangé', 'Propose-moi un repas'];
-    }
-
-    // Generic question - offer contextual replies
-    return ['Oui 👍', 'Non merci', 'Dis-moi en plus'];
+  if (/comment (?:te sens|tu te sens|vas|tu vas|ça va)|qu['']en (?:penses|dis)|ton avis|ça te (?:convient|plaît|parle)/i.test(q)) {
+    return ['Très bien, merci ! 💪', 'Ça pourrait être mieux', 'J\'ai une question'];
   }
 
-  return [];
+  if (/(?:séance|entraînement|sport|exercice|activité|workout|musculation)/i.test(q)) {
+    return ['Oui, j\'ai fait ma séance !', 'Pas encore', 'Propose-moi une séance'];
+  }
+
+  if (/(?:mangé|repas|dîner|souper|goûter|snack|collation|nutrition)/i.test(q)) {
+    return ['Oui, je vais le noter', 'Pas encore mangé', 'Propose-moi un repas'];
+  }
+
+  return ['Oui 👍', 'Non merci', 'Dis-moi en plus'];
 }
 
 const SuggestedReplies = ({ lastAssistantMessage, onReply, disabled }: SuggestedRepliesProps) => {
