@@ -227,13 +227,7 @@ export const ExerciseDetailSheet = ({
           </div>
 
           {/* Header Content */}
-          <div className="relative z-10 p-4 pt-6 h-48 flex flex-col justify-between">
-            {/* Close button */}
-            <div className="flex justify-end">
-              <Button variant="ghost" size="icon" onClick={onClose} className="bg-background/50 backdrop-blur-sm">
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
+          <div className="relative z-10 p-4 pt-6 h-48 flex flex-col justify-end">
 
             {/* Exercise title */}
             <div className="flex items-end gap-4">
