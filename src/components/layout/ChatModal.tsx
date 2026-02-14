@@ -103,6 +103,13 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
                 </div>
               </div>
             )}
+            {!isLoading && (
+              <SuggestedReplies
+                lastAssistantMessage={messages.filter(m => m.role === 'assistant').at(-1)?.content}
+                onReply={(text) => handleSend(text)}
+                disabled={isLoading}
+              />
+            )}
           </div>
         )}
       </div>
@@ -116,37 +123,6 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
           <ArrowDown className="h-4 w-4" />
         </button>
       )}
-
-      {/* Actions modal */}
-      {showActions && (
-        <div className="absolute inset-0 z-10 flex items-end bg-foreground/20 backdrop-blur-sm" onClick={() => setShowActions(false)}>
-          <div className="mb-4 mx-4 w-full animate-in slide-in-from-bottom-4 rounded-2xl bg-card p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-semibold text-foreground">Ajouter</h3>
-              <button onClick={() => setShowActions(false)} className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                <X className="h-4 w-4 text-muted-foreground" />
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => { setShowActions(false); setShowImageCapture(true); }} className="flex flex-col items-center gap-2 rounded-xl bg-muted p-4 transition-all active:scale-95">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10"><Camera className="h-6 w-6 text-primary" /></div>
-                <span className="text-sm font-medium text-foreground">Photo</span>
-              </button>
-              <button onClick={() => { setShowActions(false); setShowVoiceRecorder(true); }} className="flex flex-col items-center gap-2 rounded-xl bg-muted p-4 transition-all active:scale-95">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10"><Mic className="h-6 w-6 text-primary" /></div>
-                <span className="text-sm font-medium text-foreground">Message vocal</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Suggested replies */}
-      <SuggestedReplies
-        lastAssistantMessage={messages.filter(m => m.role === 'assistant').at(-1)?.content}
-        onReply={(text) => handleSend(text)}
-        disabled={isLoading}
-      />
 
       {/* Input area */}
       <div className="safe-bottom border-t border-border bg-card px-4 pb-2 pt-3">
