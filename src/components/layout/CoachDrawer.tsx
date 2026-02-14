@@ -140,6 +140,13 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
                   </div>
                 </div>
               )}
+              {!isLoading && (
+                <SuggestedReplies
+                  lastAssistantMessage={messages.filter(m => m.role === 'assistant').at(-1)?.content}
+                  onReply={(text) => handleSend(text)}
+                  disabled={isLoading}
+                />
+              )}
               <div ref={bottomRef} />
             </div>
           )}
@@ -151,37 +158,6 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
             <ArrowDown className="h-4 w-4" />
           </button>
         )}
-
-        {/* Actions overlay */}
-        {showActions && (
-          <div className="absolute inset-0 z-10 flex items-end bg-background/60 backdrop-blur-sm rounded-t-2xl" onClick={() => setShowActions(false)}>
-            <div className="mb-4 mx-4 w-full glass-card rounded-2xl p-4" onClick={(e) => e.stopPropagation()}>
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="font-semibold text-foreground">Ajouter</h3>
-                <button onClick={() => setShowActions(false)} className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/50 hover:bg-muted">
-                  <X className="h-4 w-4 text-muted-foreground" />
-                </button>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => { setShowActions(false); setShowImageCapture(true); }} className="flex flex-col items-center gap-2 rounded-xl bg-muted/50 p-4 hover:bg-muted">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10"><Camera className="h-6 w-6 text-primary" /></div>
-                  <span className="text-sm font-medium">Photo</span>
-                </button>
-                <button onClick={() => { setShowActions(false); setShowVoiceRecorder(true); }} className="flex flex-col items-center gap-2 rounded-xl bg-muted/50 p-4 hover:bg-muted">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10"><Mic className="h-6 w-6 text-primary" /></div>
-                  <span className="text-sm font-medium">Vocal</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Suggested replies */}
-        <SuggestedReplies
-          lastAssistantMessage={messages.filter(m => m.role === 'assistant').at(-1)?.content}
-          onReply={(text) => handleSend(text)}
-          disabled={isLoading}
-        />
 
         {/* Input area */}
         <div className="flex-shrink-0 border-t border-border/50 px-4 pb-[env(safe-area-inset-bottom,8px)] pt-3">
