@@ -379,12 +379,7 @@ const HomePage = () => {
         </h1>
       </div>
 
-      {/* Contextual Alert Chips */}
-      <ContextualAlertChips
-        weeklySessionsCompleted={weeklySessionsCompleted}
-        sleepHours={healthStats.sleepHours}
-        caloriesPercentage={caloriesPercentage}
-      />
+
 
       {/* Smart Action Card - Hero Section */}
       <SmartActionCard
