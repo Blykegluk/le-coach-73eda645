@@ -8,6 +8,7 @@ export type Message = {
   role: "user" | "assistant";
   content: string;
   imageUrl?: string;
+  suggestedReplies?: string[];
 };
 
 const WELCOME_MESSAGE: Message = {
@@ -216,7 +217,11 @@ export function useCoachChat(onNavigateAway?: () => void) {
         });
       }
 
-      const assistantMsg: Message = { role: "assistant", content: data.content };
+      const assistantMsg: Message = { 
+        role: "assistant", 
+        content: data.content,
+        suggestedReplies: data.suggestedReplies || [],
+      };
       setMessages(prev => [...prev, assistantMsg]);
       await saveMessage(userId, assistantMsg);
 

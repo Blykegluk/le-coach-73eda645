@@ -129,7 +129,7 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
                     {isLastAssistant && (
                       <div className="mt-2 ml-9">
                         <SuggestedReplies
-                          lastAssistantMessage={msg.content}
+                          suggestions={msg.suggestedReplies || []}
                           onReply={(text) => handleSend(text)}
                           disabled={isLoading}
                         />
