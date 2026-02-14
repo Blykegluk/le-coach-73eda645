@@ -20,8 +20,9 @@ function extractSuggestions(content: string | undefined): string[] {
   const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
 
   // Check if the message ends with a question (last meaningful line has ?)
+  // Handle trailing emojis, spaces, punctuation after ?
   const lastLines = lines.slice(-5);
-  const hasQuestion = lastLines.some(l => l.endsWith('?'));
+  const hasQuestion = lastLines.some(l => /\?\s*[\p{Emoji_Presentation}\p{Emoji}\uFE0F\s]*$/u.test(l));
   if (!hasQuestion) return [];
 
   // Try to extract numbered/bullet options
@@ -56,7 +57,7 @@ function extractSuggestions(content: string | undefined): string[] {
   }
 
   // Fallback: if it's a yes/no or open question
-  const questionLine = lastLines.find(l => l.endsWith('?'));
+  const questionLine = lastLines.find(l => /\?\s*[\p{Emoji_Presentation}\p{Emoji}\uFE0F\s]*$/u.test(l));
   if (questionLine) {
     const yesNoPatterns = [
       /(?:tu veux|on y va|je l['']ajoute|c['']est bon|ça te va|d['']accord|ok pour toi|je confirme|tu confirmes|je le fais)/i,
