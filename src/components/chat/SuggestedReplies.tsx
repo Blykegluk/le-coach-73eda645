@@ -19,10 +19,10 @@ function extractSuggestions(content: string | undefined): string[] {
 
   const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
 
-  // Check if the message ends with a question (last meaningful line has ?)
-  // Handle trailing emojis, spaces, punctuation after ?
+  // Check if any of the last lines contains a question mark
+  // The ? may be mid-sentence followed by encouragement text like "Dis-moi ! 💪"
   const lastLines = lines.slice(-5);
-  const hasQuestion = lastLines.some(l => /\?\s*[\p{Emoji_Presentation}\p{Emoji}\uFE0F\s]*$/u.test(l));
+  const hasQuestion = lastLines.some(l => l.includes('?'));
   if (!hasQuestion) return [];
 
   // Try to extract numbered/bullet options
@@ -57,7 +57,7 @@ function extractSuggestions(content: string | undefined): string[] {
   }
 
   // Fallback: if it's a yes/no or open question
-  const questionLine = lastLines.find(l => /\?\s*[\p{Emoji_Presentation}\p{Emoji}\uFE0F\s]*$/u.test(l));
+  const questionLine = lastLines.find(l => l.includes('?'));
   if (questionLine) {
     const yesNoPatterns = [
       /(?:tu veux|on y va|je l['']ajoute|c['']est bon|ça te va|d['']accord|ok pour toi|je confirme|tu confirmes|je le fais)/i,
