@@ -3,6 +3,7 @@ import { X, Send, Plus, Camera, Mic, Loader2, ArrowDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import ImageCapture from '@/components/chat/ImageCapture';
 import VoiceRecorder from '@/components/chat/VoiceRecorder';
+import SuggestedReplies from '@/components/chat/SuggestedReplies';
 import { useCoachChat } from '@/hooks/useCoachChat';
 
 interface ChatModalProps {
@@ -94,7 +95,11 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
               <div className="flex gap-2 justify-start">
                 <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">H</div>
                 <div className="rounded-2xl rounded-tl-md bg-coach-bubble px-4 py-2.5">
-                  <Loader2 className="h-5 w-5 animate-spin text-coach-bubble-foreground" />
+                  <div className="flex gap-1">
+                    <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                    <span className="h-2 w-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0.2s' }} />
+                    <span className="h-2 w-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0.4s' }} />
+                  </div>
                 </div>
               </div>
             )}
@@ -135,6 +140,13 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
           </div>
         </div>
       )}
+
+      {/* Suggested replies */}
+      <SuggestedReplies
+        lastAssistantMessage={messages.filter(m => m.role === 'assistant').at(-1)?.content}
+        onReply={(text) => handleSend(text)}
+        disabled={isLoading}
+      />
 
       {/* Input area */}
       <div className="safe-bottom border-t border-border bg-card px-4 pb-2 pt-3">
