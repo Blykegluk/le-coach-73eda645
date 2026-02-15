@@ -310,8 +310,8 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
         })
         .eq('id', sessionId);
 
-      // Insert all exercise logs
-      const logsToInsert = exerciseLogs.map(log => ({
+      // Insert all exercise logs (exclude feedback which is not a DB column)
+      const logsToInsert = exerciseLogs.map(({ feedback, ...log }) => ({
         session_id: sessionId,
         user_id: session.user.id,
         ...log,
