@@ -185,6 +185,30 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
         </div>
       </div>
 
+      {/* Action menu overlay */}
+      {showActions && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50" onClick={() => setShowActions(false)}>
+          <div className="mb-24 mx-4 w-full max-w-sm rounded-2xl bg-card p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowActions(false); setShowImageCapture(true); }}
+                className="flex flex-1 flex-col items-center gap-2 rounded-xl bg-muted p-4 text-foreground transition-all hover:bg-muted/80 active:scale-95"
+              >
+                <Camera className="h-6 w-6 text-primary" />
+                <span className="text-sm font-medium">Photo</span>
+              </button>
+              <button
+                onClick={() => { setShowActions(false); setShowVoiceRecorder(true); }}
+                className="flex flex-1 flex-col items-center gap-2 rounded-xl bg-muted p-4 text-foreground transition-all hover:bg-muted/80 active:scale-95"
+              >
+                <Mic className="h-6 w-6 text-primary" />
+                <span className="text-sm font-medium">Vocal</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ImageCapture isOpen={showImageCapture} onClose={() => setShowImageCapture(false)} onImageCaptured={handleImageCaptured} userId={userId} />
       <VoiceRecorder isOpen={showVoiceRecorder} onClose={() => setShowVoiceRecorder(false)} onTranscription={handleVoiceTranscription} />
     </>
