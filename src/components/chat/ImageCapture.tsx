@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Camera, X, Send, RotateCcw, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -19,6 +19,13 @@ export default function ImageCapture({ isOpen, onClose, onImageCaptured, userId 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Connect the stream to the video element once both are available
+  useEffect(() => {
+    if (showCamera && cameraStream && videoRef.current) {
+      videoRef.current.srcObject = cameraStream;
+    }
+  }, [showCamera, cameraStream]);
+
   const startCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -27,15 +34,11 @@ export default function ImageCapture({ isOpen, onClose, onImageCaptured, userId 
       });
       setCameraStream(stream);
       setShowCamera(true);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
     } catch (error) {
       console.error('Camera error:', error);
       toast.error('Impossible d\'accéder à la caméra');
     }
   }, []);
-
   const stopCamera = useCallback(() => {
     if (cameraStream) {
       cameraStream.getTracks().forEach(track => track.stop());
