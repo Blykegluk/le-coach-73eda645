@@ -151,7 +151,7 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
 
       {/* Action menu overlay */}
       {showActions && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={() => setShowActions(false)}>
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50" onClick={() => setShowActions(false)}>
           <div className="mb-20 mx-4 w-full max-w-sm rounded-2xl bg-card p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex gap-3">
               <button
