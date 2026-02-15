@@ -2846,7 +2846,22 @@ Réponse format: ["réponse1", "réponse2", "réponse3"]`
       }
     } catch (e) {
       console.error("Suggest replies error:", e);
-      // Non-critical, continue without suggestions
+    }
+
+    // Fallback: if no suggestions were generated, provide contextual defaults
+    if (suggestedReplies.length === 0) {
+      const lc = finalContent.toLowerCase();
+      if (lc.includes("repas") || lc.includes("calorie") || lc.includes("manger") || lc.includes("dessert") || lc.includes("déjeuner")) {
+        suggestedReplies = ["Mon bilan du jour 📊", "J'ai encore mangé autre chose", "Merci ! 😊"];
+      } else if (lc.includes("séance") || lc.includes("entraînement") || lc.includes("exercice") || lc.includes("musculation")) {
+        suggestedReplies = ["C'est noté, merci ! 💪", "Mon bilan du jour 📊", "Une autre séance ?"];
+      } else if (lc.includes("eau") || lc.includes("hydratation") || lc.includes("verre")) {
+        suggestedReplies = ["Encore un verre 💧", "Mon bilan du jour 📊", "Merci ! 😊"];
+      } else if (lc.includes("poids") || lc.includes("kg") || lc.includes("body") || lc.includes("graisse")) {
+        suggestedReplies = ["Mon bilan du jour 📊", "Des conseils ? 🤔", "Merci ! 😊"];
+      } else {
+        suggestedReplies = ["Mon bilan du jour 📊", "J'ai une question 🤔", "Merci ! 😊"];
+      }
     }
 
     return new Response(
