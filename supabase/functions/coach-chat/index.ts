@@ -101,6 +101,7 @@ const toolSchemas: Record<string, z.ZodSchema> = {
     severity: z.enum(["low", "medium", "high", "critical"]).optional(),
   }),
   get_health_context: z.object({}),
+  get_prepared_workout: z.object({}),
   generate_workout: z.object({
     focus: z.enum(["upper_body", "lower_body", "full_body", "push", "pull", "cardio", "core"]).default("full_body"),
     intensity: z.enum(["light", "moderate", "intense"]).default("moderate"),
@@ -675,6 +676,18 @@ const tools = [
           },
         },
         required: ["key"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_prepared_workout",
+      description: "Récupère la séance d'entraînement actuellement préparée et visible dans l'aperçu de l'application. Utilise cet outil quand l'utilisateur demande de voir, vérifier, commenter ou évaluer la séance qui est dans son aperçu/preview. Retourne tous les détails: nom, muscles ciblés, exercices, durée, conseils.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
       },
     },
   },
@@ -1803,6 +1816,44 @@ async function executeToolCall(
         };
       }
 
+      case "get_prepared_workout": {
+        console.log("=== GET_PREPARED_WORKOUT CALLED ===");
+        const { data: pwData, error: pwError } = await supabase
+          .from("user_context")
+          .select("value, updated_at")
+          .eq("user_id", userId)
+          .eq("key", "prepared_workout")
+          .maybeSingle();
+
+        if (pwError) {
+          return { error: `Erreur: ${pwError.message}` };
+        }
+        if (!pwData?.value) {
+          return { result: "Aucune séance n'est actuellement préparée dans l'aperçu. Tu peux en générer une avec generate_workout." };
+        }
+        try {
+          const pw = JSON.parse(pwData.value);
+          return {
+            workout_name: pw.workout_name,
+            estimated_duration_min: pw.estimated_duration_min,
+            target_muscles: pw.target_muscles,
+            exercises: pw.exercises?.map((e: any) => ({
+              name: e.name,
+              sets: e.sets,
+              reps: e.reps,
+              weight_recommendation: e.weight_recommendation,
+              rest_seconds: e.rest_seconds,
+              notes: e.notes,
+            })),
+            warmup_notes: pw.warmup_notes,
+            coach_advice: pw.coach_advice,
+            updated_at: pwData.updated_at,
+          };
+        } catch {
+          return { error: "Erreur de lecture de la séance préparée" };
+        }
+      }
+
       case "generate_workout": {
         console.log("=== GENERATE_WORKOUT CALLED ===");
         console.log("Args received:", JSON.stringify(args));
@@ -2602,8 +2653,14 @@ Exemples:
 - "Ajoute un jus de clémentines à mon petit-déj" → Appeler log_meal directement (mot "ajoute" = confirmation implicite)
 - Utilisateur: "Oui" après ta question → Appeler l'outil MAINTENANT (log_meal, log_water, etc.)
 
+CONSULTATION DE LA SÉANCE PRÉPARÉE (TRÈS IMPORTANT):
+Quand l'utilisateur demande de "vérifier", "checker", "voir", "commenter", "évaluer" la séance dans son aperçu/preview, tu DOIS appeler get_prepared_workout.
+- Cet outil retourne la séance complète actuellement visible dans l'aperçu de l'app.
+- Tu peux ensuite commenter si elle est adaptée, proposer des modifications, etc.
+- NE JAMAIS dire que tu n'as pas accès à l'aperçu ou au preview. Tu AS l'outil get_prepared_workout pour ça.
+
 GÉNÉRATION DE SÉANCES D'ENTRAÎNEMENT (TRÈS IMPORTANT):
-Quand l'utilisateur demande une séance, un entraînement, un programme, ou dit "propose-moi une séance", "prépare ma séance", "mets la séance en preview", "séance du jour", etc., tu DOIS TOUJOURS appeler l'outil generate_workout.
+Quand l'utilisateur demande une NOUVELLE séance, un entraînement, un programme, ou dit "propose-moi une séance", "prépare ma séance", "mets la séance en preview", "séance du jour", etc., tu DOIS TOUJOURS appeler l'outil generate_workout.
 - L'outil génère automatiquement un programme personnalisé et le sauvegarde pour que l'utilisateur le retrouve dans son aperçu de séance sur l'app.
 - Tu peux passer des paramètres optionnels: target_muscles, duration_min, difficulty, equipment.
 - Après l'appel, confirme que la séance est prête et visible dans l'aperçu.
