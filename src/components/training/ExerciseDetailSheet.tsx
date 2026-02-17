@@ -30,6 +30,7 @@ interface ExerciseDetail {
   common_mistakes: string[];
   safety_warnings?: string[];
   images?: string[];
+  wger_images?: string[];
   video_url?: string;
   media_type?: 'image' | 'video' | 'images';
 }
@@ -189,18 +190,35 @@ export const ExerciseDetailSheet = ({
     }
   };
 
-  // Get the header media (first image or video)
-  const headerMediaUrl = detail?.images?.[0] || detail?.video_url;
+  // Get the header media - prioritize wger images
+  const wgerImages = detail?.wger_images || [];
+  const hasWgerImages = wgerImages.length > 0;
+  const headerMediaUrl = wgerImages[0] || detail?.images?.[0] || detail?.video_url;
   const hasHeaderMedia = !!headerMediaUrl;
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="bottom" className="h-[90vh] rounded-t-3xl overflow-hidden flex flex-col p-0">
-        {/* Immersive Header with Video/Image Background */}
+        {/* Immersive Header with wger illustration or Video/Image Background */}
         <div className="relative flex-shrink-0">
           {/* Background Media */}
           <div className="absolute inset-0 h-48 overflow-hidden">
-            {hasHeaderMedia ? (
+            {hasWgerImages ? (
+              <>
+                <div className="w-full h-full bg-card flex items-center justify-center gap-2 p-4">
+                  {wgerImages.slice(0, 2).map((img, i) => (
+                    <img
+                      key={i}
+                      src={img}
+                      alt={`${exerciseName} - position ${i + 1}`}
+                      className="h-full max-w-[45%] object-contain"
+                      loading="eager"
+                    />
+                  ))}
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background" />
+              </>
+            ) : hasHeaderMedia ? (
               <>
                 {detail?.media_type === 'video' ? (
                   <video
@@ -218,7 +236,6 @@ export const ExerciseDetailSheet = ({
                     className="w-full h-full object-cover"
                   />
                 )}
-                {/* Dark overlay for readability */}
                 <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/80 to-background" />
               </>
             ) : (
@@ -278,7 +295,25 @@ export const ExerciseDetailSheet = ({
                 </div>
               )}
 
-              {/* Image Carousel (if available) */}
+              {/* Wger Exercise Images Gallery */}
+              {hasWgerImages && wgerImages.length > 2 && (
+                <div className="rounded-2xl overflow-hidden bg-card border border-border p-3">
+                  <p className="text-xs text-muted-foreground text-center mb-2">📐 Illustrations du mouvement</p>
+                  <div className="flex gap-2 justify-center">
+                    {wgerImages.slice(2).map((imgUrl, index) => (
+                      <div key={index} className="flex-1 max-w-[45%] aspect-square rounded-lg overflow-hidden border border-border bg-background">
+                        <img
+                          src={imgUrl}
+                          alt={`${exerciseName} - vue ${index + 3}`}
+                          className="w-full h-full object-contain p-1"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* AI-Generated Image Carousel (if available) */}
               {detail.images && detail.images.length > 0 && (
                 <div className="rounded-2xl overflow-hidden bg-muted/30 border border-border p-3">
                   <div className="flex gap-1 mb-2 justify-center">
@@ -306,8 +341,8 @@ export const ExerciseDetailSheet = ({
                 </div>
               )}
 
-              {/* Exercise pictogram */}
-              {!detail.images && !detail.video_url && (
+              {/* Exercise pictogram (only if no images at all) */}
+              {!detail.images && !detail.video_url && !hasWgerImages && (
                 <div className="rounded-2xl bg-muted/30 border border-border p-4 flex flex-col items-center">
                   <div className="h-20 w-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-2">
                     <ExerciseIcon className="h-14 w-14 text-primary" />
