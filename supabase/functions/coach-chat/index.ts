@@ -2389,11 +2389,11 @@ serve(async (req) => {
     let preparedWorkoutContext = "";
     
     if (userId) {
-      // Fetch profile, health context, and prepared workout in parallel
-      const [profileResult, healthContextResult, preparedWorkoutResult] = await Promise.all([
+      // Fetch profile, health context, prepared workout, AND last 10 workout sessions in parallel
+      const [profileResult, healthContextResult, preparedWorkoutResult, recentSessionsResult] = await Promise.all([
         supabase
           .from("profiles")
-          .select("first_name, goal, weight_kg, target_weight_kg, height_cm, activity_level, current_body_fat_pct, target_body_fat_pct")
+          .select("first_name, goal, weight_kg, target_weight_kg, height_cm, activity_level, current_body_fat_pct, target_body_fat_pct, dietary_preferences, allergies")
           .eq("user_id", userId)
           .maybeSingle(),
         supabase
@@ -2407,12 +2407,18 @@ serve(async (req) => {
           .eq("user_id", userId)
           .eq("key", "prepared_workout")
           .maybeSingle(),
+        supabase
+          .from("workout_sessions")
+          .select("id, workout_name, started_at, completed_at, status, target_muscles, total_duration_seconds, calories_burned, notes")
+          .eq("user_id", userId)
+          .order("started_at", { ascending: false })
+          .limit(10),
       ]);
 
       const profile = profileResult.data;
       const healthContexts = healthContextResult.data;
       const preparedWorkoutData = preparedWorkoutResult.data;
-
+      const recentSessions = recentSessionsResult.data || [];
       if (profile) {
         const goalLabels: Record<string, string> = {
           weight_loss: "perdre du poids",
@@ -2500,6 +2506,86 @@ ${pw.coach_advice ? `- Conseil: ${pw.coach_advice}` : ""}
           // ignore parse errors
         }
       }
+
+      // ═══ AUTO-INJECT: Last 10 workout sessions with exercise details ═══
+      let workoutHistoryContext = "";
+      if (recentSessions.length > 0) {
+        // Fetch exercise details for all sessions in one query
+        const sessionIds = recentSessions.map((s: any) => s.id);
+        const { data: allExerciseLogs } = await supabase
+          .from("workout_exercise_logs")
+          .select("session_id, exercise_name, planned_sets, planned_reps, planned_weight, actual_sets, actual_reps, actual_weight, skipped")
+          .eq("user_id", userId)
+          .in("session_id", sessionIds)
+          .order("exercise_order", { ascending: true });
+
+        const exercisesBySession: Record<string, any[]> = {};
+        (allExerciseLogs || []).forEach((e: any) => {
+          if (!exercisesBySession[e.session_id]) exercisesBySession[e.session_id] = [];
+          exercisesBySession[e.session_id].push(e);
+        });
+
+        const sessionLines = recentSessions.map((s: any) => {
+          const date = new Date(s.started_at);
+          const dateStr = new Intl.DateTimeFormat("fr-FR", {
+            timeZone: "Europe/Paris",
+            weekday: "short",
+            day: "numeric",
+            month: "short",
+          }).format(date);
+          const exercises = exercisesBySession[s.id] || [];
+          const exerciseList = exercises
+            .filter((e: any) => !e.skipped)
+            .map((e: any) => {
+              const weight = e.actual_weight || e.planned_weight || "";
+              return `${e.exercise_name} (${e.actual_sets || e.planned_sets}x${e.actual_reps || e.planned_reps}${weight ? " @ " + weight : ""})`;
+            })
+            .join(", ");
+          const muscles = s.target_muscles?.join(", ") || "";
+          const duration = s.total_duration_seconds ? Math.round(s.total_duration_seconds / 60) + "min" : "";
+          return `  ${dateStr} — ${s.workout_name}${muscles ? " [" + muscles + "]" : ""}${duration ? " (" + duration + ")" : ""}\n    Exercices: ${exerciseList || "non détaillés"}`;
+        }).join("\n");
+
+        workoutHistoryContext = `
+═══════════════════════════════════════════════
+HISTORIQUE DES 10 DERNIÈRES SÉANCES (DONNÉES RÉELLES - TOUJOURS EN TENIR COMPTE):
+═══════════════════════════════════════════════
+${sessionLines}
+
+⚠️ Tu DOIS utiliser cet historique pour :
+1. NE PAS reproposer les mêmes exercices que les 2-3 dernières séances
+2. Respecter le split/la rotation de l'utilisateur (si il alterne haut/bas, continue cette logique)
+3. Adapter la progression des charges (proposer légèrement plus lourd si les dernières séances étaient réussies)
+4. Varier les exercices pour stimuler la progression
+`;
+      }
+
+      // ═══ Extract training preferences from health context ═══
+      let trainingPreferencesContext = "";
+      if (healthContexts && healthContexts.length > 0) {
+        const trainingPrefs = healthContexts
+          .filter((c: { key: string }) => c.key.includes("training") || c.key.includes("preference") || c.key.includes("split") || c.key.includes("programme"))
+          .map((c: { key: string; value: string }) => {
+            try {
+              const parsed = JSON.parse(c.value);
+              return parsed.description || c.value;
+            } catch {
+              return c.value;
+            }
+          });
+
+        if (trainingPrefs.length > 0) {
+          trainingPreferencesContext = `
+═══════════════════════════════════════════════
+PRÉFÉRENCES D'ENTRAÎNEMENT DE L'UTILISATEUR (STRICTEMENT OBLIGATOIRES):
+═══════════════════════════════════════════════
+${trainingPrefs.map((p: string) => `- ${p}`).join("\n")}
+
+🚫 Ces préférences sont NON-NÉGOCIABLES. Si l'utilisateur préfère le split haut/bas, NE JAMAIS proposer du full body.
+Tu peux suggérer de reconsidérer une préférence, mais TOUJOURS respecter le choix final de l'utilisateur.
+`;
+        }
+      }
     }
 
     // Build current date/time context for the AI using Paris timezone
@@ -2554,6 +2640,8 @@ IMPORTANT: Quand l'utilisateur te demande des informations sur "aujourd'hui", "c
 
 ${userContext}
 ${healthContext}
+${trainingPreferencesContext}
+${workoutHistoryContext}
 ${preparedWorkoutContext}
 
 SÉANCE PRÉPARÉE (CRITIQUE):
