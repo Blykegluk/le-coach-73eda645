@@ -2335,6 +2335,7 @@ serve(async (req) => {
     // Get user profile for context
     let userContext = "";
     let healthContext = "";
+    let preparedWorkoutContext = "";
     
     if (userId) {
       // Fetch profile, health context, and prepared workout in parallel
@@ -2429,17 +2430,14 @@ ${parsedContexts.map((c: any) => `- ${categoryLabels[c.category] || c.category}:
 `;
         }
       }
-    }
-
-    // Parse prepared workout context
-    let preparedWorkoutContext = "";
-    if (preparedWorkoutData?.value) {
-      try {
-        const pw = JSON.parse(preparedWorkoutData.value);
-        const muscles = pw.target_muscles?.join(", ") || "non spécifié";
-        const exerciseCount = pw.exercises?.length || 0;
-        const exerciseNames = pw.exercises?.slice(0, 8).map((e: any) => e.name).join(", ") || "";
-        preparedWorkoutContext = `
+      // Parse prepared workout context
+      if (preparedWorkoutData?.value) {
+        try {
+          const pw = JSON.parse(preparedWorkoutData.value);
+          const muscles = pw.target_muscles?.join(", ") || "non spécifié";
+          const exerciseCount = pw.exercises?.length || 0;
+          const exerciseNames = pw.exercises?.slice(0, 8).map((e: any) => e.name).join(", ") || "";
+          preparedWorkoutContext = `
 SÉANCE D'ENTRAÎNEMENT ACTUELLEMENT PRÉPARÉE (visible dans l'aperçu de l'utilisateur):
 - Nom: ${pw.workout_name || "Sans nom"}
 - Durée estimée: ${pw.estimated_duration_min || "?"} min
@@ -2447,8 +2445,9 @@ SÉANCE D'ENTRAÎNEMENT ACTUELLEMENT PRÉPARÉE (visible dans l'aperçu de l'uti
 - ${exerciseCount} exercices: ${exerciseNames}
 ${pw.coach_advice ? `- Conseil: ${pw.coach_advice}` : ""}
 `;
-      } catch {
-        // ignore parse errors
+        } catch {
+          // ignore parse errors
+        }
       }
     }
 
