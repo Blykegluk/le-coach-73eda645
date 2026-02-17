@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Send, Plus, Camera, Mic, Loader2, X } from 'lucide-react';
+import { Send, Plus, Camera, Mic, Loader2, X, Dumbbell } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import ImageCapture from '@/components/chat/ImageCapture';
 import VoiceRecorder from '@/components/chat/VoiceRecorder';
@@ -38,7 +38,7 @@ const CoachPage = () => {
       <header className="safe-top flex items-center gap-3 border-b border-border/50 glass px-4 pb-4 pt-2">
         <div className="relative">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow font-bold text-primary-foreground shadow-glow-sm">
-            H
+            <Dumbbell className="h-5 w-5" />
           </div>
           <div className="absolute inset-0 rounded-full animate-halo-pulse" />
         </div>
@@ -70,7 +70,7 @@ const CoachPage = () => {
                   >
                     {isCoach && (
                       <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-sm font-bold text-primary-foreground shadow-glow-sm">
-                        H
+                        <Dumbbell className="h-4 w-4" />
                       </div>
                     )}
                     <div className={`flex max-w-[75%] flex-col ${isCoach ? 'items-start' : 'items-end'}`}>
@@ -102,7 +102,7 @@ const CoachPage = () => {
             })}
             {isLoading && (
               <div className="flex gap-2 justify-start animate-fade-in">
-                <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-sm font-bold text-primary-foreground">H</div>
+                <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-sm font-bold text-primary-foreground"><Dumbbell className="h-4 w-4" /></div>
                 <div className="rounded-2xl rounded-tl-md glass px-4 py-2.5">
                   <div className="flex gap-1">
                     <span className="h-2 w-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0s' }} />
