@@ -2337,8 +2337,8 @@ serve(async (req) => {
     let healthContext = "";
     
     if (userId) {
-      // Fetch profile and health context in parallel
-      const [profileResult, healthContextResult] = await Promise.all([
+      // Fetch profile, health context, and prepared workout in parallel
+      const [profileResult, healthContextResult, preparedWorkoutResult] = await Promise.all([
         supabase
           .from("profiles")
           .select("first_name, goal, weight_kg, target_weight_kg, height_cm, activity_level, current_body_fat_pct, target_body_fat_pct")
@@ -2349,10 +2349,17 @@ serve(async (req) => {
           .select("key, value")
           .eq("user_id", userId)
           .like("key", "health_%"),
+        supabase
+          .from("user_context")
+          .select("value, updated_at")
+          .eq("user_id", userId)
+          .eq("key", "prepared_workout")
+          .maybeSingle(),
       ]);
 
       const profile = profileResult.data;
       const healthContexts = healthContextResult.data;
+      const preparedWorkoutData = preparedWorkoutResult.data;
 
       if (profile) {
         const goalLabels: Record<string, string> = {
@@ -2424,6 +2431,27 @@ ${parsedContexts.map((c: any) => `- ${categoryLabels[c.category] || c.category}:
       }
     }
 
+    // Parse prepared workout context
+    let preparedWorkoutContext = "";
+    if (preparedWorkoutData?.value) {
+      try {
+        const pw = JSON.parse(preparedWorkoutData.value);
+        const muscles = pw.target_muscles?.join(", ") || "non spécifié";
+        const exerciseCount = pw.exercises?.length || 0;
+        const exerciseNames = pw.exercises?.slice(0, 8).map((e: any) => e.name).join(", ") || "";
+        preparedWorkoutContext = `
+SÉANCE D'ENTRAÎNEMENT ACTUELLEMENT PRÉPARÉE (visible dans l'aperçu de l'utilisateur):
+- Nom: ${pw.workout_name || "Sans nom"}
+- Durée estimée: ${pw.estimated_duration_min || "?"} min
+- Muscles ciblés: ${muscles}
+- ${exerciseCount} exercices: ${exerciseNames}
+${pw.coach_advice ? `- Conseil: ${pw.coach_advice}` : ""}
+`;
+      } catch {
+        // ignore parse errors
+      }
+    }
+
     // Build current date/time context for the AI using Paris timezone
     const today = getLocalDate();
     // Get yesterday's date
@@ -2476,6 +2504,7 @@ IMPORTANT: Quand l'utilisateur te demande des informations sur "aujourd'hui", "c
 
 ${userContext}
 ${healthContext}
+${preparedWorkoutContext}
 
 STYLE DE RÉPONSE (ABSOLUMENT OBLIGATOIRE):
 Tu dois TOUJOURS formater tes réponses de manière aérée et agréable à lire :
