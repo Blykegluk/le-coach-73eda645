@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/button';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { getMealIcon, getMealColorClasses } from '@/utils/mealColors';
 import JournalEntryActions from '@/components/journal/JournalEntryActions';
+import CircularProgressRings from '@/components/home/CircularProgressRings';
+import { useProfile } from '@/hooks/useProfile';
+import { useNutritionGoals } from '@/hooks/useNutritionGoals';
 
 interface JournalEntry {
   id: string;
@@ -26,8 +29,14 @@ const JournalPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
   const [showActions, setShowActions] = useState(false);
+  const [daySummary, setDaySummary] = useState({ calories: 0, protein: 0, waterMl: 0 });
   const navigate = useNavigate();
   const { onOpenCoach } = useOutletContext<{ onOpenCoach: () => void }>();
+  const { profile } = useProfile();
+  const nutritionGoals = useNutritionGoals(profile);
+  const caloriesGoal = nutritionGoals.calories;
+  const proteinGoal = nutritionGoals.protein;
+  const waterGoal = profile?.target_water_ml ?? Math.round(nutritionGoals.hydrationLiters * 1000);
 
   const loadEntries = useCallback(async () => {
     setIsLoading(true);
@@ -76,6 +85,9 @@ const JournalPage = () => {
         .lt('logged_at', endOfDayDate.toISOString())
         .order('logged_at', { ascending: true });
 
+      let totalCalories = 0;
+      let totalProtein = 0;
+
       if (meals) {
         meals.forEach(m => {
           const mealTypeLabels: Record<string, string> = {
@@ -84,6 +96,8 @@ const JournalPage = () => {
             dinner: 'Dîner',
             snack: 'Collation',
           };
+          totalCalories += m.calories || 0;
+          totalProtein += m.protein || 0;
           allEntries.push({
             id: `meal-${m.id}`,
             type: 'meal',
@@ -103,19 +117,22 @@ const JournalPage = () => {
         .eq('date', dateStr)
         .maybeSingle();
 
-      if (metrics?.water_ml) {
+      const waterMl = metrics?.water_ml || 0;
+
+      if (waterMl) {
         allEntries.push({
           id: `water-${dateStr}`,
           type: 'water',
           title: 'Hydratation',
-          subtitle: `${metrics.water_ml} ml`,
-          time: parseISO(metrics.updated_at),
-          meta: `${Math.round((metrics.water_ml / 2000) * 100)}%`,
+          subtitle: `${waterMl} ml`,
+          time: parseISO(metrics!.updated_at),
+          meta: `${Math.round((waterMl / 2000) * 100)}%`,
         });
       }
 
       allEntries.sort((a, b) => a.time.getTime() - b.time.getTime());
       setEntries(allEntries);
+      setDaySummary({ calories: Math.round(totalCalories), protein: Math.round(totalProtein), waterMl });
     } catch (error) {
       console.error('Error loading journal entries:', error);
     } finally {
@@ -289,7 +306,21 @@ const JournalPage = () => {
         </div>
       </header>
 
-      <div className="flex-1 px-4 py-6">
+      {/* Daily Progress Rings */}
+      {!isLoading && (
+        <div className="px-4 pt-4">
+          <CircularProgressRings
+            caloriesConsumed={daySummary.calories}
+            caloriesGoal={caloriesGoal}
+            proteinConsumed={daySummary.protein}
+            proteinGoal={proteinGoal}
+            waterConsumed={daySummary.waterMl}
+            waterGoal={waterGoal}
+          />
+        </div>
+      )}
+
+      <div className="flex-1 px-4 py-4">
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
