@@ -66,14 +66,29 @@ const exerciseTranslations: Record<string, string> = {
   "poulie basse": "cable curl",
 };
 
+interface WgerData {
+  exercise_images: string[];
+  muscle_images_main: string[];
+  muscle_images_secondary: string[];
+  muscles_main: string[];
+  muscles_secondary: string[];
+}
+
 /**
- * Search wger.de for exercise images using multiple strategies
+ * Search wger.de for exercise images AND muscle diagram SVGs
  */
-async function fetchWgerImages(exerciseName: string): Promise<string[]> {
+async function fetchWgerData(exerciseName: string): Promise<WgerData> {
+  const result: WgerData = {
+    exercise_images: [],
+    muscle_images_main: [],
+    muscle_images_secondary: [],
+    muscles_main: [],
+    muscles_secondary: [],
+  };
+
   try {
     const nameLower = exerciseName.toLowerCase().trim();
     
-    // Try to find English translation
     let searchTerm = exerciseName;
     for (const [fr, en] of Object.entries(exerciseTranslations)) {
       if (nameLower.includes(fr)) {
@@ -84,72 +99,77 @@ async function fetchWgerImages(exerciseName: string): Promise<string[]> {
 
     console.log(`Searching wger for: "${searchTerm}" (original: "${exerciseName}")`);
 
-    // Use the search endpoint which returns exercise IDs with base_id
     const searchUrl = `https://wger.de/api/v2/exercise/search/?term=${encodeURIComponent(searchTerm)}&language=en&format=json`;
-    const searchRes = await fetch(searchUrl, {
-      headers: { "Accept": "application/json" },
-    });
+    const searchRes = await fetch(searchUrl, { headers: { "Accept": "application/json" } });
 
-    if (!searchRes.ok) {
-      console.error("wger search failed:", searchRes.status);
-      return [];
-    }
+    if (!searchRes.ok) return result;
 
     const searchData = await searchRes.json();
-    console.log("wger search keys:", Object.keys(searchData));
-    
-    // The search endpoint returns { suggestions: [...] } where each has data.id (exercise ID) and data.base_id
     const suggestions = searchData?.suggestions || [];
     
-    if (suggestions.length === 0) {
-      console.log("No wger search results found");
-      return [];
-    }
+    if (suggestions.length === 0) return result;
 
-    // Log first suggestion structure for debugging
-    console.log("First suggestion:", JSON.stringify(suggestions[0]).slice(0, 500));
-
-    // The suggestion has data.base_id (exercise base for fetching images via exerciseinfo)
-    // and data.image which is a direct image path
     const firstSuggestion = suggestions[0];
     const baseId = firstSuggestion?.data?.base_id;
+
+    if (!baseId) return result;
+
+    // Fetch exerciseinfo which has images + muscle data
+    console.log(`Fetching exerciseinfo for base_id: ${baseId}`);
+    const infoUrl = `https://wger.de/api/v2/exerciseinfo/${baseId}/?format=json`;
+    const infoRes = await fetch(infoUrl, { headers: { "Accept": "application/json" } });
     
-    // Collect direct images from suggestions that match the same base
-    const directImages: string[] = [];
-    for (const s of suggestions) {
-      if (s?.data?.base_id === baseId && s?.data?.image) {
-        const imgPath = s.data.image;
-        const fullUrl = imgPath.startsWith("http") ? imgPath : `https://wger.de${imgPath}`;
-        if (!directImages.includes(fullUrl)) {
-          directImages.push(fullUrl);
+    if (!infoRes.ok) return result;
+
+    const infoData = await infoRes.json();
+
+    // Exercise images (positions)
+    if (infoData?.images?.length > 0) {
+      for (const img of infoData.images) {
+        if (img?.image) {
+          result.exercise_images.push(img.image);
         }
       }
     }
 
-    // Also fetch from exerciseinfo which has all images for this exercise base
-    if (baseId) {
-      console.log(`Fetching exerciseinfo for base_id: ${baseId}`);
-      const infoUrl = `https://wger.de/api/v2/exerciseinfo/${baseId}/?format=json`;
-      const infoRes = await fetch(infoUrl, { headers: { "Accept": "application/json" } });
-      if (infoRes.ok) {
-        const infoData = await infoRes.json();
-        if (infoData?.images && infoData.images.length > 0) {
-          for (const img of infoData.images) {
-            const imgUrl = img?.image;
-            if (imgUrl && !directImages.includes(imgUrl)) {
-              directImages.push(imgUrl);
-            }
+    // Muscle images (SVG diagrams from wger) - main
+    if (infoData?.muscles?.length > 0) {
+      for (const muscle of infoData.muscles) {
+        if (muscle?.image_url_main) {
+          const url = muscle.image_url_main.startsWith("http") 
+            ? muscle.image_url_main 
+            : `https://wger.de${muscle.image_url_main}`;
+          if (!result.muscle_images_main.includes(url)) {
+            result.muscle_images_main.push(url);
           }
-          console.log(`Found ${infoData.images.length} images from exerciseinfo, total: ${directImages.length}`);
         }
+        // Get muscle name
+        const muscleName = muscle?.name_en || muscle?.name || "";
+        if (muscleName) result.muscles_main.push(muscleName);
       }
     }
 
-    console.log(`Returning ${directImages.length} wger images`);
-    return directImages.slice(0, 4);
+    // Secondary muscles
+    if (infoData?.muscles_secondary?.length > 0) {
+      for (const muscle of infoData.muscles_secondary) {
+        if (muscle?.image_url_secondary) {
+          const url = muscle.image_url_secondary.startsWith("http")
+            ? muscle.image_url_secondary
+            : `https://wger.de${muscle.image_url_secondary}`;
+          if (!result.muscle_images_secondary.includes(url)) {
+            result.muscle_images_secondary.push(url);
+          }
+        }
+        const muscleName = muscle?.name_en || muscle?.name || "";
+        if (muscleName) result.muscles_secondary.push(muscleName);
+      }
+    }
+
+    console.log(`wger data: ${result.exercise_images.length} exercise imgs, ${result.muscle_images_main.length} main muscle imgs, ${result.muscle_images_secondary.length} secondary muscle imgs`);
+    return result;
   } catch (err) {
-    console.error("wger image fetch error:", err);
-    return [];
+    console.error("wger fetch error:", err);
+    return result;
   }
 }
 
@@ -175,27 +195,23 @@ serve(async (req) => {
 
     console.log(`Generating exercise detail for: ${exerciseName}`);
 
-    // Fetch AI details and wger images in parallel
-    const [aiDetailPromise, wgerImagesPromise] = [
+    // Fetch AI details and wger data in parallel
+    const [aiDetail, wgerData] = await Promise.all([
       (async () => {
-        const systemPrompt = `Tu es un coach fitness expert. Tu fournis des informations détaillées sur les exercices de musculation et fitness en français.
+        const systemPrompt = `Tu es un coach fitness expert. Réponds UNIQUEMENT avec un JSON valide, sans markdown.
 
-Tu dois TOUJOURS répondre avec un JSON valide dans ce format exact:
+Format EXACT:
 {
-  "description": "Description courte de l'exercice (2-3 phrases)",
-  "instructions": ["Étape 1", "Étape 2", "Étape 3", ...],
-  "muscles_targeted": ["muscle1", "muscle2"],
-  "tips": ["Conseil 1", "Conseil 2"],
-  "common_mistakes": ["Erreur 1", "Erreur 2"]
+  "how_to": "Explication concise en 2-3 phrases de comment réaliser l'exercice correctement.",
+  "key_points": ["Point clé 1", "Point clé 2", "Point clé 3"],
+  "muscles_targeted": ["muscle principal 1", "muscle principal 2"]
 }
 
 Règles:
-- Sois précis et pédagogique
-- Instructions claires et numérotées (4-6 étapes)
-- 2-4 muscles ciblés (principaux et secondaires)
-- 2-3 conseils pratiques
-- 2-3 erreurs courantes à éviter
-- Tout en français`;
+- "how_to": 2-3 phrases maximum, va droit au but
+- "key_points": exactement 3 points d'attention essentiels (sécurité, posture, respiration)
+- "muscles_targeted": 2-4 muscles en français
+- Tout en français, langage simple et direct`;
 
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
@@ -204,59 +220,47 @@ Règles:
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               contents: [
-                { role: "user", parts: [{ text: `${systemPrompt}\n\nDonne-moi les informations détaillées pour l'exercice: "${exerciseName}"` }] },
+                { role: "user", parts: [{ text: `${systemPrompt}\n\nExercice: "${exerciseName}"` }] },
               ],
             }),
           }
         );
 
         if (!response.ok) {
-          if (response.status === 429) {
-            throw new Error("rate_limit");
-          }
-          const errorText = await response.text();
-          console.error("Gemini API error:", response.status, errorText);
+          if (response.status === 429) throw new Error("rate_limit");
           throw new Error(`Gemini API error: ${response.status}`);
         }
 
         const data = await response.json();
         const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
         if (!content) throw new Error("No content from AI");
 
         try {
           const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
-          const jsonStr = jsonMatch[1].trim();
-          return JSON.parse(jsonStr);
+          return JSON.parse(jsonMatch[1].trim());
         } catch {
-          console.error("Failed to parse AI response:", content);
           return {
-            description: `${exerciseName} est un exercice efficace pour développer votre force et votre musculature.`,
-            instructions: [
-              "Placez-vous en position de départ",
-              "Effectuez le mouvement de manière contrôlée",
-              "Maintenez la tension musculaire",
-              "Revenez à la position initiale"
-            ],
+            how_to: `${exerciseName} : placez-vous en position de départ, effectuez le mouvement de manière contrôlée, puis revenez lentement.`,
+            key_points: ["Gardez le dos droit", "Respirez correctement", "Contrôlez le mouvement"],
             muscles_targeted: ["muscles principaux"],
-            tips: ["Gardez le dos droit", "Respirez correctement"],
-            common_mistakes: ["Mouvement trop rapide", "Mauvaise posture"]
           };
         }
       })(),
-      fetchWgerImages(exerciseName),
-    ];
+      fetchWgerData(exerciseName),
+    ]);
 
-    const [exerciseDetail, wgerImages] = await Promise.all([aiDetailPromise, wgerImagesPromise]);
+    const result = {
+      how_to: aiDetail.how_to,
+      key_points: aiDetail.key_points,
+      muscles_targeted: aiDetail.muscles_targeted,
+      exercise_images: wgerData.exercise_images.slice(0, 2),
+      muscle_images_main: wgerData.muscle_images_main,
+      muscle_images_secondary: wgerData.muscle_images_secondary,
+    };
 
-    // Merge wger images into the response
-    if (wgerImages.length > 0) {
-      exerciseDetail.wger_images = wgerImages;
-    }
+    console.log("Exercise detail generated successfully");
 
-    console.log("Exercise detail generated successfully, wger images:", wgerImages.length);
-
-    return new Response(JSON.stringify(exerciseDetail), {
+    return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
