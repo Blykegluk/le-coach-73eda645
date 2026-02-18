@@ -747,7 +747,7 @@ NE JAMAIS appeler cet outil avec des paramètres vides.`,
     type: "function",
     function: {
       name: "get_recent_workout_sessions",
-      description: "Récupère les séances d'entraînement TERMINÉES (completed) récentes de l'utilisateur, incluant les workout_sessions ET les activités libres. Retourne 20 séances par défaut pour un bon historique. N'inclut PAS les séances avortées ou en cours.",
+      description: "Récupère les séances d'entraînement TERMINÉES (completed) récentes de l'utilisateur, incluant les workout_sessions ET les activités libres. Supporte le filtrage par plage de dates (date_from/date_to) pour des requêtes précises comme 'cette semaine'. N'inclut PAS les séances avortées ou en cours.",
       parameters: {
         type: "object",
         properties: {
@@ -757,7 +757,15 @@ NE JAMAIS appeler cet outil avec des paramètres vides.`,
           },
           date: {
             type: "string",
-            description: "Date spécifique au format YYYY-MM-DD pour filtrer (optionnel). Utiliser pour 'hier', 'lundi dernier', etc.",
+            description: "Date spécifique au format YYYY-MM-DD pour filtrer un seul jour (optionnel).",
+          },
+          date_from: {
+            type: "string",
+            description: "Date de début (incluse) au format YYYY-MM-DD pour filtrer une plage. Utiliser pour 'cette semaine' (lundi), 'ce mois', etc.",
+          },
+          date_to: {
+            type: "string",
+            description: "Date de fin (incluse) au format YYYY-MM-DD pour filtrer une plage. Utiliser pour 'cette semaine' (dimanche), 'ce mois', etc.",
           },
         },
         required: [],
@@ -2160,17 +2168,44 @@ IMPORTANT: Retourne un JSON valide avec cette structure exacte:
             .lt("started_at", `${targetDate}T23:59:59`);
         }
 
+        // Filter by date range if provided
+        if (args.date_from) {
+          const fromDate = getLocalDate(args.date_from);
+          query = query.gte("started_at", `${fromDate}T00:00:00`);
+        }
+        if (args.date_to) {
+          const toDate = getLocalDate(args.date_to);
+          query = query.lte("started_at", `${toDate}T23:59:59`);
+        }
+
         const { data: sessions, error } = await query;
 
         if (error) throw error;
 
         // Also fetch activities for a complete picture
-        const { data: activities } = await supabase
+        let actQuery = supabase
           .from("activities")
           .select("id, activity_type, performed_at, duration_min, calories_burned, notes")
           .eq("user_id", userId)
           .order("performed_at", { ascending: false })
           .limit(limit);
+
+        if (args.date_from) {
+          const fromDate = getLocalDate(args.date_from);
+          actQuery = actQuery.gte("performed_at", `${fromDate}T00:00:00`);
+        }
+        if (args.date_to) {
+          const toDate = getLocalDate(args.date_to);
+          actQuery = actQuery.lte("performed_at", `${toDate}T23:59:59`);
+        }
+        if (args.date) {
+          const targetDate = getLocalDate(args.date);
+          actQuery = actQuery
+            .gte("performed_at", `${targetDate}T00:00:00`)
+            .lt("performed_at", `${targetDate}T23:59:59`);
+        }
+
+        const { data: activities } = await actQuery;
 
         const formattedSessions = (sessions || []).map((s: any) => ({
           id: s.id,
@@ -2735,6 +2770,8 @@ Tu DOIS systématiquement consulter les données pertinentes AVANT de répondre 
 
 🏋️ **SPORT / SÉANCES:**
 - Quand l'utilisateur parle de sport, séance, entraînement, ou demande une séance → appelle get_recent_workout_sessions ET get_health_context AVANT de répondre ou de générer
+- **Pour "cette semaine"** → utilise OBLIGATOIREMENT date_from="${mondayStr}" et date_to="${sundayStr}" dans get_recent_workout_sessions. NE FAIS PAS de calcul mental de dates, utilise ces paramètres.
+- **Pour "la semaine dernière"** → calcule le lundi et dimanche de la semaine précédente et utilise date_from/date_to.
 - Cela te permet de : éviter de proposer les mêmes exercices, adapter l'intensité selon la fatigue, respecter le split (haut/bas/push/pull), connaître les blessures
 - Quand tu génères une séance → consulte TOUJOURS les 3-5 dernières séances pour varier les exercices et respecter la progression
 
