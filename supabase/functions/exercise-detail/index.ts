@@ -10,88 +10,66 @@ const corsHeaders = {
  * Generate exercise position illustrations using Gemini image generation
  * Returns 2 base64 images: start position and end position
  */
+async function generateImageWithGemini(prompt: string, apiKey: string): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      console.error(`Gemini image gen error: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    for (const part of parts) {
+      if (part.inlineData) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
+    }
+    return null;
+  } catch (err) {
+    console.error("Gemini image gen failed:", err);
+    return null;
+  }
+}
+
 async function generateExerciseImages(exerciseName: string, apiKey: string): Promise<string[]> {
-  const images: string[] = [];
-  
   const positions = [
-    `starting position`,
-    `ending/contracted position`,
+    { desc: "starting position", label: "position de départ" },
+    { desc: "ending/contracted position", label: "position finale contractée" },
   ];
 
-  for (const positionDesc of positions) {
-    try {
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash-image",
-          messages: [
-            {
-              role: "user",
-              content: `Generate a realistic anatomical illustration of a muscular male figure performing the ${positionDesc} of the exercise "${exerciseName}". The style should be like a professional fitness anatomy textbook: realistic human body proportions, visible muscle definition and shading, semi-transparent skin showing the underlying muscle groups engaged. The figure should be shown from a 3/4 or side view against a plain white background. No text, no labels, no equipment labels. Clean, high-quality, detailed anatomical drawing style similar to Strength Training Anatomy by Frederic Delavier.`,
-            },
-          ],
-          modalities: ["image", "text"],
-        }),
-      });
+  const results = await Promise.all(
+    positions.map(({ desc }) =>
+      generateImageWithGemini(
+        `Generate a realistic anatomical illustration of a muscular male figure performing the ${desc} of the exercise "${exerciseName}". The style should be like a professional fitness anatomy textbook (Strength Training Anatomy by Frederic Delavier): realistic human body proportions, visible muscle definition and shading, semi-transparent skin showing the underlying muscle groups engaged. 3/4 or side view, plain white background. No text, no labels. Clean, high-quality, detailed anatomical drawing.`,
+        apiKey
+      )
+    )
+  );
 
-      if (!response.ok) {
-        console.error(`Image gen error for "${positionDesc}": ${response.status}`);
-        continue;
-      }
-
-      const data = await response.json();
-      const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-      if (imageUrl) {
-        images.push(imageUrl);
-      }
-    } catch (err) {
-      console.error(`Image gen failed for "${positionDesc}":`, err);
-    }
-  }
-
-  return images;
+  return results.filter((img): img is string => img !== null);
 }
 
 /**
  * Generate a muscle diagram showing targeted muscles
  */
 async function generateMuscleDiagram(exerciseName: string, muscles: string[], apiKey: string): Promise<string | null> {
-  try {
-    const muscleList = muscles.length > 0 ? muscles.join(", ") : "muscles principaux";
-    
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
-        messages: [
-          {
-            role: "user",
-            content: `Generate an anatomical muscle map illustration showing the muscles targeted during the exercise "${exerciseName}". Targeted muscles: ${muscleList}. Style: two human body silhouettes side by side (front view and back view), with the targeted muscles highlighted in bright red/orange color, and the rest of the body in light gray. Realistic anatomical muscle rendering, like a fitness anatomy textbook (Frederic Delavier style). White background. No text, no labels. Clean, professional, detailed.`,
-          },
-        ],
-        modalities: ["image", "text"],
-      }),
-    });
-
-    if (!response.ok) {
-      console.error(`Muscle diagram gen error: ${response.status}`);
-      return null;
-    }
-
-    const data = await response.json();
-    return data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
-  } catch (err) {
-    console.error("Muscle diagram gen failed:", err);
-    return null;
-  }
+  const muscleList = muscles.length > 0 ? muscles.join(", ") : "main muscles";
+  return generateImageWithGemini(
+    `Generate an anatomical muscle map illustration showing the muscles targeted during the exercise "${exerciseName}". Targeted muscles: ${muscleList}. Style: two human body silhouettes side by side (front view and back view), with the targeted muscles highlighted in bright red/orange color, and the rest of the body in light gray. Realistic anatomical muscle rendering, like a fitness anatomy textbook (Frederic Delavier style). White background. No text, no labels. Clean, professional, detailed.`,
+    apiKey
+  );
 }
 
 serve(async (req) => {
@@ -101,13 +79,9 @@ serve(async (req) => {
 
   try {
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!GEMINI_API_KEY) {
       throw new Error("GEMINI_API_KEY is not configured");
-    }
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
     }
 
     const { exerciseName } = await req.json();
@@ -172,11 +146,11 @@ Règles:
       }
     })();
 
-    // Step 2: Generate all images in parallel using Lovable AI gateway
-    console.log("Generating uniform exercise illustrations via AI...");
+    // Step 2: Generate all images in parallel using Gemini direct API
+    console.log("Generating realistic exercise illustrations via Gemini...");
     const [exerciseImages, muscleDiagram] = await Promise.all([
-      generateExerciseImages(exerciseName, LOVABLE_API_KEY),
-      generateMuscleDiagram(exerciseName, aiDetail.muscles_targeted || [], LOVABLE_API_KEY),
+      generateExerciseImages(exerciseName, GEMINI_API_KEY),
+      generateMuscleDiagram(exerciseName, aiDetail.muscles_targeted || [], GEMINI_API_KEY),
     ]);
 
     const result = {

@@ -24,7 +24,7 @@ interface ExerciseDetail {
   muscle_diagram: string | null; // base64 data URL
 }
 
-const CACHE_KEY_PREFIX = 'exercise_detail_v4_';
+const CACHE_KEY_PREFIX = 'exercise_detail_v5_';
 const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days (images are AI-generated, stable)
 
 export const ExerciseDetailSheet = ({
