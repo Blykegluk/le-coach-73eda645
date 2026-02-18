@@ -62,18 +62,36 @@ export const ExerciseDetailSheet = ({
     fetchExerciseDetail();
   }, [isOpen, exerciseName]);
 
-  const fetchExerciseDetail = async () => {
+  const fetchExerciseDetail = async (retryCount = 0) => {
     setIsLoading(true);
     setError(null);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const { data, error: fnError } = await supabase.functions.invoke('exercise-detail', {
-        body: { exerciseName },
-        headers: session ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+      
+      // Use fetch directly with a longer timeout for image generation
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/exercise-detail`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          ...(session ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ exerciseName }),
+        signal: controller.signal,
       });
-
-      if (fnError) throw fnError;
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
       if (data?.error) throw new Error(data.error);
 
       setDetail(data);
@@ -81,7 +99,12 @@ export const ExerciseDetailSheet = ({
       localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
     } catch (err) {
       console.error('Error fetching exercise detail:', err);
-      setError('Impossible de charger les détails');
+      // Auto-retry once on timeout/network error
+      if (retryCount < 1 && (err instanceof DOMException || (err instanceof TypeError && err.message.includes('fetch')))) {
+        console.log('Retrying exercise detail fetch...');
+        return fetchExerciseDetail(retryCount + 1);
+      }
+      setError('Impossible de charger les détails. Réessaie.');
     } finally {
       setIsLoading(false);
     }
@@ -124,7 +147,7 @@ export const ExerciseDetailSheet = ({
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <AlertCircle className="h-10 w-10 text-destructive mb-3" />
               <p className="text-muted-foreground mb-4">{error}</p>
-              <Button variant="outline" size="sm" onClick={fetchExerciseDetail}>
+              <Button variant="outline" size="sm" onClick={() => fetchExerciseDetail()}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Réessayer
               </Button>
