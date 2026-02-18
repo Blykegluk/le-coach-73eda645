@@ -6,170 +6,91 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Common exercise name translations (FR → EN) for wger search
-const exerciseTranslations: Record<string, string> = {
-  "développé couché": "bench press",
-  "développé incliné": "incline bench press",
-  "développé décliné": "decline bench press",
-  "développé militaire": "military press",
-  "développé haltères": "dumbbell press",
-  "squat": "squat",
-  "squat avant": "front squat",
-  "squat bulgare": "bulgarian split squat",
-  "fente": "lunge",
-  "fentes": "lunges",
-  "soulevé de terre": "deadlift",
-  "rowing": "barbell row",
-  "rowing barre": "barbell row",
-  "rowing haltère": "dumbbell row",
-  "tirage vertical": "lat pulldown",
-  "tirage horizontal": "seated cable row",
-  "tirage poitrine": "lat pulldown",
-  "traction": "pull up",
-  "tractions": "pull ups",
-  "pompe": "push up",
-  "pompes": "push ups",
-  "dips": "dips",
-  "curl biceps": "bicep curl",
-  "curl haltères": "dumbbell curl",
-  "curl barre": "barbell curl",
-  "curl marteau": "hammer curl",
-  "extension triceps": "tricep extension",
-  "triceps poulie": "tricep pushdown",
-  "élévation latérale": "lateral raise",
-  "élévations latérales": "lateral raise",
-  "oiseau": "reverse fly",
-  "oiseau haltères": "reverse fly",
-  "presse à cuisses": "leg press",
-  "leg press": "leg press",
-  "leg curl": "leg curl",
-  "leg extension": "leg extension",
-  "hip thrust": "hip thrust",
-  "mollets": "calf raise",
-  "crunch": "crunch",
-  "crunches": "crunches",
-  "gainage": "plank",
-  "planche": "plank",
-  "abdos": "crunches",
-  "pec deck": "pec deck",
-  "butterfly": "butterfly",
-  "écarté": "chest fly",
-  "écartés": "chest fly",
-  "écarté haltères": "dumbbell fly",
-  "presse épaules": "shoulder press",
-  "shrug": "shrugs",
-  "face pull": "face pull",
-  "good morning": "good morning",
-  "hack squat": "hack squat",
-  "machine convergente": "chest press machine",
-  "poulie haute": "cable crossover",
-  "poulie basse": "cable curl",
-};
+/**
+ * Generate exercise position illustrations using Gemini image generation
+ * Returns 2 base64 images: start position and end position
+ */
+async function generateExerciseImages(exerciseName: string, apiKey: string): Promise<string[]> {
+  const images: string[] = [];
+  
+  const positions = [
+    `Position de départ de l'exercice "${exerciseName}"`,
+    `Position finale de l'exercice "${exerciseName}"`,
+  ];
 
-interface WgerData {
-  exercise_images: string[];
-  muscle_images_main: string[];
-  muscle_images_secondary: string[];
-  muscles_main: string[];
-  muscles_secondary: string[];
+  for (const positionDesc of positions) {
+    try {
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image",
+          messages: [
+            {
+              role: "user",
+              content: `Génère un dessin anatomique en noir et blanc, style illustration médicale/fitness, sur fond blanc pur, montrant clairement la posture d'une personne réalisant: ${positionDesc}. Le style doit être un dessin au trait propre, professionnel, type manuel d'anatomie sportive. Pas de texte, pas de légende, juste le dessin de la posture. Vue de profil ou 3/4.`,
+            },
+          ],
+          modalities: ["image", "text"],
+        }),
+      });
+
+      if (!response.ok) {
+        console.error(`Image gen error for "${positionDesc}": ${response.status}`);
+        continue;
+      }
+
+      const data = await response.json();
+      const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      if (imageUrl) {
+        images.push(imageUrl);
+      }
+    } catch (err) {
+      console.error(`Image gen failed for "${positionDesc}":`, err);
+    }
+  }
+
+  return images;
 }
 
 /**
- * Search wger.de for exercise images AND muscle diagram SVGs
+ * Generate a muscle diagram showing targeted muscles
  */
-async function fetchWgerData(exerciseName: string): Promise<WgerData> {
-  const result: WgerData = {
-    exercise_images: [],
-    muscle_images_main: [],
-    muscle_images_secondary: [],
-    muscles_main: [],
-    muscles_secondary: [],
-  };
-
+async function generateMuscleDiagram(exerciseName: string, muscles: string[], apiKey: string): Promise<string | null> {
   try {
-    const nameLower = exerciseName.toLowerCase().trim();
+    const muscleList = muscles.length > 0 ? muscles.join(", ") : "muscles principaux";
     
-    let searchTerm = exerciseName;
-    for (const [fr, en] of Object.entries(exerciseTranslations)) {
-      if (nameLower.includes(fr)) {
-        searchTerm = en;
-        break;
-      }
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-image",
+        messages: [
+          {
+            role: "user",
+            content: `Génère un diagramme anatomique musculaire en couleur montrant les muscles sollicités lors de l'exercice "${exerciseName}". Les muscles ciblés sont : ${muscleList}. Style : silhouette anatomique humaine de face et de dos, muscles ciblés colorés en rouge/orange vif, le reste du corps en gris clair. Fond blanc pur. Pas de texte ni légende. Style clean, professionnel, type application fitness.`,
+          },
+        ],
+        modalities: ["image", "text"],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`Muscle diagram gen error: ${response.status}`);
+      return null;
     }
 
-    console.log(`Searching wger for: "${searchTerm}" (original: "${exerciseName}")`);
-
-    const searchUrl = `https://wger.de/api/v2/exercise/search/?term=${encodeURIComponent(searchTerm)}&language=en&format=json`;
-    const searchRes = await fetch(searchUrl, { headers: { "Accept": "application/json" } });
-
-    if (!searchRes.ok) return result;
-
-    const searchData = await searchRes.json();
-    const suggestions = searchData?.suggestions || [];
-    
-    if (suggestions.length === 0) return result;
-
-    const firstSuggestion = suggestions[0];
-    const baseId = firstSuggestion?.data?.base_id;
-
-    if (!baseId) return result;
-
-    // Fetch exerciseinfo which has images + muscle data
-    console.log(`Fetching exerciseinfo for base_id: ${baseId}`);
-    const infoUrl = `https://wger.de/api/v2/exerciseinfo/${baseId}/?format=json`;
-    const infoRes = await fetch(infoUrl, { headers: { "Accept": "application/json" } });
-    
-    if (!infoRes.ok) return result;
-
-    const infoData = await infoRes.json();
-
-    // Exercise images (positions)
-    if (infoData?.images?.length > 0) {
-      for (const img of infoData.images) {
-        if (img?.image) {
-          result.exercise_images.push(img.image);
-        }
-      }
-    }
-
-    // Muscle images (SVG diagrams from wger) - main
-    if (infoData?.muscles?.length > 0) {
-      for (const muscle of infoData.muscles) {
-        if (muscle?.image_url_main) {
-          const url = muscle.image_url_main.startsWith("http") 
-            ? muscle.image_url_main 
-            : `https://wger.de${muscle.image_url_main}`;
-          if (!result.muscle_images_main.includes(url)) {
-            result.muscle_images_main.push(url);
-          }
-        }
-        // Get muscle name
-        const muscleName = muscle?.name_en || muscle?.name || "";
-        if (muscleName) result.muscles_main.push(muscleName);
-      }
-    }
-
-    // Secondary muscles
-    if (infoData?.muscles_secondary?.length > 0) {
-      for (const muscle of infoData.muscles_secondary) {
-        if (muscle?.image_url_secondary) {
-          const url = muscle.image_url_secondary.startsWith("http")
-            ? muscle.image_url_secondary
-            : `https://wger.de${muscle.image_url_secondary}`;
-          if (!result.muscle_images_secondary.includes(url)) {
-            result.muscle_images_secondary.push(url);
-          }
-        }
-        const muscleName = muscle?.name_en || muscle?.name || "";
-        if (muscleName) result.muscles_secondary.push(muscleName);
-      }
-    }
-
-    console.log(`wger data: ${result.exercise_images.length} exercise imgs, ${result.muscle_images_main.length} main muscle imgs, ${result.muscle_images_secondary.length} secondary muscle imgs`);
-    return result;
+    const data = await response.json();
+    return data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
   } catch (err) {
-    console.error("wger fetch error:", err);
-    return result;
+    console.error("Muscle diagram gen failed:", err);
+    return null;
   }
 }
 
@@ -180,8 +101,13 @@ serve(async (req) => {
 
   try {
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    
     if (!GEMINI_API_KEY) {
       throw new Error("GEMINI_API_KEY is not configured");
+    }
+    if (!LOVABLE_API_KEY) {
+      throw new Error("LOVABLE_API_KEY is not configured");
     }
 
     const { exerciseName } = await req.json();
@@ -195,10 +121,9 @@ serve(async (req) => {
 
     console.log(`Generating exercise detail for: ${exerciseName}`);
 
-    // Fetch AI details and wger data in parallel
-    const [aiDetail, wgerData] = await Promise.all([
-      (async () => {
-        const systemPrompt = `Tu es un coach fitness expert. Réponds UNIQUEMENT avec un JSON valide, sans markdown.
+    // Step 1: Get AI text details first (we need muscles list for the diagram)
+    const aiDetail = await (async () => {
+      const systemPrompt = `Tu es un coach fitness expert. Réponds UNIQUEMENT avec un JSON valide, sans markdown.
 
 Format EXACT:
 {
@@ -213,52 +138,56 @@ Règles:
 - "muscles_targeted": 2-4 muscles en français
 - Tout en français, langage simple et direct`;
 
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [
-                { role: "user", parts: [{ text: `${systemPrompt}\n\nExercice: "${exerciseName}"` }] },
-              ],
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          if (response.status === 429) throw new Error("rate_limit");
-          throw new Error(`Gemini API error: ${response.status}`);
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              { role: "user", parts: [{ text: `${systemPrompt}\n\nExercice: "${exerciseName}"` }] },
+            ],
+          }),
         }
+      );
 
-        const data = await response.json();
-        const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!content) throw new Error("No content from AI");
+      if (!response.ok) {
+        if (response.status === 429) throw new Error("rate_limit");
+        throw new Error(`Gemini API error: ${response.status}`);
+      }
 
-        try {
-          const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
-          return JSON.parse(jsonMatch[1].trim());
-        } catch {
-          return {
-            how_to: `${exerciseName} : placez-vous en position de départ, effectuez le mouvement de manière contrôlée, puis revenez lentement.`,
-            key_points: ["Gardez le dos droit", "Respirez correctement", "Contrôlez le mouvement"],
-            muscles_targeted: ["muscles principaux"],
-          };
-        }
-      })(),
-      fetchWgerData(exerciseName),
+      const data = await response.json();
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!content) throw new Error("No content from AI");
+
+      try {
+        const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
+        return JSON.parse(jsonMatch[1].trim());
+      } catch {
+        return {
+          how_to: `${exerciseName} : placez-vous en position de départ, effectuez le mouvement de manière contrôlée, puis revenez lentement.`,
+          key_points: ["Gardez le dos droit", "Respirez correctement", "Contrôlez le mouvement"],
+          muscles_targeted: ["muscles principaux"],
+        };
+      }
+    })();
+
+    // Step 2: Generate all images in parallel using Lovable AI gateway
+    console.log("Generating uniform exercise illustrations via AI...");
+    const [exerciseImages, muscleDiagram] = await Promise.all([
+      generateExerciseImages(exerciseName, LOVABLE_API_KEY),
+      generateMuscleDiagram(exerciseName, aiDetail.muscles_targeted || [], LOVABLE_API_KEY),
     ]);
 
     const result = {
       how_to: aiDetail.how_to,
       key_points: aiDetail.key_points,
       muscles_targeted: aiDetail.muscles_targeted,
-      exercise_images: wgerData.exercise_images.slice(0, 2),
-      muscle_images_main: wgerData.muscle_images_main,
-      muscle_images_secondary: wgerData.muscle_images_secondary,
+      exercise_images: exerciseImages,
+      muscle_diagram: muscleDiagram,
     };
 
-    console.log("Exercise detail generated successfully");
+    console.log(`Exercise detail generated: ${exerciseImages.length} position imgs, muscle diagram: ${!!muscleDiagram}`);
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
