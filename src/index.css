@@ -174,10 +174,6 @@
     @apply h-full w-full;
   }
 
-  #root {
-    @apply overflow-hidden;
-  }
-
   body {
     @apply bg-background text-foreground font-sans antialiased;
     -webkit-font-smoothing: antialiased;
