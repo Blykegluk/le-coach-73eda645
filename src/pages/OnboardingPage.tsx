@@ -382,7 +382,7 @@ export default function OnboardingPage() {
   );
 
   return (
-    <div className="flex min-h-screen flex-col bg-background px-4 py-8 safe-top safe-bottom">
+    <div className="flex min-h-[100dvh] flex-col bg-background px-4 py-8 safe-top safe-bottom overflow-y-auto">
       <div className="mx-auto w-full max-w-md flex-1">
         {renderStepIndicator()}
 
