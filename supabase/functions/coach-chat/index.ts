@@ -2387,6 +2387,8 @@ serve(async (req) => {
     let userContext = "";
     let healthContext = "";
     let preparedWorkoutContext = "";
+    let trainingPreferencesContext = "";
+    let workoutHistoryContext = "";
     
     if (userId) {
       // Fetch profile, health context, prepared workout, AND last 10 workout sessions in parallel
@@ -2508,7 +2510,7 @@ ${pw.coach_advice ? `- Conseil: ${pw.coach_advice}` : ""}
       }
 
       // ═══ AUTO-INJECT: Last 10 workout sessions with exercise details ═══
-      let workoutHistoryContext = "";
+      workoutHistoryContext = "";
       if (recentSessions.length > 0) {
         // Fetch exercise details for all sessions in one query
         const sessionIds = recentSessions.map((s: any) => s.id);
@@ -2561,7 +2563,7 @@ ${sessionLines}
       }
 
       // ═══ Extract training preferences from health context ═══
-      let trainingPreferencesContext = "";
+      trainingPreferencesContext = "";
       if (healthContexts && healthContexts.length > 0) {
         const trainingPrefs = healthContexts
           .filter((c: { key: string }) => c.key.includes("training") || c.key.includes("preference") || c.key.includes("split") || c.key.includes("programme"))
