@@ -14,8 +14,8 @@ async function generateExerciseImages(exerciseName: string, apiKey: string): Pro
   const images: string[] = [];
   
   const positions = [
-    `Position de départ de l'exercice "${exerciseName}"`,
-    `Position finale de l'exercice "${exerciseName}"`,
+    `starting position`,
+    `ending/contracted position`,
   ];
 
   for (const positionDesc of positions) {
@@ -31,7 +31,7 @@ async function generateExerciseImages(exerciseName: string, apiKey: string): Pro
           messages: [
             {
               role: "user",
-              content: `Génère un dessin anatomique en noir et blanc, style illustration médicale/fitness, sur fond blanc pur, montrant clairement la posture d'une personne réalisant: ${positionDesc}. Le style doit être un dessin au trait propre, professionnel, type manuel d'anatomie sportive. Pas de texte, pas de légende, juste le dessin de la posture. Vue de profil ou 3/4.`,
+              content: `Generate a realistic anatomical illustration of a muscular male figure performing the ${positionDesc} of the exercise "${exerciseName}". The style should be like a professional fitness anatomy textbook: realistic human body proportions, visible muscle definition and shading, semi-transparent skin showing the underlying muscle groups engaged. The figure should be shown from a 3/4 or side view against a plain white background. No text, no labels, no equipment labels. Clean, high-quality, detailed anatomical drawing style similar to Strength Training Anatomy by Frederic Delavier.`,
             },
           ],
           modalities: ["image", "text"],
@@ -74,7 +74,7 @@ async function generateMuscleDiagram(exerciseName: string, muscles: string[], ap
         messages: [
           {
             role: "user",
-            content: `Génère un diagramme anatomique musculaire en couleur montrant les muscles sollicités lors de l'exercice "${exerciseName}". Les muscles ciblés sont : ${muscleList}. Style : silhouette anatomique humaine de face et de dos, muscles ciblés colorés en rouge/orange vif, le reste du corps en gris clair. Fond blanc pur. Pas de texte ni légende. Style clean, professionnel, type application fitness.`,
+            content: `Generate an anatomical muscle map illustration showing the muscles targeted during the exercise "${exerciseName}". Targeted muscles: ${muscleList}. Style: two human body silhouettes side by side (front view and back view), with the targeted muscles highlighted in bright red/orange color, and the rest of the body in light gray. Realistic anatomical muscle rendering, like a fitness anatomy textbook (Frederic Delavier style). White background. No text, no labels. Clean, professional, detailed.`,
           },
         ],
         modalities: ["image", "text"],
