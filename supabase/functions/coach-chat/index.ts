@@ -747,13 +747,13 @@ NE JAMAIS appeler cet outil avec des paramètres vides.`,
     type: "function",
     function: {
       name: "get_recent_workout_sessions",
-      description: "Récupère les séances d'entraînement récentes de l'utilisateur avec leurs détails",
+      description: "Récupère les séances d'entraînement TERMINÉES (completed) récentes de l'utilisateur, incluant les workout_sessions ET les activités libres. Retourne 20 séances par défaut pour un bon historique. N'inclut PAS les séances avortées ou en cours.",
       parameters: {
         type: "object",
         properties: {
           limit: {
             type: "number",
-            description: "Nombre de séances à récupérer (défaut: 5)",
+            description: "Nombre de séances à récupérer (défaut: 20)",
           },
           date: {
             type: "string",
@@ -2143,11 +2143,12 @@ IMPORTANT: Retourne un JSON valide avec cette structure exacte:
       }
 
       case "get_recent_workout_sessions": {
-        const limit = args.limit || 5;
+        const limit = args.limit || 20;
         let query = supabase
           .from("workout_sessions")
           .select("id, workout_name, started_at, completed_at, status, target_muscles, total_duration_seconds, notes")
           .eq("user_id", userId)
+          .eq("status", "completed")
           .order("started_at", { ascending: false })
           .limit(limit);
 
@@ -2163,22 +2164,46 @@ IMPORTANT: Retourne un JSON valide avec cette structure exacte:
 
         if (error) throw error;
 
+        // Also fetch activities for a complete picture
+        const { data: activities } = await supabase
+          .from("activities")
+          .select("id, activity_type, performed_at, duration_min, calories_burned, notes")
+          .eq("user_id", userId)
+          .order("performed_at", { ascending: false })
+          .limit(limit);
+
         const formattedSessions = (sessions || []).map((s: any) => ({
           id: s.id,
+          source: "workout_session",
           workout_name: s.workout_name,
           started_at: s.started_at,
           completed_at: s.completed_at,
-          status: s.status,
           target_muscles: s.target_muscles,
           duration_min: s.total_duration_seconds ? Math.round(s.total_duration_seconds / 60) : null,
           notes: s.notes,
           time_ago: getTimeAgo(s.started_at),
         }));
 
+        const formattedActivities = (activities || []).map((a: any) => ({
+          id: a.id,
+          source: "activity",
+          workout_name: a.activity_type,
+          started_at: a.performed_at,
+          duration_min: a.duration_min,
+          calories_burned: a.calories_burned,
+          notes: a.notes,
+          time_ago: getTimeAgo(a.performed_at),
+        }));
+
+        // Merge and sort by date
+        const allSessions = [...formattedSessions, ...formattedActivities]
+          .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())
+          .slice(0, limit);
+
         return {
           success: true,
-          message: `${formattedSessions.length} séance(s) trouvée(s)`,
-          data: formattedSessions,
+          message: `${allSessions.length} séance(s) trouvée(s) (terminées uniquement, incluant entraînements structurés et activités libres)`,
+          data: allSessions,
         };
       }
 
