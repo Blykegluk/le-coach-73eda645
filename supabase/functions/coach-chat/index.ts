@@ -2999,10 +2999,14 @@ NE JAMAIS écrire un programme en texte. L'outil sauvegarde automatiquement la s
             {
               role: "system",
               content: `Tu génères des réponses suggérées pour un chat de coaching santé/fitness en français.
-Retourne UNIQUEMENT un tableau JSON de 2 à 4 réponses courtes (max 40 caractères chacune) que l'utilisateur pourrait envoyer en réponse au message du coach.
-Les réponses doivent être naturelles, variées, et contextuelles. Inclus un emoji quand c'est pertinent.
-Exemples de bonnes réponses: "Oui, go ! 💪", "Pas encore mangé", "Montre-moi mes stats", "J'ai une question"
-NE JAMAIS proposer des réponses génériques comme "Oui" / "Non" / "Dis-moi en plus" sauf si c'est vraiment pertinent.
+Retourne UNIQUEMENT un tableau JSON de 2 à 4 réponses courtes (max 40 caractères chacune).
+
+RÈGLE CRITIQUE : Les suggestions doivent être des RÉPONSES DIRECTES à la question ou au message du coach.
+- Si le coach pose une question avec des options (ex: "haut du corps ou bas du corps ?"), les suggestions DOIVENT reprendre ces options comme réponses (ex: "Haut du corps 💪", "Bas du corps 🦵").
+- Si le coach demande une confirmation (oui/non), propose "Oui, go ! ✅" et "Non, plutôt..." comme options.
+- Si le coach donne un résumé ou un conseil sans question, propose des relances naturelles.
+- NE JAMAIS proposer des réactions passives comme "Super merci !", "Noté ✅", "J'ai hâte !" quand le coach attend une réponse concrète.
+
 Réponse format: ["réponse1", "réponse2", "réponse3"]`
             },
             {
