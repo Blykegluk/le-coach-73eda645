@@ -171,7 +171,11 @@
   }
 
   html, body, #root {
-    @apply h-full w-full overflow-hidden;
+    @apply h-full w-full;
+  }
+
+  #root {
+    @apply overflow-hidden;
   }
 
   body {
