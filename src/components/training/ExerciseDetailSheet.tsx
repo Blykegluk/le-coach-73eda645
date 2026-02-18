@@ -20,13 +20,12 @@ interface ExerciseDetail {
   how_to: string;
   key_points: string[];
   muscles_targeted: string[];
-  exercise_images: string[];
-  muscle_images_main: string[];
-  muscle_images_secondary: string[];
+  exercise_images: string[]; // base64 data URLs
+  muscle_diagram: string | null; // base64 data URL
 }
 
-const CACHE_KEY_PREFIX = 'exercise_detail_v2_';
-const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000;
+const CACHE_KEY_PREFIX = 'exercise_detail_v3_';
+const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days (images are AI-generated, stable)
 
 export const ExerciseDetailSheet = ({
   isOpen,
@@ -88,12 +87,6 @@ export const ExerciseDetailSheet = ({
     }
   };
 
-  const exerciseImages = detail?.exercise_images || [];
-  const muscleImages = [
-    ...(detail?.muscle_images_main || []),
-    ...(detail?.muscle_images_secondary || []),
-  ];
-
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl overflow-hidden flex flex-col p-0">
@@ -118,9 +111,14 @@ export const ExerciseDetailSheet = ({
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
           {isLoading ? (
             <div className="space-y-4">
-              <Skeleton className="h-40 w-full rounded-2xl" />
-              <Skeleton className="h-40 w-full rounded-2xl" />
-              <Skeleton className="h-20 w-full rounded-xl" />
+              <Skeleton className="h-6 w-32 rounded" />
+              <div className="grid grid-cols-2 gap-3">
+                <Skeleton className="aspect-square rounded-2xl" />
+                <Skeleton className="aspect-square rounded-2xl" />
+              </div>
+              <Skeleton className="h-6 w-40 rounded" />
+              <Skeleton className="h-48 w-full rounded-2xl" />
+              <Skeleton className="h-32 w-full rounded-xl" />
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -133,76 +131,53 @@ export const ExerciseDetailSheet = ({
             </div>
           ) : detail ? (
             <>
-              {/* Section 1: Exercise Positions (2 pictos) */}
+              {/* Section 1: Exercise Positions (2 AI-generated illustrations) */}
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                   Comment faire
                 </p>
-                {exerciseImages.length >= 2 ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    {exerciseImages.slice(0, 2).map((img, i) => (
+                <div className="grid grid-cols-2 gap-3">
+                  {detail.exercise_images.length >= 2 ? (
+                    detail.exercise_images.slice(0, 2).map((img, i) => (
                       <div
                         key={i}
-                        className="aspect-square rounded-2xl bg-card border border-border overflow-hidden flex items-center justify-center p-3"
+                        className="aspect-square rounded-2xl bg-card border border-border overflow-hidden flex items-center justify-center p-2"
                       >
                         <img
                           src={img}
                           alt={`${exerciseName} - position ${i + 1}`}
                           className="w-full h-full object-contain"
-                          loading="eager"
                         />
                       </div>
-                    ))}
-                    <p className="col-span-2 text-center text-xs text-muted-foreground -mt-1">
-                      Position de départ → Position finale
-                    </p>
-                  </div>
-                ) : exerciseImages.length === 1 ? (
-                  <div className="flex justify-center">
-                    <div className="w-1/2 aspect-square rounded-2xl bg-card border border-border overflow-hidden flex items-center justify-center p-3">
-                      <img
-                        src={exerciseImages[0]}
-                        alt={exerciseName}
-                        className="w-full h-full object-contain"
-                        loading="eager"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="aspect-square rounded-2xl bg-muted/40 border border-border flex items-center justify-center">
-                      <ExerciseIcon className="h-16 w-16 text-muted-foreground/40" />
-                    </div>
-                    <div className="aspect-square rounded-2xl bg-muted/40 border border-border flex items-center justify-center">
-                      <ExerciseIcon className="h-16 w-16 text-muted-foreground/40" />
-                    </div>
-                    <p className="col-span-2 text-center text-xs text-muted-foreground -mt-1">
-                      Illustrations non disponibles
-                    </p>
-                  </div>
-                )}
+                    ))
+                  ) : (
+                    <>
+                      <div className="aspect-square rounded-2xl bg-muted/40 border border-border flex items-center justify-center">
+                        <ExerciseIcon className="h-16 w-16 text-muted-foreground/40" />
+                      </div>
+                      <div className="aspect-square rounded-2xl bg-muted/40 border border-border flex items-center justify-center">
+                        <ExerciseIcon className="h-16 w-16 text-muted-foreground/40" />
+                      </div>
+                    </>
+                  )}
+                </div>
+                <p className="text-center text-xs text-muted-foreground mt-2">
+                  Position de départ → Position finale
+                </p>
               </div>
 
-              {/* Section 2: Muscles Targeted (2 pictos) */}
+              {/* Section 2: Muscle Diagram (1 AI-generated illustration) */}
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                   Muscles ciblés
                 </p>
-                {muscleImages.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    {muscleImages.slice(0, 2).map((img, i) => (
-                      <div
-                        key={i}
-                        className="aspect-[3/4] rounded-2xl bg-card border border-border overflow-hidden flex items-center justify-center p-2"
-                      >
-                        <img
-                          src={img}
-                          alt={`Muscles ciblés ${i + 1}`}
-                          className="w-full h-full object-contain"
-                          loading="lazy"
-                        />
-                      </div>
-                    ))}
+                {detail.muscle_diagram ? (
+                  <div className="rounded-2xl bg-card border border-border overflow-hidden flex items-center justify-center p-3">
+                    <img
+                      src={detail.muscle_diagram}
+                      alt={`Muscles ciblés - ${exerciseName}`}
+                      className="w-full max-h-64 object-contain"
+                    />
                   </div>
                 ) : null}
                 <div className="flex flex-wrap gap-1.5 mt-3">
