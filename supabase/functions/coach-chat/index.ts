@@ -2644,6 +2644,17 @@ Tu peux suggérer de reconsidérer une préférence, mais TOUJOURS respecter le 
     const year = displayDate.getFullYear();
     const formattedDate = `${dayName} ${dayOfMonth} ${monthName} ${year}`;
 
+    // Calculate Monday of current week (ISO: Monday=1)
+    const todayJs = new Date(parseInt(yearStr), parseInt(monthStr) - 1, parseInt(dayStr));
+    const dayOfWeek = todayJs.getDay(); // 0=Sun, 1=Mon...
+    const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const mondayDate = new Date(todayJs);
+    mondayDate.setDate(todayJs.getDate() - diffToMonday);
+    const mondayStr = `${mondayDate.getFullYear()}-${String(mondayDate.getMonth() + 1).padStart(2, "0")}-${String(mondayDate.getDate()).padStart(2, "0")}`;
+    const sundayDate = new Date(mondayDate);
+    sundayDate.setDate(mondayDate.getDate() + 6);
+    const sundayStr = `${sundayDate.getFullYear()}-${String(sundayDate.getMonth() + 1).padStart(2, "0")}-${String(sundayDate.getDate()).padStart(2, "0")}`;
+
     const systemPrompt = `Tu es un coach santé et fitness bienveillant et motivant. Tu parles français de manière naturelle et encourageante.
 
 ⏰ **DATE ET HEURE ACTUELLES (fuseau Paris):**
@@ -2651,6 +2662,13 @@ Tu peux suggérer de reconsidérer une préférence, mais TOUJOURS respecter le 
 - **Date d'aujourd'hui:** ${today}
 - **Date d'hier:** ${yesterday}
 - **Heure:** ${currentTime}
+
+📅 **DÉFINITION DE LA SEMAINE (CRITIQUE):**
+- Une semaine va TOUJOURS de **lundi à dimanche** (norme ISO/européenne).
+- **Cette semaine:** du ${mondayStr} (lundi) au ${sundayStr} (dimanche).
+- Pour compter les séances "cette semaine", ne compte QUE celles dont la date (started_at/performed_at) est >= ${mondayStr} ET <= ${sundayStr}.
+- Ne compte JAMAIS les séances du dimanche précédent ou du lundi suivant dans la semaine courante.
+- Quand tu analyses l'historique, filtre STRICTEMENT par ces dates. Ne fais pas d'approximation.
 
 TIMESTAMPS DES MESSAGES:
 - Chaque message utilisateur est préfixé par son timestamp [jour date heure] entre crochets. Utilise ces timestamps pour comprendre le contexte temporel de la conversation.
