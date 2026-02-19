@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Send, Plus, Camera, Mic, Loader2, ArrowDown } from 'lucide-react';
+import { X, Send, Plus, Camera, Mic, Loader2, ArrowDown, Dumbbell } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import ImageCapture from '@/components/chat/ImageCapture';
 import VoiceRecorder from '@/components/chat/VoiceRecorder';
@@ -74,7 +74,9 @@ const ChatModal = ({ isOpen, onClose }: ChatModalProps) => {
                 <div key={msg.id || index}>
                   <div className={`flex gap-2 ${isCoach ? 'justify-start' : 'justify-end'}`}>
                     {isCoach && (
-                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">H</div>
+                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                        <Dumbbell className="h-4 w-4" />
+                      </div>
                     )}
                     <div className={`flex max-w-[75%] flex-col ${isCoach ? 'items-start' : 'items-end'}`}>
                       {msg.imageUrl && (
