@@ -38,6 +38,7 @@ const HomePage = () => {
   const [currentBodyFat, setCurrentBodyFat] = useState<number | null>(null);
   const [proteinConsumed, setProteinConsumed] = useState<number>(0);
   const [caloriesConsumed, setCaloriesConsumed] = useState<number>(0);
+  const [loggedMealTypes, setLoggedMealTypes] = useState<string[]>([]);
   const [preparedWorkout, setPreparedWorkout] = useState<Workout | null>(null);
   const [isWorkoutPreviewOpen, setIsWorkoutPreviewOpen] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
@@ -133,7 +134,7 @@ const HomePage = () => {
 
     const { data } = await supabase
       .from('nutrition_logs')
-      .select('calories, protein')
+      .select('calories, protein, meal_type')
       .eq('user_id', user.id)
       .gte('logged_at', startOfDay)
       .lte('logged_at', endOfDay);
@@ -143,6 +144,7 @@ const HomePage = () => {
       const totalProtein = data.reduce((sum, log) => sum + (log.protein || 0), 0);
       setCaloriesConsumed(Math.round(totalCalories));
       setProteinConsumed(Math.round(totalProtein));
+      setLoggedMealTypes(data.map(log => log.meal_type));
     }
   }, [user]);
 
@@ -387,6 +389,7 @@ const HomePage = () => {
           name: preparedWorkout.workout_name,
           targetMuscles: preparedWorkout.target_muscles,
         } : null}
+        loggedMealTypes={loggedMealTypes}
         onStartWorkout={handleStartWorkout}
         onOpenCoach={handleOpenCoach}
         onPreviewWorkout={handlePreviewWorkout}
