@@ -37,6 +37,25 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated");
     logStep("User authenticated", { email: user.email });
 
+    // Check if user is a tester (bypass subscription)
+    const { data: testerData } = await supabaseClient
+      .from('testers')
+      .select('id')
+      .eq('email', user.email)
+      .maybeSingle();
+
+    if (testerData) {
+      logStep("User is a tester, granting access", { email: user.email });
+      return new Response(JSON.stringify({
+        subscribed: true,
+        is_in_trial: false,
+        is_tester: true,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
     // Check if user is in trial (account created < 14 days ago)
     const createdAt = new Date(user.created_at);
     const now = new Date();
