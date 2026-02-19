@@ -19,24 +19,33 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
   const finalTranscriptRef = useRef('');
+  const interimTranscriptRef = useRef('');
+  const sentRef = useRef(false);
+  const onTranscriptionRef = useRef(onTranscription);
+  const onCloseRef = useRef(onClose);
+
+  // Keep refs up to date
+  useEffect(() => {
+    onTranscriptionRef.current = onTranscription;
+    onCloseRef.current = onClose;
+  }, [onTranscription, onClose]);
 
   const hasSpeechRecognition = typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
 
-  // Cleanup on unmount / close
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      cleanup();
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch {}
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+      }
     };
   }, []);
 
-  const cleanup = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch {}
-    }
+  const stopMediaTracks = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       try { mediaRecorderRef.current.stop(); } catch {}
     }
@@ -45,6 +54,31 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
       streamRef.current = null;
     }
   }, []);
+
+  const doSend = useCallback(() => {
+    if (sentRef.current) return;
+    sentRef.current = true;
+
+    // Use final transcript, fall back to interim, fall back to displayed transcript
+    let text = finalTranscriptRef.current.trim();
+    if (!text) text = interimTranscriptRef.current.trim();
+    
+    console.log('[VoiceRecorder] doSend called, text:', JSON.stringify(text));
+
+    stopMediaTracks();
+
+    if (text) {
+      onTranscriptionRef.current(text);
+    }
+
+    setIsRecording(false);
+    setStatus('idle');
+    setTranscript('');
+    setRecordingTime(0);
+    finalTranscriptRef.current = '';
+    interimTranscriptRef.current = '';
+    onCloseRef.current();
+  }, [stopMediaTracks]);
 
   const startRecording = useCallback(async () => {
     try {
@@ -60,8 +94,9 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
       setRecordingTime(0);
       setTranscript('');
       finalTranscriptRef.current = '';
+      interimTranscriptRef.current = '';
+      sentRef.current = false;
 
-      // Start speech recognition
       if (hasSpeechRecognition) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
@@ -71,103 +106,88 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
         recognition.lang = 'fr-FR';
 
         recognition.onresult = (event: { resultIndex: number; results: { length: number; [key: number]: { isFinal: boolean; 0: { transcript: string } } } }) => {
-          let final = finalTranscriptRef.current;
+          let final = '';
           let interim = '';
-          for (let i = event.resultIndex; i < event.results.length; i++) {
+          for (let i = 0; i < event.results.length; i++) {
+            const t = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-              final += event.results[i][0].transcript;
-              finalTranscriptRef.current = final;
+              final += t;
             } else {
-              interim += event.results[i][0].transcript;
+              interim += t;
             }
           }
+          finalTranscriptRef.current = final;
+          interimTranscriptRef.current = interim;
           setTranscript(final + interim);
+          console.log('[VoiceRecorder] onresult - final:', JSON.stringify(final), 'interim:', JSON.stringify(interim));
         };
 
         recognition.onerror = (event: { error: string }) => {
-          console.error('Speech recognition error:', event.error);
+          console.error('[VoiceRecorder] recognition error:', event.error);
+          // On error, if we have any text, send it
+          if (event.error === 'no-speech' || event.error === 'aborted') {
+            return; // non-fatal
+          }
+        };
+
+        recognition.onend = () => {
+          console.log('[VoiceRecorder] recognition onend');
+          // Small delay to let last results process
+          setTimeout(() => doSend(), 100);
         };
 
         recognition.start();
+        console.log('[VoiceRecorder] recognition started');
       }
 
-      // Timer
       timerRef.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
     } catch (error) {
-      console.error('Microphone access error:', error);
+      console.error('[VoiceRecorder] Microphone access error:', error);
       setStatus('idle');
     }
-  }, [hasSpeechRecognition]);
-
-  const sendTranscriptRef = useRef(false);
-
-  const finishAndSend = useCallback(() => {
-    if (sendTranscriptRef.current) return; // prevent double-send
-    sendTranscriptRef.current = true;
-
-    const finalText = finalTranscriptRef.current.trim();
-    console.log('[VoiceRecorder] finishAndSend, transcript:', finalText);
-    if (finalText) {
-      onTranscription(finalText);
-    }
-
-    // Stop media tracks
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      try { mediaRecorderRef.current.stop(); } catch {}
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-    }
-
-    // Reset UI
-    setIsRecording(false);
-    setStatus('idle');
-    setTranscript('');
-    setRecordingTime(0);
-    finalTranscriptRef.current = '';
-    onClose();
-  }, [onTranscription, onClose]);
+  }, [hasSpeechRecognition, doSend]);
 
   const stopAndSend = useCallback(() => {
+    console.log('[VoiceRecorder] stopAndSend called, final:', JSON.stringify(finalTranscriptRef.current), 'interim:', JSON.stringify(interimTranscriptRef.current));
     setIsRecording(false);
     setStatus('processing');
-    sendTranscriptRef.current = false;
 
-    // Stop timer
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
 
     if (recognitionRef.current) {
-      // Listen for the end event to guarantee final results are captured
-      recognitionRef.current.onend = () => {
-        console.log('[VoiceRecorder] recognition onend fired');
-        finishAndSend();
-      };
       try { recognitionRef.current.stop(); } catch {}
-      // Safety fallback if onend never fires (e.g. iOS quirks)
-      setTimeout(() => {
-        finishAndSend();
-      }, 1500);
+      // recognition.onend will call doSend
+      // Safety fallback
+      setTimeout(() => doSend(), 2000);
     } else {
-      // No speech recognition — send immediately
-      finishAndSend();
+      doSend();
     }
-  }, [finishAndSend]);
+  }, [doSend]);
 
   const handleClose = useCallback(() => {
-    cleanup();
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch {}
+      recognitionRef.current = null;
+    }
+    stopMediaTracks();
     setIsRecording(false);
     setStatus('idle');
     setTranscript('');
     setRecordingTime(0);
     finalTranscriptRef.current = '';
+    interimTranscriptRef.current = '';
+    sentRef.current = false;
     onClose();
-  }, [cleanup, onClose]);
+  }, [stopMediaTracks, onClose]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
