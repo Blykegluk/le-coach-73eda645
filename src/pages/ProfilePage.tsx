@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Settings, ChevronRight, Target, Apple, Watch, Bell, Shield, HelpCircle, LogOut, User, Moon, Sun } from 'lucide-react';
+import { Settings, ChevronRight, Target, Apple, Watch, Bell, Shield, HelpCircle, LogOut, User, Moon, Sun, CreditCard, Crown } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import GoalEditorModal from '@/components/profile/GoalEditorModal';
 import ProfileEditModal from '@/components/profile/ProfileEditModal';
@@ -26,6 +27,7 @@ type ModalType = 'goal' | 'profile' | 'objectives' | 'dietary' | 'notifications'
 const ProfilePage = () => {
   const { user, signOut } = useAuth();
   const { profile, isLoading } = useProfile();
+  const { subscribed, isInTrial, trialDaysRemaining, startCheckout, openCustomerPortal } = useSubscription();
   const { theme, setTheme } = useTheme();
   const [openModal, setOpenModal] = useState<ModalType>(null);
 
@@ -200,6 +202,46 @@ const ProfilePage = () => {
               <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Subscription */}
+      <div className="mb-4 card-premium p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+              <Crown className="h-5 w-5 text-primary" />
+              <div className="absolute inset-0 rounded-full bg-primary/20 blur-sm -z-10" />
+            </div>
+            <div>
+              <p className="font-medium text-foreground">
+                {subscribed ? 'Abonné' : isInTrial ? 'Essai gratuit' : 'Non abonné'}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {subscribed
+                  ? '9,90€/mois'
+                  : isInTrial
+                  ? `${trialDaysRemaining} jour${trialDaysRemaining > 1 ? 's' : ''} restant${trialDaysRemaining > 1 ? 's' : ''}`
+                  : 'Essai terminé'}
+              </p>
+            </div>
+          </div>
+          {subscribed ? (
+            <button
+              onClick={openCustomerPortal}
+              className="flex items-center gap-1 rounded-lg bg-muted px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/80 transition-colors"
+            >
+              <CreditCard className="h-3.5 w-3.5" />
+              Gérer
+            </button>
+          ) : (
+            <button
+              onClick={startCheckout}
+              className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-primary to-primary-glow px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-glow-sm hover:shadow-glow-md transition-all"
+            >
+              S'abonner
+            </button>
+          )}
         </div>
       </div>
 
