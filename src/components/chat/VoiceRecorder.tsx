@@ -101,14 +101,40 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
     }
   }, [hasSpeechRecognition]);
 
+  const sendTranscriptRef = useRef(false);
+
+  const finishAndSend = useCallback(() => {
+    if (sendTranscriptRef.current) return; // prevent double-send
+    sendTranscriptRef.current = true;
+
+    const finalText = finalTranscriptRef.current.trim();
+    console.log('[VoiceRecorder] finishAndSend, transcript:', finalText);
+    if (finalText) {
+      onTranscription(finalText);
+    }
+
+    // Stop media tracks
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try { mediaRecorderRef.current.stop(); } catch {}
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+
+    // Reset UI
+    setIsRecording(false);
+    setStatus('idle');
+    setTranscript('');
+    setRecordingTime(0);
+    finalTranscriptRef.current = '';
+    onClose();
+  }, [onTranscription, onClose]);
+
   const stopAndSend = useCallback(() => {
     setIsRecording(false);
     setStatus('processing');
-
-    // Stop recognition
-    if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch {}
-    }
+    sendTranscriptRef.current = false;
 
     // Stop timer
     if (timerRef.current) {
@@ -116,24 +142,22 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
       timerRef.current = null;
     }
 
-    // Stop media
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+    if (recognitionRef.current) {
+      // Listen for the end event to guarantee final results are captured
+      recognitionRef.current.onend = () => {
+        console.log('[VoiceRecorder] recognition onend fired');
+        finishAndSend();
+      };
+      try { recognitionRef.current.stop(); } catch {}
+      // Safety fallback if onend never fires (e.g. iOS quirks)
+      setTimeout(() => {
+        finishAndSend();
+      }, 1500);
+    } else {
+      // No speech recognition — send immediately
+      finishAndSend();
     }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-    }
-
-    // Small delay to let final recognition results arrive
-    setTimeout(() => {
-      const finalText = finalTranscriptRef.current.trim();
-      if (finalText) {
-        onTranscription(finalText);
-      }
-      handleClose();
-    }, 400);
-  }, [onTranscription]);
+  }, [finishAndSend]);
 
   const handleClose = useCallback(() => {
     cleanup();
