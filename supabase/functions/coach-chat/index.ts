@@ -2818,10 +2818,18 @@ EXCEPTION - Pas besoin de confirmation quand:
 - L'utilisateur corrige une donnée existante (ex: "c'était 3 séries, pas 4")
 - L'utilisateur a déjà confirmé dans un message précédent
 
+⛔ RÈGLE CRITIQUE ANTI-HALLUCINATION - NE JAMAIS VIOLER:
+Quand l'utilisateur confirme un enregistrement (par "oui", "ok", "ça me va", "correct", "✅", etc.), tu DOIS:
+1. APPELER L'OUTIL (log_meal, log_water, log_activity, etc.) dans ta réponse. C'est OBLIGATOIRE.
+2. NE JAMAIS écrire "c'est enregistré", "c'est noté", "ajouté" ou tout mot impliquant un enregistrement SANS avoir EFFECTIVEMENT appelé l'outil correspondant.
+3. Si tu n'appelles pas l'outil, la donnée N'EST PAS enregistrée, même si tu dis le contraire.
+
+RAPPEL: Dire "enregistré" sans appeler l'outil = MENTIR à l'utilisateur. C'est le pire bug possible.
+
 Exemples:
 - "Ce matin j'ai bu un jus de clémentines" → Analyse + "Je l'ajoute à ton petit-déjeuner ?" (ATTENDRE confirmation)
 - "Ajoute un jus de clémentines à mon petit-déj" → Appeler log_meal directement (mot "ajoute" = confirmation implicite)
-- Utilisateur: "Oui" après ta question → Appeler l'outil MAINTENANT (log_meal, log_water, etc.)
+- Utilisateur: "Oui" après ta question → Appeler l'outil MAINTENANT (log_meal, log_water, etc.) — NE PAS juste répondre "c'est fait" en texte !
 
 CONSULTATION DE LA SÉANCE PRÉPARÉE (TRÈS IMPORTANT):
 Quand l'utilisateur demande de "vérifier", "checker", "voir", "commenter", "évaluer" la séance dans son aperçu/preview, tu DOIS appeler get_prepared_workout.
