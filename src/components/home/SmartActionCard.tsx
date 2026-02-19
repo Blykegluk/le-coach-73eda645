@@ -8,12 +8,13 @@ interface SmartActionCardProps {
     name: string;
     targetMuscles?: string[];
   } | null;
+  loggedMealTypes?: string[];
   onStartWorkout?: () => void;
   onOpenCoach?: () => void;
   onPreviewWorkout?: () => void;
 }
 
-type ActionType = 'workout' | 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'hydration' | 'sleep';
+type ActionType = 'workout' | 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'snack2' | 'hydration' | 'sleep';
 
 interface ActionConfig {
   type: ActionType;
@@ -25,79 +26,47 @@ interface ActionConfig {
   iconBg: string;
 }
 
-const SmartActionCard = ({ preparedWorkout, onStartWorkout, onOpenCoach, onPreviewWorkout }: SmartActionCardProps) => {
+const SmartActionCard = ({ preparedWorkout, loggedMealTypes = [], onStartWorkout, onOpenCoach, onPreviewWorkout }: SmartActionCardProps) => {
   const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const getContextualAction = (): ActionConfig | null => {
-    const now = new Date();
-    const hour = now.getHours();
+  // Ordered meal sequence with their configs
+  const mealSequence: ActionConfig[] = [
+    { type: 'breakfast', icon: <Utensils className="h-6 w-6" />, title: 'Petit-déjeuner', subtitle: 'Commence ta journée avec énergie', buttonText: 'Enregistrer', gradient: 'from-energy to-energy/70', iconBg: 'bg-energy/20 text-energy' },
+    { type: 'snack', icon: <Utensils className="h-6 w-6" />, title: 'Collation', subtitle: 'Un petit boost', buttonText: 'Enregistrer', gradient: 'from-energy to-energy/70', iconBg: 'bg-energy/20 text-energy' },
+    { type: 'lunch', icon: <Utensils className="h-6 w-6" />, title: 'Déjeuner', subtitle: 'Recharge tes batteries', buttonText: 'Enregistrer', gradient: 'from-primary to-primary-glow', iconBg: 'bg-primary/20 text-primary' },
+    { type: 'snack2', icon: <Utensils className="h-6 w-6" />, title: 'Goûter', subtitle: "Un boost pour l'après-midi", buttonText: 'Enregistrer', gradient: 'from-energy to-energy/70', iconBg: 'bg-energy/20 text-energy' },
+    { type: 'dinner', icon: <Utensils className="h-6 w-6" />, title: 'Dîner', subtitle: 'Termine la journée en beauté', buttonText: 'Enregistrer', gradient: 'from-primary to-primary-glow', iconBg: 'bg-primary/20 text-primary' },
+  ];
 
-    if (hour >= 6 && hour < 10) {
-      return {
-        type: 'breakfast',
-        icon: <Utensils className="h-6 w-6" />,
-        title: 'Petit-déjeuner',
-        subtitle: 'Commence ta journée avec énergie',
-        buttonText: 'Enregistrer',
-        gradient: 'from-energy to-energy/70',
-        iconBg: 'bg-energy/20 text-energy',
-      };
-    }
-    if (hour >= 11 && hour < 14) {
-      return {
-        type: 'lunch',
-        icon: <Utensils className="h-6 w-6" />,
-        title: 'Déjeuner',
-        subtitle: 'Recharge tes batteries',
-        buttonText: 'Enregistrer',
-        gradient: 'from-primary to-primary-glow',
-        iconBg: 'bg-primary/20 text-primary',
-      };
-    }
-    if (hour >= 15 && hour < 17) {
-      return {
-        type: 'snack',
-        icon: <Utensils className="h-6 w-6" />,
-        title: 'Goûter',
-        subtitle: 'Un boost pour l\'après-midi',
-        buttonText: 'Enregistrer',
-        gradient: 'from-energy to-energy/70',
-        iconBg: 'bg-energy/20 text-energy',
-      };
-    }
-    if (hour >= 18 && hour < 21) {
-      return {
-        type: 'dinner',
-        icon: <Utensils className="h-6 w-6" />,
-        title: 'Dîner',
-        subtitle: 'Termine la journée en beauté',
-        buttonText: 'Enregistrer',
-        gradient: 'from-primary to-primary-glow',
-        iconBg: 'bg-primary/20 text-primary',
-      };
-    }
-    if (hour >= 21 || hour < 6) {
-      return {
-        type: 'sleep',
-        icon: <Moon className="h-6 w-6" />,
-        title: 'Bonne nuit',
-        subtitle: 'La récupération commence',
-        buttonText: 'Journal',
-        gradient: 'from-sleep to-sleep/70',
-        iconBg: 'bg-sleep/20 text-sleep',
-      };
-    }
-    return {
-      type: 'hydration',
-      icon: <Droplets className="h-6 w-6" />,
-      title: 'Hydratation',
-      subtitle: 'N\'oublie pas de boire',
-      buttonText: 'Ajouter',
-      gradient: 'from-water to-water/70',
-      iconBg: 'bg-water/20 text-water',
+  // Map meal_type from DB to our sequence types
+  const isMealLogged = (type: ActionType): boolean => {
+    const mapping: Record<string, string[]> = {
+      breakfast: ['breakfast'],
+      snack: ['morning_snack', 'snack'],
+      lunch: ['lunch'],
+      snack2: ['afternoon_snack', 'gouter'],
+      dinner: ['dinner'],
     };
+    const dbTypes = mapping[type] || [];
+    return dbTypes.some(t => loggedMealTypes.includes(t));
+  };
+
+  // Find the next unlogged meal
+  const nextMealAction = mealSequence.find(m => !isMealLogged(m.type));
+
+  // Night / hydration fallback
+  const hour = new Date().getHours();
+  const getContextualAction = (): ActionConfig | null => {
+    if (hour >= 21 || hour < 6) {
+      return { type: 'sleep', icon: <Moon className="h-6 w-6" />, title: 'Bonne nuit', subtitle: 'La récupération commence', buttonText: 'Journal', gradient: 'from-sleep to-sleep/70', iconBg: 'bg-sleep/20 text-sleep' };
+    }
+    // If all meals logged, suggest hydration
+    if (!nextMealAction) {
+      return { type: 'hydration', icon: <Droplets className="h-6 w-6" />, title: 'Hydratation', subtitle: "N'oublie pas de boire", buttonText: 'Ajouter', gradient: 'from-water to-water/70', iconBg: 'bg-water/20 text-water' };
+    }
+    return nextMealAction;
   };
 
   const contextualAction = getContextualAction();
@@ -113,12 +82,10 @@ const SmartActionCard = ({ preparedWorkout, onStartWorkout, onOpenCoach, onPrevi
     iconBg: 'bg-primary/20 text-primary',
   } : null;
 
-  // Build cards array: contextual first, then workout (if not already the contextual one)
+  // Build cards array: workout ALWAYS first, then contextual meal/action
   const cards: ActionConfig[] = [];
+  if (workoutAction) cards.push(workoutAction);
   if (contextualAction) cards.push(contextualAction);
-  if (workoutAction && contextualAction?.type !== 'workout') cards.push(workoutAction);
-  // If no contextual and just workout
-  if (cards.length === 0 && workoutAction) cards.push(workoutAction);
 
   const handleAction = (action: ActionConfig) => {
     switch (action.type) {
@@ -129,6 +96,7 @@ const SmartActionCard = ({ preparedWorkout, onStartWorkout, onOpenCoach, onPrevi
       case 'lunch':
       case 'dinner':
       case 'snack':
+      case 'snack2':
       case 'hydration':
         onOpenCoach?.();
         break;
