@@ -350,6 +350,24 @@ export type Database = {
         }
         Relationships: []
       }
+      testers: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+        }
+        Relationships: []
+      }
       user_context: {
         Row: {
           created_at: string
