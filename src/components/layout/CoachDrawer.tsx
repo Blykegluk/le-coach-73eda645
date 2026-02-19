@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Plus, Camera, Mic, Loader2, X, ArrowDown } from 'lucide-react';
+import { Send, Plus, Camera, Mic, Loader2, X, ArrowDown, Dumbbell } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import ImageCapture from '@/components/chat/ImageCapture';
 import VoiceRecorder from '@/components/chat/VoiceRecorder';
@@ -76,8 +76,8 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
         {/* Header */}
         <div className="flex-shrink-0 border-b border-border/50 px-4 pb-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow font-bold text-primary-foreground shadow-glow-sm">
-              H
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-primary-foreground shadow-glow-sm">
+              <Dumbbell className="h-5 w-5" />
             </div>
             <div className="flex-1">
               <h2 className="text-lg font-semibold leading-none">Coach IA</h2>
@@ -105,8 +105,8 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
                   <div key={msg.id || index}>
                     <div className={`flex gap-2 ${isCoach ? 'justify-start' : 'justify-end'}`}>
                       {isCoach && (
-                        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-xs font-bold text-primary-foreground">
-                          H
+                        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-primary-foreground">
+                          <Dumbbell className="h-3.5 w-3.5" />
                         </div>
                       )}
                       <div className={`flex max-w-[80%] flex-col ${isCoach ? 'items-start' : 'items-end'}`}>
@@ -140,9 +140,9 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
               })}
               {isLoading && (
                 <div className="flex gap-2 justify-start">
-                  <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-xs font-bold text-primary-foreground">
-                    H
-                  </div>
+                   <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-primary-foreground">
+                     <Dumbbell className="h-3.5 w-3.5" />
+                   </div>
                   <div className="rounded-2xl rounded-tl-md bg-muted/50 px-3 py-2">
                     <div className="flex gap-1">
                       <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
