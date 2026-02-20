@@ -2449,6 +2449,9 @@ serve(async (req) => {
     let preparedWorkoutContext = "";
     let trainingPreferencesContext = "";
     let workoutHistoryContext = "";
+    // Declare these at outer scope so they're accessible after the if(userId) block
+    let savedSplitPreference: string | null = null;
+    let recentSessions: any[] = [];
     
     if (userId) {
       // Fetch profile, health context, prepared workout, AND last 10 workout sessions in parallel
@@ -2487,10 +2490,9 @@ serve(async (req) => {
       const healthContexts = healthContextResult.data;
       const allUserContexts = trainingPrefsResult.data || [];
       const preparedWorkoutData = preparedWorkoutResult.data;
-      const recentSessions = recentSessionsResult.data || [];
+      recentSessions = recentSessionsResult.data || [];
 
       // Detect user's preferred split from saved context (for focus detection later)
-      let savedSplitPreference: string | null = null;
       for (const ctx of allUserContexts) {
         try {
           const val = ctx.value.toLowerCase();
