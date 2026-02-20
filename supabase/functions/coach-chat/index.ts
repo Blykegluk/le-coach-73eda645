@@ -180,13 +180,7 @@ interface ToolCall {
 // Available tools for the coach
 // Helper to get date in Europe/Paris timezone
 function getLocalDate(dateStr?: string): string {
-  if (dateStr) {
-    // Validate format YYYY-MM-DD
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-      return dateStr;
-    }
-  }
-  // Get current date in Paris timezone
+  // Get current date in Paris timezone (this is the source of truth)
   const now = new Date();
   const parisTime = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Paris",
@@ -194,6 +188,20 @@ function getLocalDate(dateStr?: string): string {
     month: "2-digit",
     day: "2-digit",
   }).format(now);
+  const currentYear = parseInt(parisTime.slice(0, 4));
+
+  if (dateStr) {
+    // Validate format YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      // CRITICAL: Reject dates with wrong year (AI hallucinating 2025 instead of 2026)
+      const dateYear = parseInt(dateStr.slice(0, 4));
+      if (dateYear < currentYear) {
+        console.warn(`[getLocalDate] AI passed year ${dateYear}, expected ${currentYear}. Using today: ${parisTime}`);
+        return parisTime;
+      }
+      return dateStr;
+    }
+  }
   return parisTime; // Returns YYYY-MM-DD format
 }
 
@@ -1467,7 +1475,17 @@ async function executeToolCall(
           caloriesBurned = Math.round(met * weight * (duration / 60));
         }
 
-        const performedAt = args.date ? `${args.date}T12:00:00` : new Date().toISOString();
+        // Validate date: if the year is wrong (e.g. AI uses 2025 instead of 2026), use today
+        let activityDateToUse = args.date;
+        if (activityDateToUse) {
+          const yearInDate = parseInt(activityDateToUse.slice(0, 4));
+          const currentYear = new Date().getFullYear();
+          if (yearInDate < currentYear) {
+            console.warn(`[log_activity] AI passed wrong year ${yearInDate}, correcting to ${currentYear}`);
+            activityDateToUse = today; // use server's today
+          }
+        }
+        const performedAt = activityDateToUse ? `${activityDateToUse}T12:00:00` : new Date().toISOString();
         const { error } = await supabase.from("workout_sessions").insert({
           user_id: userId,
           workout_name: args.activity_type,
@@ -1482,8 +1500,8 @@ async function executeToolCall(
 
         if (error) throw error;
 
-        // Also update daily calories burned
-        const activityDate = args.date || today;
+        // Also update daily calories burned - use validated date
+        const activityDate = activityDateToUse || today;
         const { data: currentMetrics } = await supabase
           .from("daily_metrics")
           .select("calories_burned")
@@ -3115,6 +3133,11 @@ Si c'est une séance de salle/sport structurée, tu DOIS:
       // Update conversation history with assistant message and tool results
       conversationHistory.push(assistantMessage);
       conversationHistory.push(...currentToolResults);
+      // CRITICAL: Re-inject date reminder so Gemini uses server date, not training data date
+      conversationHistory.push({
+        role: "system",
+        content: `RAPPEL CRITIQUE DE DATE: Nous sommes le ${today} (année ${today.slice(0,4)}). TOUJOURS utiliser ${today} comme date d'aujourd'hui. NE JAMAIS utiliser 2025 ou toute autre année. La date actuelle du serveur est ${today}.`,
+      });
 
       console.log(`Calling AI for follow-up (iteration ${iteration})`);
 
@@ -3151,7 +3174,15 @@ Si c'est une séance de salle/sport structurée, tu DOIS:
     }
 
     // Return final response (either after tool chain completed or no tool calls)
-    const finalContent = assistantMessage.content || executedActions.map((a) => a.result.message).join("\n");
+    // Ensure finalContent is never empty - provide a meaningful fallback
+    let finalContent = assistantMessage.content;
+    if (!finalContent || finalContent.trim() === "") {
+      if (executedActions.length > 0) {
+        finalContent = executedActions.map((a) => a.result.message).join("\n\n");
+      } else {
+        finalContent = "✅ C'est fait ! Autre chose ?";
+      }
+    }
 
     // Generate suggested replies via Gemini
     let suggestedReplies: string[] = [];
