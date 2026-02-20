@@ -2452,7 +2452,7 @@ serve(async (req) => {
     
     if (userId) {
       // Fetch profile, health context, prepared workout, AND last 10 workout sessions in parallel
-      const [profileResult, healthContextResult, preparedWorkoutResult, recentSessionsResult] = await Promise.all([
+      const [profileResult, healthContextResult, trainingPrefsResult, preparedWorkoutResult, recentSessionsResult] = await Promise.all([
         supabase
           .from("profiles")
           .select("first_name, goal, weight_kg, target_weight_kg, height_cm, activity_level, current_body_fat_pct, target_body_fat_pct, dietary_preferences, allergies")
@@ -2463,6 +2463,12 @@ serve(async (req) => {
           .select("key, value")
           .eq("user_id", userId)
           .like("key", "health_%"),
+        // Also fetch training preferences specifically for workout focus detection
+        supabase
+          .from("user_context")
+          .select("key, value")
+          .eq("user_id", userId)
+          .or("key.like.health_%,key.eq.training_split_preference"),
         supabase
           .from("user_context")
           .select("value, updated_at")
@@ -2479,8 +2485,24 @@ serve(async (req) => {
 
       const profile = profileResult.data;
       const healthContexts = healthContextResult.data;
+      const allUserContexts = trainingPrefsResult.data || [];
       const preparedWorkoutData = preparedWorkoutResult.data;
       const recentSessions = recentSessionsResult.data || [];
+
+      // Detect user's preferred split from saved context (for focus detection later)
+      let savedSplitPreference: string | null = null;
+      for (const ctx of allUserContexts) {
+        try {
+          const val = ctx.value.toLowerCase();
+          if (val.includes("pas de full") || val.includes("no full") || val.includes("jamais full") || val.includes("haut/bas") || val.includes("haut et bas") || val.includes("split haut") || val.includes("upper/lower")) {
+            savedSplitPreference = "split"; // means: NEVER full_body, always upper or lower
+          } else if (val.includes("haut du corps") || val.includes("upper_body")) {
+            savedSplitPreference = "upper_body";
+          } else if (val.includes("bas du corps") || val.includes("lower_body")) {
+            savedSplitPreference = "lower_body";
+          }
+        } catch { /* ignore */ }
+      }
       if (profile) {
         const goalLabels: Record<string, string> = {
           weight_loss: "perdre du poids",
@@ -2931,19 +2953,57 @@ Après avoir utilisé un outil, confirme l'action de manière naturelle et encou
     const workoutKeywords = ['séance', 'seance', 'entraînement', 'entrainement', 'programme', 'workout', 'preview', 'musculation', 'lancer la séance', 'prépare'];
     const isWorkoutRequest = workoutKeywords.some(k => lastContent.includes(k));
 
-    // Extract focus from message
+    // Extract focus from message — then fallback to saved preferences (NEVER default to full_body if user prefers split)
     let detectedFocus = "full_body";
     let detectedIntensity = "moderate";
-    if (lastContent.includes("haut du corps") || lastContent.includes("upper")) detectedFocus = "upper_body";
-    else if (lastContent.includes("bas du corps") || lastContent.includes("lower") || lastContent.includes("jambes") || lastContent.includes("cuisses")) detectedFocus = "lower_body";
-    else if (lastContent.includes("push") || lastContent.includes("poussée")) detectedFocus = "push";
-    else if (lastContent.includes("pull") || lastContent.includes("tirage")) detectedFocus = "pull";
-    else if (lastContent.includes("cardio")) detectedFocus = "cardio";
-    else if (lastContent.includes("abdos") || lastContent.includes("core")) detectedFocus = "core";
-    else if (lastContent.includes("pec") || lastContent.includes("dos") || lastContent.includes("épaule") || lastContent.includes("bras") || lastContent.includes("biceps")) detectedFocus = "upper_body";
-    
+    let focusExplicitlyMentioned = false;
+
+    if (lastContent.includes("haut du corps") || lastContent.includes("upper body") || lastContent.includes("upper_body")) {
+      detectedFocus = "upper_body"; focusExplicitlyMentioned = true;
+    } else if (lastContent.includes("bas du corps") || lastContent.includes("lower body") || lastContent.includes("lower_body") || lastContent.includes("jambes") || lastContent.includes("cuisses") || lastContent.includes("quadriceps") || lastContent.includes("fessiers") || lastContent.includes("ischio")) {
+      detectedFocus = "lower_body"; focusExplicitlyMentioned = true;
+    } else if (lastContent.includes("push") || lastContent.includes("poussée")) {
+      detectedFocus = "push"; focusExplicitlyMentioned = true;
+    } else if (lastContent.includes("pull") || lastContent.includes("tirage")) {
+      detectedFocus = "pull"; focusExplicitlyMentioned = true;
+    } else if (lastContent.includes("cardio")) {
+      detectedFocus = "cardio"; focusExplicitlyMentioned = true;
+    } else if (lastContent.includes("abdos") || lastContent.includes("core")) {
+      detectedFocus = "core"; focusExplicitlyMentioned = true;
+    } else if (lastContent.includes("pec") || lastContent.includes("épaule") || lastContent.includes("biceps") || lastContent.includes("triceps")) {
+      detectedFocus = "upper_body"; focusExplicitlyMentioned = true;
+    } else if (lastContent.includes("dos") && !lastContent.includes("mal au dos")) {
+      detectedFocus = "upper_body"; focusExplicitlyMentioned = true;
+    }
+
+    // If focus NOT explicitly mentioned in message, use saved split preference
+    // This prevents defaulting to full_body when user has expressed a preference
+    if (!focusExplicitlyMentioned && savedSplitPreference) {
+      if (savedSplitPreference === "split") {
+        // Alternate upper/lower based on last session
+        const lastSession = recentSessions?.[0];
+        const lastMuscles = (lastSession?.target_muscles || []).join(" ").toLowerCase();
+        const lastWasUpper = lastMuscles.includes("pec") || lastMuscles.includes("dos") || lastMuscles.includes("épaule") || lastMuscles.includes("bras") || lastMuscles.includes("biceps") || lastMuscles.includes("triceps") || lastMuscles.includes("upper") || lastMuscles.includes("haut");
+        const lastWasLower = lastMuscles.includes("jambe") || lastMuscles.includes("quad") || lastMuscles.includes("fessier") || lastMuscles.includes("ischio") || lastMuscles.includes("lower") || lastMuscles.includes("bas") || lastMuscles.includes("cuisse");
+        if (lastWasUpper) {
+          detectedFocus = "lower_body"; // alternate
+        } else if (lastWasLower) {
+          detectedFocus = "upper_body"; // alternate
+        } else {
+          detectedFocus = "upper_body"; // default to upper if unknown
+        }
+        console.log(`[Focus] Split preference detected. Last session muscles: "${lastMuscles}". Choosing: ${detectedFocus}`);
+      } else {
+        detectedFocus = savedSplitPreference;
+        console.log(`[Focus] Using saved preference: ${detectedFocus}`);
+      }
+    }
+
     if (lastContent.includes("intense") || lastContent.includes("lourd") || lastContent.includes("costaud") || lastContent.includes("hardcore")) detectedIntensity = "intense";
     else if (lastContent.includes("léger") || lastContent.includes("récup") || lastContent.includes("doux")) detectedIntensity = "light";
+
+    // Also check recent context for activity log reminder
+    const isActivityMention = lastContent.includes("j'ai fait") || lastContent.includes("j ai fait") || lastContent.includes("j'ai terminé") || lastContent.includes("j'ai fini") || lastContent.includes("séance terminée") || lastContent.includes("c'était ma séance") || lastContent.includes("ma séance de");
 
     const finalMessages = [
       { role: "system", content: systemPrompt },
@@ -2952,13 +3012,32 @@ Après avoir utilisé un outil, confirme l'action de manière naturelle et encou
 
     // If workout-related, inject a strong reminder right before the last message
     if (isWorkoutRequest) {
+      const splitNote = savedSplitPreference === "split" 
+        ? `\n⚠️ L'utilisateur a une préférence STRICTE pour le split haut/bas. NE JAMAIS utiliser focus="full_body". Focus choisi automatiquement: "${detectedFocus}" (basé sur l'alternance haut/bas).`
+        : savedSplitPreference 
+          ? `\n⚠️ L'utilisateur préfère les séances "${savedSplitPreference}". RESPECTER cette préférence.`
+          : "";
+      
       finalMessages.splice(finalMessages.length - 1, 0, {
         role: "system",
         content: `RAPPEL CRITIQUE: L'utilisateur demande une séance. Tu DOIS appeler generate_workout avec les paramètres:
 - focus: "${detectedFocus}"
 - intensity: "${detectedIntensity}"
 NE JAMAIS appeler generate_workout sans focus et intensity.
-NE JAMAIS écrire un programme en texte. L'outil sauvegarde automatiquement la séance dans l'app.`
+NE JAMAIS écrire un programme en texte. L'outil sauvegarde automatiquement la séance dans l'app.${splitNote}`
+      });
+    }
+
+    // If user mentions having done a session, remind coach to log it
+    if (isActivityMention) {
+      finalMessages.splice(finalMessages.length - 1, 0, {
+        role: "system",
+        content: `RAPPEL CRITIQUE - ENREGISTREMENT SÉANCE: L'utilisateur semble mentionner qu'il a effectué une séance ou activité sportive.
+Si c'est une séance de salle/sport structurée, tu DOIS:
+1. Vérifier avec get_recent_workout_sessions si elle est déjà enregistrée (avec une date récente)
+2. Si elle n'est PAS enregistrée (status "completed"), utilise log_activity pour l'enregistrer
+3. Ne JAMAIS dire "c'est enregistré" sans avoir RÉELLEMENT appelé l'outil
+4. Si l'utilisateur confirme des informations (durée, exercices), appelle IMMÉDIATEMENT l'outil d'enregistrement`
       });
     }
 
