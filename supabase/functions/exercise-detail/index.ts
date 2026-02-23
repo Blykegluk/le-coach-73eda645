@@ -146,7 +146,7 @@ serve(async (req) => {
       );
     }
 
-    const normalizedName = exerciseName.toLowerCase().replace(/[^a-z0-9àâäéèêëïîôùûüÿçœæ]+/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+    const normalizedName = exerciseName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
 
     console.log(`Generating exercise detail for: ${exerciseName}`);
 
