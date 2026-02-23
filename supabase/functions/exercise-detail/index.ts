@@ -19,7 +19,7 @@ async function generatePositionsImage(exerciseName: string, apiKey: string): Pro
 Same person, same angle, same style throughout. The style should be like a professional fitness anatomy textbook (Strength Training Anatomy by Frederic Delavier): realistic human body proportions, visible muscle definition and shading, semi-transparent skin showing underlying engaged muscles. 3/4 or side view, plain white background. An arrow or visual flow from left to right showing the movement progression. No text, no labels. Clean, high-quality, detailed anatomical drawing. Wide landscape format.`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -56,7 +56,7 @@ async function generateMuscleDiagram(exerciseName: string, muscles: string[], ap
   const muscleList = muscles.length > 0 ? muscles.join(", ") : "main muscles";
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
