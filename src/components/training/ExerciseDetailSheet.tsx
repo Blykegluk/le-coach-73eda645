@@ -20,8 +20,9 @@ interface ExerciseDetail {
   how_to: string;
   key_points: string[];
   muscles_targeted: string[];
-  exercise_images: string[]; // base64 data URLs
-  muscle_diagram: string | null; // base64 data URL
+  positions_image?: string | null; // URL from storage (single coherent image)
+  exercise_images: string[]; // backward compat
+  muscle_diagram: string | null; // URL from storage
 }
 
 const CACHE_KEY_PREFIX = 'exercise_detail_v5_';
@@ -52,10 +53,6 @@ export const ExerciseDetailSheet = ({
         if (Date.now() - timestamp < CACHE_EXPIRY_MS) {
           setDetail(data);
           setError(null);
-          // If cached without images, refetch in background for images
-          if (!data.exercise_images?.length && !data.muscle_diagram) {
-            fetchExerciseDetail(0, true);
-          }
           return;
         }
       } catch {
@@ -66,8 +63,8 @@ export const ExerciseDetailSheet = ({
     fetchExerciseDetail();
   }, [isOpen, exerciseName]);
 
-  const fetchExerciseDetail = async (retryCount = 0, backgroundRefresh = false) => {
-    if (!backgroundRefresh) setIsLoading(true);
+  const fetchExerciseDetail = async (retryCount = 0) => {
+    setIsLoading(true);
     setError(null);
 
     try {
@@ -99,18 +96,12 @@ export const ExerciseDetailSheet = ({
       if (data?.error) throw new Error(data.error);
 
       setDetail(data);
-      // Cache text-only data (images are too large for localStorage ~5MB limit)
+      // Cache the data - now safe since we use URLs instead of base64
       const cacheKey = `${CACHE_KEY_PREFIX}${exerciseName.toLowerCase().replace(/\s+/g, '_')}`;
       try {
-        const cacheData = {
-          ...data,
-          // Strip base64 images to avoid localStorage quota errors
-          exercise_images: [],
-          muscle_diagram: null,
-        };
-        localStorage.setItem(cacheKey, JSON.stringify({ data: cacheData, timestamp: Date.now() }));
+        localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
       } catch (e) {
-        console.warn('Cache write failed (quota exceeded), skipping', e);
+        console.warn('Cache write failed, skipping', e);
       }
     } catch (err) {
       console.error('Error fetching exercise detail:', err);
@@ -169,36 +160,32 @@ export const ExerciseDetailSheet = ({
             </div>
           ) : detail ? (
             <>
-              {/* Section 1: Exercise Positions (2 AI-generated illustrations) */}
+              {/* Section 1: Exercise Positions (single coherent illustration) */}
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                   Comment faire
                 </p>
-                <div className="grid grid-cols-2 gap-3">
-                  {detail.exercise_images.length >= 2 ? (
-                    detail.exercise_images.slice(0, 2).map((img, i) => (
-                      <div
-                        key={i}
-                        className="aspect-square rounded-2xl bg-card border border-border overflow-hidden flex items-center justify-center p-2"
-                      >
-                        <img
-                          src={img}
-                          alt={`${exerciseName} - position ${i + 1}`}
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
-                    ))
-                  ) : (
-                    <>
-                      <div className="aspect-square rounded-2xl bg-muted/40 border border-border flex items-center justify-center">
-                        <ExerciseIcon className="h-16 w-16 text-muted-foreground/40" />
-                      </div>
-                      <div className="aspect-square rounded-2xl bg-muted/40 border border-border flex items-center justify-center">
-                        <ExerciseIcon className="h-16 w-16 text-muted-foreground/40" />
-                      </div>
-                    </>
-                  )}
-                </div>
+                {detail.positions_image ? (
+                  <div className="rounded-2xl bg-card border border-border overflow-hidden flex items-center justify-center p-2">
+                    <img
+                      src={detail.positions_image}
+                      alt={`${exerciseName} - positions`}
+                      className="w-full h-auto object-contain"
+                    />
+                  </div>
+                ) : detail.exercise_images?.length > 0 ? (
+                  <div className="rounded-2xl bg-card border border-border overflow-hidden flex items-center justify-center p-2">
+                    <img
+                      src={detail.exercise_images[0]}
+                      alt={`${exerciseName} - positions`}
+                      className="w-full h-auto object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="aspect-video rounded-2xl bg-muted/40 border border-border flex items-center justify-center">
+                    <ExerciseIcon className="h-16 w-16 text-muted-foreground/40" />
+                  </div>
+                )}
                 <p className="text-center text-xs text-muted-foreground mt-2">
                   Position de départ → Position finale
                 </p>
