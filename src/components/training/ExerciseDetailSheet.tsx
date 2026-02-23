@@ -52,6 +52,10 @@ export const ExerciseDetailSheet = ({
         if (Date.now() - timestamp < CACHE_EXPIRY_MS) {
           setDetail(data);
           setError(null);
+          // If cached without images, refetch in background for images
+          if (!data.exercise_images?.length && !data.muscle_diagram) {
+            fetchExerciseDetail(0, true);
+          }
           return;
         }
       } catch {
@@ -62,8 +66,8 @@ export const ExerciseDetailSheet = ({
     fetchExerciseDetail();
   }, [isOpen, exerciseName]);
 
-  const fetchExerciseDetail = async (retryCount = 0) => {
-    setIsLoading(true);
+  const fetchExerciseDetail = async (retryCount = 0, backgroundRefresh = false) => {
+    if (!backgroundRefresh) setIsLoading(true);
     setError(null);
 
     try {
@@ -95,8 +99,19 @@ export const ExerciseDetailSheet = ({
       if (data?.error) throw new Error(data.error);
 
       setDetail(data);
+      // Cache text-only data (images are too large for localStorage ~5MB limit)
       const cacheKey = `${CACHE_KEY_PREFIX}${exerciseName.toLowerCase().replace(/\s+/g, '_')}`;
-      localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
+      try {
+        const cacheData = {
+          ...data,
+          // Strip base64 images to avoid localStorage quota errors
+          exercise_images: [],
+          muscle_diagram: null,
+        };
+        localStorage.setItem(cacheKey, JSON.stringify({ data: cacheData, timestamp: Date.now() }));
+      } catch (e) {
+        console.warn('Cache write failed (quota exceeded), skipping', e);
+      }
     } catch (err) {
       console.error('Error fetching exercise detail:', err);
       // Auto-retry once on timeout/network error
