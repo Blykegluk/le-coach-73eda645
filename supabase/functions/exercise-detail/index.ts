@@ -115,8 +115,14 @@ async function uploadToStorage(
       return null;
     }
 
-    const { data } = supabase.storage.from("chat-uploads").getPublicUrl(path);
-    return data.publicUrl;
+    const { data: signedData, error: signError } = await supabase.storage
+      .from("chat-uploads")
+      .createSignedUrl(path, 60 * 60 * 24 * 30); // 30 days
+    if (signError || !signedData?.signedUrl) {
+      console.error("Signed URL error:", signError);
+      return null;
+    }
+    return signedData.signedUrl;
   } catch (err) {
     console.error("Upload failed:", err);
     return null;
@@ -217,12 +223,12 @@ Règles:
     let muscleUrl: string | null = null;
 
     if (hasPositions) {
-      const { data } = supabase.storage.from("chat-uploads").getPublicUrl(positionsPath);
-      positionsUrl = data.publicUrl;
+      const { data } = await supabase.storage.from("chat-uploads").createSignedUrl(positionsPath, 60 * 60 * 24 * 30);
+      positionsUrl = data?.signedUrl || null;
     }
     if (hasMuscles) {
-      const { data } = supabase.storage.from("chat-uploads").getPublicUrl(musclePath);
-      muscleUrl = data.publicUrl;
+      const { data } = await supabase.storage.from("chat-uploads").createSignedUrl(musclePath, 60 * 60 * 24 * 30);
+      muscleUrl = data?.signedUrl || null;
     }
 
     if (!hasPositions || !hasMuscles) {
