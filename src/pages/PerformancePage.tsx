@@ -1,80 +1,13 @@
 import { Dumbbell, Clock, Flame, Trophy, TrendingUp } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { Skeleton } from '@/components/ui/skeleton';
-
-interface PerformanceStats {
-  totalSessions: number;
-  totalTimeMin: number;
-  totalCalories: number;
-  currentStreak: number;
-}
+import { usePerformanceStats } from '@/hooks/queries/usePerformanceQueries';
 
 const PerformancePage = () => {
   const { user } = useAuth();
   const { profile } = useProfile();
-  const [stats, setStats] = useState<PerformanceStats>({
-    totalSessions: 0,
-    totalTimeMin: 0,
-    totalCalories: 0,
-    currentStreak: 0,
-  });
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchPerformanceData = async () => {
-      if (!user) return;
-
-      // Fetch all activities
-      const { data: activities } = await supabase
-        .from('activities')
-        .select('duration_min, calories_burned, performed_at')
-        .eq('user_id', user.id)
-        .order('performed_at', { ascending: false });
-
-      if (activities) {
-        const totalSessions = activities.length;
-        const totalTimeMin = activities.reduce((sum, a) => sum + (a.duration_min || 0), 0);
-        const totalCalories = activities.reduce((sum, a) => sum + (a.calories_burned || 0), 0);
-        
-        // Calculate streak (consecutive days with activities)
-        let streak = 0;
-        if (activities.length > 0) {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          
-          const activityDates = [...new Set(
-            activities.map(a => new Date(a.performed_at).toISOString().split('T')[0])
-          )].sort().reverse();
-          
-          for (let i = 0; i < activityDates.length; i++) {
-            const activityDate = new Date(activityDates[i]);
-            const expectedDate = new Date(today);
-            expectedDate.setDate(today.getDate() - i);
-            
-            if (activityDate.toISOString().split('T')[0] === expectedDate.toISOString().split('T')[0]) {
-              streak++;
-            } else {
-              break;
-            }
-          }
-        }
-
-        setStats({
-          totalSessions,
-          totalTimeMin,
-          totalCalories,
-          currentStreak: streak,
-        });
-      }
-
-      setIsLoading(false);
-    };
-
-    fetchPerformanceData();
-  }, [user]);
+  const { data: stats, isLoading } = usePerformanceStats(user?.id);
 
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -83,7 +16,6 @@ const PerformancePage = () => {
     return `${hours}h ${mins}min`;
   };
 
-  // Calculate goal progress from profile
   const goals = profile ? [
     {
       id: 'weight',
@@ -97,7 +29,7 @@ const PerformancePage = () => {
     },
   ].filter(g => g.target > 0) : [];
 
-  if (isLoading) {
+  if (isLoading || !stats) {
     return (
       <div className="safe-top px-4 pb-4 pt-2">
         <div className="mb-6">
@@ -163,31 +95,23 @@ const PerformancePage = () => {
         <div className="mb-4">
           <p className="mb-3 text-sm font-medium text-foreground">Mon objectif</p>
           <div className="space-y-3">
-            {goals.map((goal) => {
-              const progress = goal.type === 'loss'
-                ? ((goal.current - goal.target) / (goal.current - goal.target)) * 100
-                : goal.type === 'gain'
-                ? ((goal.current / goal.target) * 100)
-                : 100;
-              
-              return (
-                <div key={goal.id} className="rounded-2xl border border-border bg-card p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10">
-                        <TrendingUp className="h-3 w-3 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">{goal.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {goal.current}{goal.unit} → {goal.target}{goal.unit}
-                        </p>
-                      </div>
+            {goals.map((goal) => (
+              <div key={goal.id} className="rounded-2xl border border-border bg-card p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10">
+                      <TrendingUp className="h-3 w-3 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">{goal.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {goal.current}{goal.unit} → {goal.target}{goal.unit}
+                      </p>
                     </div>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
       )}

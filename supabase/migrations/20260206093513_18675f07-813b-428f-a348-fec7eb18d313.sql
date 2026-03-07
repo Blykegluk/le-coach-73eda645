@@ -1,3 +1,6 @@
+-- ⚠️ ONE-TIME DATA FIX — NE PAS REPRODUIRE
+-- Cette migration contient des opérations de données spécifiques à un utilisateur (anthony.bouskila@gmail.com).
+-- Les futures opérations de données doivent passer par l'app ou des scripts de seed séparés, pas des migrations.
 -- Correction: utiliser une seule instruction WITH (CTE) pour que keep_ids/delete_ids soient visibles
 
 BEGIN;

@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { dataManager } from '@/services/DataManager';
+import { healthProvider } from '@/providers/health';
 
 interface AuthContextType {
   user: User | null;
@@ -18,30 +18,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
-        // Sync with DataManager
-        if (session?.user) {
-          setTimeout(() => {
-            dataManager.setUserId(session.user.id);
-          }, 0);
-        } else {
-          dataManager.setUserId(null);
-        }
+        healthProvider.setUserId(session?.user?.id ?? null);
       }
     );
 
-    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) {
-        dataManager.setUserId(session.user.id);
-      }
+      healthProvider.setUserId(session?.user?.id ?? null);
       setIsLoading(false);
     });
 
@@ -50,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    dataManager.setUserId(null);
+    healthProvider.setUserId(null);
   };
 
   return (

@@ -1,3 +1,5 @@
+-- ⚠️ ONE-TIME DATA FIX — NE PAS REPRODUIRE
+-- Insertion de préférence pour un user spécifique (user_id hardcodé). Utiliser l'app pour les futures préférences.
 -- Save user's training split preference permanently so the coach always reads it
 INSERT INTO user_context (user_id, key, value)
 VALUES (

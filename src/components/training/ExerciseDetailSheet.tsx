@@ -26,7 +26,7 @@ interface ExerciseDetail {
 }
 
 const CACHE_KEY_PREFIX = 'exercise_detail_v6_';
-const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
+const CACHE_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const ExerciseDetailSheet = ({
   isOpen,

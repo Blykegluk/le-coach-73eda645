@@ -101,22 +101,3 @@ export interface CoachAction {
   response: string;
 }
 
-// Input types for DataManager
-export interface LogMealInput {
-  meal_type: MealType;
-  food_name: string;
-  calories: number;
-  protein?: number;
-  carbs?: number;
-  fat?: number;
-  photo_url?: string;
-  ai_analysis_json?: Record<string, unknown>;
-}
-
-export interface LogActivityInput {
-  activity_type: string;
-  duration_min: number;
-  avg_heart_rate?: number;
-  calories_burned?: number;
-  notes?: string;
-}

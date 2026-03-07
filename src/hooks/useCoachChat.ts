@@ -202,28 +202,88 @@ export function useCoachChat(onNavigateAway?: () => void) {
         throw new Error(errorBody || `Erreur ${response.status}`);
       }
 
-      const data = await response.json();
+      // Read SSE stream
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let sseBuffer = "";
+      let accumulatedContent = "";
+      let assistantAdded = false;
 
-      if (data.actions && data.actions.length > 0) {
-        data.actions.forEach((action: { name: string; result: { success: boolean; message: string; data?: { workout?: unknown; type?: string } } }) => {
-          if (action.result.success) {
-            toast.success(action.result.message);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-            if (action.name === "generate_workout" && action.result.data?.workout) {
-              // Workout is already saved to user_context by the edge function
-              // Realtime subscriptions will pick it up automatically
-            }
+        sseBuffer += decoder.decode(value, { stream: true });
+        const eventBlocks = sseBuffer.split("\n\n");
+        sseBuffer = eventBlocks.pop() || "";
+
+        for (const block of eventBlocks) {
+          const eventMatch = block.match(/^event: (.+)/m);
+          const dataMatch = block.match(/^data: (.+)/m);
+          if (!eventMatch || !dataMatch) continue;
+
+          const eventType = eventMatch[1];
+          let eventData: any;
+          try { eventData = JSON.parse(dataMatch[1]); } catch { continue; }
+
+          switch (eventType) {
+            case "content_start":
+              accumulatedContent = "";
+              if (!assistantAdded) {
+                setMessages(prev => [...prev, { role: "assistant", content: "" }]);
+                assistantAdded = true;
+              } else {
+                setMessages(prev => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = { ...updated[updated.length - 1], content: "" };
+                  return updated;
+                });
+              }
+              break;
+
+            case "content_delta":
+              accumulatedContent += eventData.text;
+              setMessages(prev => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                updated[updated.length - 1] = { ...last, content: last.content + eventData.text };
+                return updated;
+              });
+              break;
+
+            case "actions":
+              if (Array.isArray(eventData)) {
+                eventData.forEach((action: { name: string; result: { success: boolean; message: string; data?: { workout?: unknown } } }) => {
+                  if (action.result.success) {
+                    toast.success(action.result.message);
+                  }
+                });
+              }
+              break;
+
+            case "suggested_replies":
+              if (Array.isArray(eventData)) {
+                setMessages(prev => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = { ...updated[updated.length - 1], suggestedReplies: eventData };
+                  return updated;
+                });
+              }
+              break;
+
+            case "error":
+              throw new Error(eventData.message || "Erreur du coach");
+
+            case "done":
+              break;
           }
-        });
+        }
       }
 
-      const assistantMsg: Message = { 
-        role: "assistant", 
-        content: data.content,
-        suggestedReplies: data.suggestedReplies || [],
-      };
-      setMessages(prev => [...prev, assistantMsg]);
-      await saveMessage(userId, assistantMsg);
+      // Save the complete assistant message
+      if (accumulatedContent) {
+        await saveMessage(userId, { role: "assistant", content: accumulatedContent });
+      }
 
     } catch (error) {
       console.error("Chat error:", error);
