@@ -86,6 +86,7 @@ interface CircularProgressRingsProps {
   proteinGoal: number;
   waterConsumed: number;
   waterGoal: number;
+  onRingClick?: (ring: 'calories' | 'protein' | 'water') => void;
 }
 
 const CircularProgressRings = ({
@@ -95,6 +96,7 @@ const CircularProgressRings = ({
   proteinGoal,
   waterConsumed,
   waterGoal,
+  onRingClick,
 }: CircularProgressRingsProps) => {
   // Convert water to liters for display
   const waterLiters = (waterConsumed / 1000).toFixed(1);
@@ -104,37 +106,52 @@ const CircularProgressRings = ({
     <div className="card-premium p-4 mb-4">
       <div className="flex items-center justify-around">
         {/* Calories Ring */}
-        <ProgressRing
-          value={caloriesConsumed}
-          max={caloriesGoal}
-          color="hsl(var(--calories))"
-          bgColor="hsl(var(--calories-light))"
-          icon={<Flame className="h-5 w-5" />}
-          label="Calories"
-          unit=""
-        />
-        
+        <button
+          onClick={() => onRingClick?.('calories')}
+          className="transition-transform active:scale-95 focus:outline-none"
+        >
+          <ProgressRing
+            value={caloriesConsumed}
+            max={caloriesGoal}
+            color="hsl(var(--calories))"
+            bgColor="hsl(var(--calories-light))"
+            icon={<Flame className="h-5 w-5" />}
+            label="Calories"
+            unit=""
+          />
+        </button>
+
         {/* Protein Ring */}
-        <ProgressRing
-          value={proteinConsumed}
-          max={proteinGoal}
-          color="hsl(var(--primary))"
-          bgColor="hsl(var(--ring-background))"
-          icon={<Beef className="h-5 w-5" />}
-          label="Protéines"
-          unit="g"
-        />
-        
+        <button
+          onClick={() => onRingClick?.('protein')}
+          className="transition-transform active:scale-95 focus:outline-none"
+        >
+          <ProgressRing
+            value={proteinConsumed}
+            max={proteinGoal}
+            color="hsl(var(--primary))"
+            bgColor="hsl(var(--ring-background))"
+            icon={<Beef className="h-5 w-5" />}
+            label="Protéines"
+            unit="g"
+          />
+        </button>
+
         {/* Water Ring */}
-        <ProgressRing
-          value={parseFloat(waterLiters)}
-          max={parseFloat(waterGoalLiters)}
-          color="hsl(var(--water))"
-          bgColor="hsl(var(--water-light))"
-          icon={<Droplets className="h-5 w-5" />}
-          label="Eau"
-          unit="L"
-        />
+        <button
+          onClick={() => onRingClick?.('water')}
+          className="transition-transform active:scale-95 focus:outline-none"
+        >
+          <ProgressRing
+            value={parseFloat(waterLiters)}
+            max={parseFloat(waterGoalLiters)}
+            color="hsl(var(--water))"
+            bgColor="hsl(var(--water-light))"
+            icon={<Droplets className="h-5 w-5" />}
+            label="Eau"
+            unit="L"
+          />
+        </button>
       </div>
     </div>
   );

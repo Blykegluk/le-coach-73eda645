@@ -15,6 +15,8 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import GoalEditorModal from '@/components/profile/GoalEditorModal';
+import AppHeader from '@/components/layout/AppHeader';
+import StatHistorySheet from '@/components/home/StatHistorySheet';
 
 import HealthStatsCard from '@/components/home/HealthStatsCard';
 import SmartActionCard from '@/components/home/SmartActionCard';
@@ -40,6 +42,7 @@ const HomePage = () => {
   const [isWorkoutPreviewOpen, setIsWorkoutPreviewOpen] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [isRefreshingWorkout, setIsRefreshingWorkout] = useState(false);
+  const [statHistoryKey, setStatHistoryKey] = useState<string | null>(null);
 
   // TanStack Query hooks — all data fetching
   const { data: metrics, isLoading: metricsLoading } = useTodayMetrics(user?.id);
@@ -67,6 +70,20 @@ const HomePage = () => {
     : profile?.activity_level === 'moderate' ? 4
     : profile?.activity_level === 'light' ? 3
     : 2;
+
+  // Stat history sheet config
+  const statHistoryConfig: Record<string, { title: string; unit: string; metricKey: string }> = {
+    sleep: { title: 'Sommeil', unit: 'h', metricKey: 'sleep_hours' },
+    heartRate: { title: 'Rythme cardiaque', unit: 'bpm', metricKey: 'heart_rate_avg' },
+    steps: { title: 'Pas', unit: '', metricKey: 'steps' },
+    activeMinutes: { title: 'Minutes actives', unit: 'min', metricKey: 'active_minutes' },
+    calories: { title: 'Calories', unit: 'kcal', metricKey: 'calories' },
+    protein: { title: 'Protéines', unit: 'g', metricKey: 'protein' },
+    water: { title: 'Eau', unit: 'ml', metricKey: 'water_ml' },
+  };
+
+  const handleStatClick = (key: string) => setStatHistoryKey(key);
+  const handleRingClick = (ring: 'calories' | 'protein' | 'water') => setStatHistoryKey(ring);
 
   const handleStartWorkout = () => {
     if (preparedWorkout) {
@@ -155,12 +172,7 @@ const HomePage = () => {
   return (
     <div className="safe-top px-4 pb-24 md:pb-4 pt-2">
       {/* Header */}
-      <div className="mb-4 text-center">
-        <h1 className="text-2xl font-bold tracking-tight">
-          <span className="text-gradient-primary">The Perfect</span>{' '}
-          <span className="text-foreground">Coach</span>
-        </h1>
-      </div>
+      <AppHeader title="The Perfect Coach" />
 
       {/* Smart Action Card - Hero Section */}
       <SmartActionCard
@@ -182,6 +194,7 @@ const HomePage = () => {
         proteinGoal={proteinGoal}
         waterConsumed={waterConsumed}
         waterGoal={waterGoal}
+        onRingClick={handleRingClick}
       />
 
 
@@ -198,6 +211,7 @@ const HomePage = () => {
         isLoading={false}
         targetSteps={profile?.target_steps ?? 10000}
         targetSleepHours={profile?.target_sleep_hours ?? 8}
+        onStatClick={handleStatClick}
       />
 
       {/* Goal Editor Modal */}
@@ -217,6 +231,18 @@ const HomePage = () => {
         onRefresh={handleRefreshWorkout}
         isRefreshing={isRefreshingWorkout}
       />
+
+      {/* Stat History Sheet */}
+      {statHistoryKey && statHistoryConfig[statHistoryKey] && (
+        <StatHistorySheet
+          isOpen={!!statHistoryKey}
+          onClose={() => setStatHistoryKey(null)}
+          metricKey={statHistoryConfig[statHistoryKey].metricKey}
+          title={statHistoryConfig[statHistoryKey].title}
+          unit={statHistoryConfig[statHistoryKey].unit}
+          userId={user?.id}
+        />
+      )}
     </div>
   );
 };

@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import AppHeader from '@/components/layout/AppHeader';
 import GoalEditorModal from '@/components/profile/GoalEditorModal';
 import ProfileEditModal from '@/components/profile/ProfileEditModal';
 import ObjectivesModal from '@/components/profile/ObjectivesModal';
@@ -81,15 +82,7 @@ const ProfilePage = () => {
   return (
     <div className="safe-top px-4 pb-4 pt-2">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground">Profil</h1>
-        <button 
-          onClick={() => setOpenModal('profile')}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-muted/50 text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
-        >
-          <Settings className="h-5 w-5" />
-        </button>
-      </div>
+      <AppHeader title="Profil" />
 
       {/* User info - clickable to edit */}
       <button 

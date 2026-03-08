@@ -17,6 +17,7 @@ import PerformancePage from "@/pages/PerformancePage";
 import ProfilePage from "@/pages/ProfilePage";
 import AuthPage from "@/pages/AuthPage";
 import OnboardingPage from "@/pages/OnboardingPage";
+import ProgressPage from "@/pages/ProgressPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -52,6 +53,7 @@ const App = () => (
                       <Route element={<SubscriptionGate />}>
                         <Route element={<AppLayout />}>
                           <Route path="/" element={<HomePage />} />
+                          <Route path="/progress" element={<ProgressPage />} />
                           <Route path="/journal" element={<JournalPage />} />
                           <Route path="/training" element={<TrainingPage />} />
                           <Route path="/performance" element={<PerformancePage />} />

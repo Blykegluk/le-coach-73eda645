@@ -15,13 +15,15 @@ interface HealthStatsCardProps {
   isLoading?: boolean;
   targetSteps?: number;
   targetSleepHours?: number;
+  onStatClick?: (key: string) => void;
 }
 
-const HealthStatsCard = ({ 
-  stats, 
+const HealthStatsCard = ({
+  stats,
   isLoading = false,
   targetSteps = 10000,
-  targetSleepHours = 8
+  targetSleepHours = 8,
+  onStatClick,
 }: HealthStatsCardProps) => {
   const hasAnyData = stats.sleepHours !== null || 
                      stats.steps !== null || 
@@ -43,6 +45,7 @@ const HealthStatsCard = ({
 
   const statItems = [
     {
+      key: 'sleep',
       icon: Moon,
       label: 'Sommeil',
       value: stats.sleepHours,
@@ -54,6 +57,7 @@ const HealthStatsCard = ({
       progressColor: 'from-indigo-500 to-indigo-400',
     },
     {
+      key: 'heartRate',
       icon: Heart,
       label: 'Rythme cardiaque',
       value: stats.heartRateAvg,
@@ -64,6 +68,7 @@ const HealthStatsCard = ({
       bgColor: 'bg-rose-500/10',
     },
     {
+      key: 'steps',
       icon: Footprints,
       label: 'Pas',
       value: stats.steps,
@@ -75,13 +80,14 @@ const HealthStatsCard = ({
       progressColor: 'from-emerald-500 to-emerald-400',
     },
     {
+      key: 'activeMinutes',
       icon: Timer,
       label: 'Minutes actives',
       value: stats.activeMinutes,
       displayValue: stats.activeMinutes !== null ? `${stats.activeMinutes}` : null,
       suffix: 'min',
-      subValue: stats.floorsClimbed !== null && stats.floorsClimbed > 0 
-        ? `${stats.floorsClimbed} étages` 
+      subValue: stats.floorsClimbed !== null && stats.floorsClimbed > 0
+        ? `${stats.floorsClimbed} étages`
         : null,
       color: 'text-amber-400',
       bgColor: 'bg-amber-500/10',
@@ -106,9 +112,11 @@ const HealthStatsCard = ({
             : 0;
 
           return (
-            <div 
-              key={item.label}
-              className="card-premium p-3 group"
+            <button
+              key={item.key}
+              onClick={() => hasValue && onStatClick?.(item.key)}
+              className="card-premium p-3 group text-left transition-transform active:scale-[0.97]"
+              disabled={!hasValue}
             >
               <div className="mb-2 flex items-center gap-2">
                 <div className={`relative flex h-8 w-8 items-center justify-center rounded-lg ${item.bgColor}`}>
@@ -153,7 +161,7 @@ const HealthStatsCard = ({
                   <span className="text-xs">Non connecté</span>
                 </div>
               )}
-            </div>
+            </button>
           );
         })}
       </div>

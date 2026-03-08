@@ -9,6 +9,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { getMealIcon, getMealColorClasses } from '@/utils/mealColors';
 import JournalEntryActions from '@/components/journal/JournalEntryActions';
 import CircularProgressRings from '@/components/home/CircularProgressRings';
+import AppHeader from '@/components/layout/AppHeader';
 import { useProfile } from '@/hooks/useProfile';
 import { useNutritionGoals } from '@/hooks/useNutritionGoals';
 
@@ -268,19 +269,8 @@ const JournalPage = () => {
   return (
     <div className="flex flex-col min-h-full pb-20 md:pb-4">
       <header className="safe-top sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border/50">
-        <div className="flex items-center justify-between px-4 py-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Journal</h1>
-            <p className="text-sm text-muted-foreground">Ton historique unifié</p>
-          </div>
-          <Button
-            variant="outline"
-            size="icon"
-            className="rounded-full"
-            onClick={() => setSelectedDate(new Date())}
-          >
-            <Calendar className="h-5 w-5" />
-          </Button>
+        <div className="px-4 pt-4">
+          <AppHeader title="Journal" subtitle="Ton historique unifié" />
         </div>
 
         <div className="flex items-center justify-between px-4 pb-4">
@@ -346,7 +336,7 @@ const JournalPage = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate('/training')}
+                onClick={() => navigate('/progress')}
                 className="gap-2"
               >
                 <Dumbbell className="h-4 w-4" />
