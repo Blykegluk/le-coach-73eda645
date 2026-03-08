@@ -1,45 +1,59 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Profile } from '@/types/profile';
 import { isProfileComplete } from '@/types/profile';
 
 export function useProfile() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  // Track which user ID the current profile belongs to
+  const fetchedForRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (!user) {
-        setProfile(null);
-        setIsComplete(false);
-        setIsLoading(false);
-        return;
-      }
+    if (!user) {
+      setProfile(null);
+      setIsComplete(false);
+      setIsFetching(false);
+      fetchedForRef.current = null;
+      return;
+    }
 
+    // If user changed, mark as not fetched yet
+    if (fetchedForRef.current !== user.id) {
+      fetchedForRef.current = null;
+    }
+
+    let cancelled = false;
+    setIsFetching(true);
+
+    const fetchProfile = async () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', user.id)
         .single();
 
+      if (cancelled) return;
+
       if (error) {
         console.error('Error fetching profile:', error);
         setProfile(null);
         setIsComplete(false);
       } else {
-        // Cast to Profile type (Supabase types may not have new columns yet)
         const profileData = data as unknown as Profile;
         setProfile(profileData);
         setIsComplete(isProfileComplete(profileData));
       }
-      
-      setIsLoading(false);
+
+      fetchedForRef.current = user.id;
+      setIsFetching(false);
     };
 
     fetchProfile();
+    return () => { cancelled = true; };
   }, [user]);
 
   const updateProfile = async (updates: Partial<Profile>) => {
@@ -61,13 +75,19 @@ export function useProfile() {
     return { data, error };
   };
 
+  // isLoading is true while:
+  // - auth is still loading (don't know user yet)
+  // - profile fetch is in progress
+  // - user exists but profile hasn't been fetched for this user yet
+  const isLoading = authLoading || isFetching || (!!user && fetchedForRef.current !== user.id);
+
   return {
     profile,
     isLoading,
     isComplete,
     updateProfile,
     refetch: async () => {
-      setIsLoading(true);
+      setIsFetching(true);
       if (user) {
         const { data } = await supabase
           .from('profiles')
@@ -79,8 +99,9 @@ export function useProfile() {
           setProfile(profileData);
           setIsComplete(isProfileComplete(profileData));
         }
+        fetchedForRef.current = user.id;
       }
-      setIsLoading(false);
+      setIsFetching(false);
     }
   };
 }

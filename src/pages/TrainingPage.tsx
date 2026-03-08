@@ -1,14 +1,20 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Dumbbell, Clock, Flame, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, isToday } from 'date-fns';
 import NextWorkoutCard from '@/components/training/NextWorkoutCard';
 import EquipmentSection from '@/components/training/EquipmentSection';
 import WeeklyCarousel from '@/components/training/WeeklyCarousel';
+import {
+  useActivities,
+  useUserWeight,
+  useTrainingRealtimeInvalidation,
+  trainingKeys,
+} from '@/hooks/queries/useTrainingQueries';
 
 interface Activity {
   id: string;
@@ -25,10 +31,10 @@ const estimateCalories = (activity: Activity, weightKg: number = 70): number => 
   if (activity.calories_burned !== null && activity.calories_burned > 0) {
     return activity.calories_burned;
   }
-  
+
   const activityLower = activity.activity_type.toLowerCase();
-  let met = 4; // default moderate
-  
+  let met = 4;
+
   if (activityLower.includes("course") || activityLower.includes("running") || activityLower.includes("jogging")) {
     met = 8;
   } else if (activityLower.includes("musculation") || activityLower.includes("muscu") || activityLower.includes("poids") || activityLower.includes("épaules") || activityLower.includes("jambes") || activityLower.includes("dos") || activityLower.includes("pec")) {
@@ -50,72 +56,19 @@ const estimateCalories = (activity: Activity, weightKg: number = 70): number => 
   } else if (activityLower.includes("escalade") || activityLower.includes("climbing")) {
     met = 8;
   }
-  
+
   return Math.round(met * weightKg * (activity.duration_min / 60));
 };
 
 const TrainingPage = () => {
   const { user } = useAuth();
-  
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [userWeight, setUserWeight] = useState<number>(70);
-  const [isLoading, setIsLoading] = useState(true);
   const equipmentRef = useRef<HTMLDivElement>(null);
 
-  const fetchActivities = useCallback(async () => {
-    if (!user) return;
-
-    // Fetch activities and user weight in parallel
-    const [activitiesRes, profileRes] = await Promise.all([
-      supabase
-        .from('activities')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('performed_at', { ascending: false })
-        .limit(20),
-      supabase
-        .from('profiles')
-        .select('weight_kg')
-        .eq('user_id', user.id)
-        .maybeSingle()
-    ]);
-
-    if (!activitiesRes.error && activitiesRes.data) {
-      setActivities(activitiesRes.data as Activity[]);
-    }
-    if (profileRes.data?.weight_kg) {
-      setUserWeight(profileRes.data.weight_kg);
-    }
-    setIsLoading(false);
-  }, [user]);
-
-  useEffect(() => {
-    fetchActivities();
-
-    // Subscribe to real-time changes
-    if (user) {
-      const channel = supabase
-        .channel('training_activities')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'activities',
-            filter: `user_id=eq.${user.id}`,
-          },
-          () => {
-            fetchActivities();
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
-  }, [user, fetchActivities]);
+  const { data: activities = [], isLoading } = useActivities(user?.id);
+  const { data: userWeight = 70 } = useUserWeight(user?.id);
+  useTrainingRealtimeInvalidation(user?.id);
 
   // Scroll to equipment section if query param present
   useEffect(() => {
@@ -133,12 +86,11 @@ const TrainingPage = () => {
       .eq('id', activityId)
       .eq('user_id', user?.id);
 
-    if (!error) {
-      setActivities(prev => prev.filter(a => a.id !== activityId));
+    if (!error && user) {
+      queryClient.invalidateQueries({ queryKey: trainingKeys.activities(user.id) });
     }
   };
 
-  // Filter today's activities only
   const todayActivities = activities.filter(a => isToday(new Date(a.performed_at)));
 
   const formatTime = (dateStr: string) => {
@@ -148,7 +100,7 @@ const TrainingPage = () => {
   const ActivityCard = ({ activity }: { activity: Activity }) => {
     const calories = estimateCalories(activity, userWeight);
     const isEstimated = activity.calories_burned === null || activity.calories_burned === 0;
-    
+
     return (
       <div className="flex items-center gap-3 card-premium p-4 group">
         <div className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
@@ -246,7 +198,6 @@ const TrainingPage = () => {
         </p>
         <NextWorkoutCard />
       </div>
-
 
       {/* Empty state when no activities */}
       {activities.length === 0 && (

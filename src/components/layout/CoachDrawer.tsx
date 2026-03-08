@@ -23,6 +23,7 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
   const [showImageCapture, setShowImageCapture] = useState(false);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const {
     scrollRef,
@@ -173,12 +174,36 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-end gap-2">
             <button onClick={() => setShowActions(true)} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-muted/50 text-muted-foreground hover:bg-primary/10 hover:text-primary">
               <Plus className="h-5 w-5" />
             </button>
-            <input type="text" value={inputMessage} onChange={(e) => setInputMessage(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} placeholder="Message..." disabled={isLoading} className="h-10 flex-1 rounded-full border border-border/50 bg-card/50 px-4 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none disabled:opacity-50" />
-            <button onClick={() => handleSend()} disabled={!inputMessage.trim() || isLoading} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-primary to-primary-glow text-primary-foreground disabled:opacity-50">
+            <textarea
+              ref={textareaRef}
+              value={inputMessage}
+              onChange={(e) => {
+                setInputMessage(e.target.value);
+                // Auto-resize
+                const el = e.target;
+                el.style.height = 'auto';
+                el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                  // Reset height after send
+                  if (textareaRef.current) {
+                    textareaRef.current.style.height = '40px';
+                  }
+                }
+              }}
+              placeholder="Message..."
+              disabled={isLoading}
+              rows={1}
+              className="min-h-[40px] max-h-[120px] flex-1 resize-none rounded-2xl border border-border/50 bg-card/50 px-4 py-2.5 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none disabled:opacity-50"
+            />
+            <button onClick={() => { handleSend(); if (textareaRef.current) textareaRef.current.style.height = '40px'; }} disabled={!inputMessage.trim() || isLoading} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-primary to-primary-glow text-primary-foreground disabled:opacity-50">
               {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
             </button>
           </div>

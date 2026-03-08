@@ -3,19 +3,20 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
-// ─── Zod validation schemas for tool call arguments ───
+// ─── CORS ───────────────────────────────────────────────────────────────────
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+// ─── ZOD VALIDATION SCHEMAS ─────────────────────────────────────────────────
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional();
 const timeSchema = z.string().max(10).optional();
 
 const toolSchemas: Record<string, z.ZodSchema> = {
-  log_water: z.object({
-    amount_ml: z.number().positive().max(10000),
-    date: dateSchema,
-  }),
-  remove_water: z.object({
-    amount_ml: z.number().positive().max(10000),
-    date: dateSchema,
-  }),
+  log_water: z.object({ amount_ml: z.number().positive().max(10000), date: dateSchema }),
+  remove_water: z.object({ amount_ml: z.number().positive().max(10000), date: dateSchema }),
   log_meal: z.object({
     meal_type: z.enum(["breakfast", "morning_snack", "lunch", "afternoon_snack", "dinner", "dessert", "snack"]),
     food_name: z.string().min(1).max(500),
@@ -26,9 +27,7 @@ const toolSchemas: Record<string, z.ZodSchema> = {
     estimated_time: timeSchema,
     date: dateSchema,
   }),
-  get_recent_meals: z.object({
-    limit: z.number().int().positive().max(50).optional(),
-  }),
+  get_recent_meals: z.object({ limit: z.number().int().positive().max(50).optional() }),
   update_meal: z.object({
     meal_id: z.string().uuid(),
     meal_type: z.enum(["breakfast", "morning_snack", "lunch", "afternoon_snack", "dinner", "dessert"]).optional(),
@@ -39,12 +38,8 @@ const toolSchemas: Record<string, z.ZodSchema> = {
     carbs: z.number().nonnegative().max(1000).optional(),
     fat: z.number().nonnegative().max(500).optional(),
   }),
-  delete_meal: z.object({
-    meal_id: z.string().uuid(),
-  }),
-  get_recent_activities: z.object({
-    limit: z.number().int().positive().max(50).optional(),
-  }),
+  delete_meal: z.object({ meal_id: z.string().uuid() }),
+  get_recent_activities: z.object({ limit: z.number().int().positive().max(50).optional() }),
   update_activity: z.object({
     activity_id: z.string().uuid(),
     activity_type: z.string().min(1).max(100).optional(),
@@ -53,15 +48,9 @@ const toolSchemas: Record<string, z.ZodSchema> = {
     distance_km: z.number().nonnegative().max(500).optional(),
     notes: z.string().max(1000).optional(),
   }),
-  delete_activity: z.object({
-    activity_id: z.string().uuid(),
-  }),
-  get_daily_summary: z.object({
-    date: dateSchema,
-  }),
-  log_weight: z.object({
-    weight_kg: z.number().positive().min(20).max(300),
-  }),
+  delete_activity: z.object({ activity_id: z.string().uuid() }),
+  get_daily_summary: z.object({ date: dateSchema }),
+  log_weight: z.object({ weight_kg: z.number().positive().min(20).max(300) }),
   log_activity: z.object({
     activity_type: z.string().min(1).max(100),
     duration_min: z.number().positive().max(600),
@@ -70,9 +59,7 @@ const toolSchemas: Record<string, z.ZodSchema> = {
     notes: z.string().max(1000).optional(),
     date: dateSchema,
   }),
-  log_body_fat: z.object({
-    body_fat_pct: z.number().positive().max(80),
-  }),
+  log_body_fat: z.object({ body_fat_pct: z.number().positive().max(80) }),
   log_body_composition: z.object({
     weight_kg: z.number().positive().min(20).max(300).optional(),
     body_fat_pct: z.number().positive().max(80).optional(),
@@ -91,9 +78,7 @@ const toolSchemas: Record<string, z.ZodSchema> = {
     skeletal_muscle_pct: z.number().nonnegative().max(100).optional(),
     standard_weight_kg: z.number().positive().max(300).optional(),
   }),
-  get_body_composition_history: z.object({
-    limit: z.number().int().positive().max(50).optional(),
-  }),
+  get_body_composition_history: z.object({ limit: z.number().int().positive().max(50).optional() }),
   save_health_context: z.object({
     category: z.string().min(1).max(100),
     key: z.string().min(1).max(200),
@@ -111,2278 +96,50 @@ const toolSchemas: Record<string, z.ZodSchema> = {
   }),
 };
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
-
+// ─── HELPERS ────────────────────────────────────────────────────────────────
 const MEAL_DEFAULT_TIMES: Record<string, string> = {
-  breakfast: "08:00",
-  morning_snack: "10:30",
-  lunch: "12:30",
-  afternoon_snack: "16:00",
-  dinner: "19:30",
-  dessert: "20:30",
+  breakfast: "08:00", morning_snack: "10:30", lunch: "12:30",
+  afternoon_snack: "16:00", dinner: "19:30", dessert: "20:30",
+};
+const MEAL_TYPE_LABELS: Record<string, string> = {
+  breakfast: "petit-déjeuner", morning_snack: "collation matin",
+  lunch: "déjeuner", afternoon_snack: "goûter", dinner: "dîner", dessert: "dessert",
 };
 
-const MEAL_TYPE_LABELS: Record<string, string> = {
-  breakfast: "petit-déjeuner",
-  morning_snack: "collation",
-  lunch: "déjeuner",
-  afternoon_snack: "goûter",
-  dinner: "dîner",
-  dessert: "dessert",
-};
+function getLocalDate(dateStr?: string): string {
+  const now = new Date();
+  const parisDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(now);
+  const currentYear = parseInt(parisDate.slice(0, 4));
+  if (dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    if (parseInt(dateStr.slice(0, 4)) < currentYear) return parisDate;
+    return dateStr;
+  }
+  return parisDate;
+}
 
 function normalizeTimeToHHMM(input?: string): string | null {
   if (!input) return null;
   const raw = String(input).trim().toLowerCase();
-  if (!raw) return null;
-
-  // Supported examples: "17:30", "17h30", "17 h 30", "17h"
   const full = raw.match(/^(\d{1,2})\s*(?:h|:)\s*(\d{2})$/);
   const hourOnly = raw.match(/^(\d{1,2})\s*h$/);
-
   const toHHMM = (h: number, m: number) => {
-    if (Number.isNaN(h) || Number.isNaN(m)) return null;
-    if (h < 0 || h > 23) return null;
-    if (m < 0 || m > 59) return null;
-    const hh = String(h).padStart(2, "0");
-    const mm = String(m).padStart(2, "0");
-    return `${hh}:${mm}`;
+    if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
   };
-
-  if (full) return toHHMM(parseInt(full[1], 10), parseInt(full[2], 10));
-  if (hourOnly) return toHHMM(parseInt(hourOnly[1], 10), 0);
-
-  // Fallback: already HH:MM?
+  if (full) return toHHMM(parseInt(full[1]), parseInt(full[2]));
+  if (hourOnly) return toHHMM(parseInt(hourOnly[1]), 0);
   const hhmm = raw.match(/^(\d{2}):(\d{2})$/);
-  if (hhmm) return toHHMM(parseInt(hhmm[1], 10), parseInt(hhmm[2], 10));
-
+  if (hhmm) return toHHMM(parseInt(hhmm[1]), parseInt(hhmm[2]));
   return null;
 }
 
-interface ChatMessage {
-  role: "user" | "assistant" | "system";
-  content: string;
-}
-
-interface ToolCall {
-  id: string;
-  type: "function";
-  function: {
-    name: string;
-    arguments: string;
-  };
-}
-
-// Available tools for the coach
-// Helper to get date in Europe/Paris timezone
-function getLocalDate(dateStr?: string): string {
-  // Get current date in Paris timezone (this is the source of truth)
-  const now = new Date();
-  const parisTime = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Paris",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
-  const currentYear = parseInt(parisTime.slice(0, 4));
-
-  if (dateStr) {
-    // Validate format YYYY-MM-DD
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-      // CRITICAL: Reject dates with wrong year (AI hallucinating 2025 instead of 2026)
-      const dateYear = parseInt(dateStr.slice(0, 4));
-      if (dateYear < currentYear) {
-        console.warn(`[getLocalDate] AI passed year ${dateYear}, expected ${currentYear}. Using today: ${parisTime}`);
-        return parisTime;
-      }
-      return dateStr;
-    }
-  }
-  return parisTime; // Returns YYYY-MM-DD format
-}
-
-const tools = [
-  {
-    type: "function",
-    function: {
-      name: "log_water",
-      description: "Enregistre une consommation d'eau pour l'utilisateur. Par défaut, enregistre sur la date du jour (heure de Paris). Peut aussi enregistrer sur une date passée si spécifié.",
-      parameters: {
-        type: "object",
-        properties: {
-          amount_ml: {
-            type: "number",
-            description: "Quantité d'eau en millilitres (250 = 1 verre)",
-          },
-          date: {
-            type: "string",
-            description: "Date d'enregistrement au format YYYY-MM-DD. Si non spécifié, utilise aujourd'hui (heure de Paris). Utiliser pour enregistrer rétroactivement (ex: 'hier' → date d'hier).",
-          },
-        },
-        required: ["amount_ml"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "remove_water",
-      description: "Retire/corrige une consommation d'eau pour une date donnée. Utiliser quand l'utilisateur a fait une erreur de saisie et veut retirer de l'eau.",
-      parameters: {
-        type: "object",
-        properties: {
-          amount_ml: {
-            type: "number",
-            description: "Quantité d'eau à retirer en millilitres (nombre positif)",
-          },
-          date: {
-            type: "string",
-            description: "Date au format YYYY-MM-DD. Si non spécifié, utilise aujourd'hui (heure de Paris).",
-          },
-        },
-        required: ["amount_ml"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "log_meal",
-      description: "Enregistre un NOUVEAU repas pour l'utilisateur. Ne pas utiliser pour modifier un repas existant.",
-      parameters: {
-        type: "object",
-        properties: {
-          meal_type: {
-            type: "string",
-            enum: ["breakfast", "morning_snack", "lunch", "afternoon_snack", "dinner", "dessert"],
-            description: "Type de repas SELON LE CONTEXTE FRANÇAIS: breakfast (petit-déjeuner ~8h), morning_snack (collation du matin ~10h30), lunch (déjeuner ~12h30), afternoon_snack (goûter ~16h, entre déjeuner et dîner), dinner (dîner ~19h30), dessert (~20h30)",
-          },
-          food_name: {
-            type: "string",
-            description: "Nom/description du repas",
-          },
-          calories: {
-            type: "number",
-            description: "Calories estimées",
-          },
-          protein: {
-            type: "number",
-            description: "Protéines estimées en grammes",
-          },
-          carbs: {
-            type: "number",
-            description: "Glucides estimés en grammes",
-          },
-          fat: {
-            type: "number",
-            description: "Lipides estimés en grammes",
-          },
-          estimated_time: {
-            type: "string",
-            description: "Heure estimée du repas au format HH:MM (ex: '16:00' pour un goûter, '08:00' pour petit-déjeuner). Utilise l'heure typique du type de repas si non précisé.",
-          },
-          date: {
-            type: "string",
-            description: "Date du repas au format YYYY-MM-DD. Utiliser si l'utilisateur mentionne une date passée (ex: 'hier', 'vendredi dernier'). Par défaut: aujourd'hui.",
-          },
-        },
-        required: ["meal_type", "food_name", "calories"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_recent_meals",
-      description: "Récupère les repas récents de l'utilisateur pour pouvoir les modifier ou vérifier ce qui a été enregistré",
-      parameters: {
-        type: "object",
-        properties: {
-          limit: {
-            type: "number",
-            description: "Nombre de repas à récupérer (défaut: 5)",
-          },
-        },
-        required: [],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "update_meal",
-      description: "Modifie un repas existant. Utiliser get_recent_meals d'abord pour obtenir l'ID du repas.",
-      parameters: {
-        type: "object",
-        properties: {
-          meal_id: {
-            type: "string",
-            description: "ID du repas à modifier (obtenu via get_recent_meals)",
-          },
-          meal_type: {
-            type: "string",
-            enum: ["breakfast", "morning_snack", "lunch", "afternoon_snack", "dinner", "dessert"],
-            description: "Nouveau type de repas (optionnel). Exemple: 'afternoon_snack' quand l'utilisateur dit 'goûter'.",
-          },
-          food_name: {
-            type: "string",
-            description: "Nouveau nom/description du repas (optionnel)",
-          },
-          estimated_time: {
-            type: "string",
-            description: "Heure estimée du repas au format HH:MM (ex: '17:30'). Si précisée, met à jour logged_at.",
-          },
-          calories: {
-            type: "number",
-            description: "Nouvelles calories (optionnel)",
-          },
-          protein: {
-            type: "number",
-            description: "Nouvelles protéines en grammes (optionnel)",
-          },
-          carbs: {
-            type: "number",
-            description: "Nouveaux glucides en grammes (optionnel)",
-          },
-          fat: {
-            type: "number",
-            description: "Nouveaux lipides en grammes (optionnel)",
-          },
-        },
-        required: ["meal_id"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "delete_meal",
-      description: "Supprime un repas existant. Utiliser get_recent_meals d'abord pour obtenir l'ID.",
-      parameters: {
-        type: "object",
-        properties: {
-          meal_id: {
-            type: "string",
-            description: "ID du repas à supprimer",
-          },
-        },
-        required: ["meal_id"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_recent_activities",
-      description: "Récupère les séances/activités sportives récentes de l'utilisateur (entraînements structurés et activités libres)",
-      parameters: {
-        type: "object",
-        properties: {
-          limit: {
-            type: "number",
-            description: "Nombre d'activités à récupérer (défaut: 5)",
-          },
-        },
-        required: [],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "update_activity",
-      description: "Modifie une séance/activité sportive existante",
-      parameters: {
-        type: "object",
-        properties: {
-          activity_id: {
-            type: "string",
-            description: "ID de la séance à modifier",
-          },
-          activity_type: {
-            type: "string",
-            description: "Nouveau type/nom d'activité (optionnel)",
-          },
-          duration_min: {
-            type: "number",
-            description: "Nouvelle durée en minutes (optionnel)",
-          },
-          calories_burned: {
-            type: "number",
-            description: "Nouvelles calories brûlées (optionnel)",
-          },
-          distance_km: {
-            type: "number",
-            description: "Nouvelle distance en km (optionnel)",
-          },
-          notes: {
-            type: "string",
-            description: "Nouvelles notes (optionnel)",
-          },
-        },
-        required: ["activity_id"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "delete_activity",
-      description: "Supprime une séance/activité sportive existante. Utilise get_recent_activities ou get_recent_workout_sessions pour obtenir l'ID.",
-      parameters: {
-        type: "object",
-        properties: {
-          activity_id: {
-            type: "string",
-            description: "ID de la séance/activité à supprimer",
-          },
-        },
-        required: ["activity_id"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_daily_summary",
-      description: "Récupère le résumé de la journée en cours (AUJOURD'HUI) de l'utilisateur (calories, protéines, eau, poids, repas, activités). Utilise cet outil quand l'utilisateur demande son bilan, ses stats du jour, où il en est, combien de protéines/calories il a consommé aujourd'hui.",
-      parameters: {
-        type: "object",
-        properties: {
-          date: {
-            type: "string",
-            description: "Date au format YYYY-MM-DD. Par défaut: aujourd'hui. Utiliser uniquement si l'utilisateur demande explicitement une autre date (ex: 'hier', 'lundi dernier').",
-          },
-        },
-        required: [],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "log_weight",
-      description: "Enregistre le poids de l'utilisateur",
-      parameters: {
-        type: "object",
-        properties: {
-          weight_kg: {
-            type: "number",
-            description: "Poids en kilogrammes",
-          },
-        },
-        required: ["weight_kg"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "log_activity",
-      description: "Enregistre une NOUVELLE séance de sport. Ne pas utiliser pour modifier une activité existante.",
-      parameters: {
-        type: "object",
-        properties: {
-          activity_type: {
-            type: "string",
-            description: "Type d'activité (ex: course, musculation, natation, vélo, yoga, marche, HIIT, crossfit, etc.)",
-          },
-          duration_min: {
-            type: "number",
-            description: "Durée de l'activité en minutes",
-          },
-          calories_burned: {
-            type: "number",
-            description: "Calories brûlées estimées (optionnel)",
-          },
-          distance_km: {
-            type: "number",
-            description: "Distance parcourue en km (optionnel, pour course/vélo/marche)",
-          },
-          notes: {
-            type: "string",
-            description: "Notes ou détails supplémentaires sur la séance",
-          },
-          date: {
-            type: "string",
-            description: "Date de la séance au format YYYY-MM-DD. Utiliser si l'utilisateur mentionne une date passée (ex: 'hier', 'vendredi dernier'). Par défaut: aujourd'hui.",
-          },
-        },
-        required: ["activity_type", "duration_min"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "log_body_fat",
-      description: "Enregistre le pourcentage de masse grasse simple (utiliser log_body_composition pour des mesures complètes d'impédancemètre)",
-      parameters: {
-        type: "object",
-        properties: {
-          body_fat_pct: {
-            type: "number",
-            description: "Pourcentage de masse grasse (ex: 18.5)",
-          },
-        },
-        required: ["body_fat_pct"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "log_body_composition",
-      description: "Enregistre une mesure complète d'impédancemètre/balance connectée avec toutes les métriques corporelles. Utiliser quand l'utilisateur donne plusieurs valeurs (poids, masse grasse, masse musculaire, etc.)",
-      parameters: {
-        type: "object",
-        properties: {
-          weight_kg: {
-            type: "number",
-            description: "Poids en kg",
-          },
-          body_fat_pct: {
-            type: "number",
-            description: "Pourcentage de masse grasse (%)",
-          },
-          muscle_mass_kg: {
-            type: "number",
-            description: "Masse musculaire en kg",
-          },
-          lean_mass_kg: {
-            type: "number",
-            description: "Masse maigre (sans graisse) en kg",
-          },
-          bone_mass_kg: {
-            type: "number",
-            description: "Masse osseuse en kg",
-          },
-          water_pct: {
-            type: "number",
-            description: "Pourcentage d'eau corporelle (%)",
-          },
-          bmi: {
-            type: "number",
-            description: "Indice de masse corporelle (IMC)",
-          },
-          bmr_kcal: {
-            type: "number",
-            description: "Métabolisme de base en kcal",
-          },
-          visceral_fat_index: {
-            type: "number",
-            description: "Indice de graisse viscérale (1-59)",
-          },
-          body_age: {
-            type: "number",
-            description: "Âge métabolique/corporel",
-          },
-          protein_pct: {
-            type: "number",
-            description: "Taux de protéines (%)",
-          },
-          protein_kg: {
-            type: "number",
-            description: "Masse de protéines en kg",
-          },
-          subcutaneous_fat_pct: {
-            type: "number",
-            description: "Graisse sous-cutanée (%)",
-          },
-          fat_mass_kg: {
-            type: "number",
-            description: "Masse grasse en kg",
-          },
-          skeletal_muscle_pct: {
-            type: "number",
-            description: "Taux de muscle squelettique (%)",
-          },
-          standard_weight_kg: {
-            type: "number",
-            description: "Poids idéal/standard selon la balance",
-          },
-        },
-        required: [],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_body_composition_history",
-      description: "Récupère l'historique des mesures d'impédancemètre pour voir l'évolution",
-      parameters: {
-        type: "object",
-        properties: {
-          limit: {
-            type: "number",
-            description: "Nombre de mesures à récupérer (défaut: 5)",
-          },
-        },
-        required: [],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "save_health_context",
-      description: "Enregistre une information de santé importante sur l'utilisateur (blessures, allergies, conditions médicales, préférences, contraintes physiques, etc.). Ces informations seront retenues pour personnaliser les conseils futurs.",
-      parameters: {
-        type: "object",
-        properties: {
-          category: {
-            type: "string",
-            enum: ["injury", "allergy", "medical_condition", "physical_limitation", "preference", "lifestyle", "other"],
-            description: "Catégorie de l'information: injury (blessure), allergy (allergie alimentaire), medical_condition (condition médicale), physical_limitation (limitation physique), preference (préférence), lifestyle (mode de vie), other (autre)",
-          },
-          key: {
-            type: "string",
-            description: "Identifiant court et clair pour cette information (ex: 'hernies_discales', 'allergie_gluten', 'vegetarien')",
-          },
-          value: {
-            type: "string",
-            description: "Description détaillée de l'information avec contexte (ex: '2 hernies discales L4-L5 il y a 3 ans, fragilité persistante lors d'exercices intenses type CrossFit/Hyrox')",
-          },
-          severity: {
-            type: "string",
-            enum: ["low", "medium", "high", "critical"],
-            description: "Niveau d'importance: low (à noter), medium (adapter les conseils), high (précautions importantes), critical (contre-indication stricte)",
-          },
-        },
-        required: ["category", "key", "value", "severity"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_health_context",
-      description: "Récupère toutes les informations de santé enregistrées sur l'utilisateur",
-      parameters: {
-        type: "object",
-        properties: {},
-        required: [],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "delete_health_context",
-      description: "Supprime une information de santé qui n'est plus d'actualité",
-      parameters: {
-        type: "object",
-        properties: {
-          key: {
-            type: "string",
-            description: "L'identifiant de l'information à supprimer",
-          },
-        },
-        required: ["key"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_prepared_workout",
-      description: "Récupère la séance d'entraînement actuellement préparée et visible dans l'aperçu de l'application. Utilise cet outil quand l'utilisateur demande de voir, vérifier, commenter ou évaluer la séance qui est dans son aperçu/preview. Retourne tous les détails: nom, muscles ciblés, exercices, durée, conseils.",
-      parameters: {
-        type: "object",
-        properties: {},
-        required: [],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "generate_workout",
-      description: `Génère un programme d'entraînement personnalisé. OBLIGATOIRE: tu DOIS toujours remplir les paramètres "focus" et "intensity" en fonction de ce que l'utilisateur demande.
-
-Mapping OBLIGATOIRE:
-- "haut du corps" / "pecs" / "dos" / "épaules" / "bras" → focus: "upper_body"
-- "bas du corps" / "jambes" / "cuisses" / "fessiers" → focus: "lower_body"  
-- "full body" / "corps entier" → focus: "full_body"
-- "push" / "poussée" → focus: "push"
-- "pull" / "tirage" → focus: "pull"
-- "cardio" → focus: "cardio"
-- "abdos" / "core" / "gainage" → focus: "core"
-
-- "intense" / "lourd" / "costaud" / "hardcore" → intensity: "intense"
-- "léger" / "récupération" / "doux" → intensity: "light"
-- Sinon → intensity: "moderate"
-
-Si l'utilisateur ne précise pas, utilise focus: "full_body" et intensity: "moderate".
-NE JAMAIS appeler cet outil avec des paramètres vides.`,
-      parameters: {
-        type: "object",
-        properties: {
-          focus: {
-            type: "string",
-            enum: ["upper_body", "lower_body", "full_body", "push", "pull", "cardio", "core"],
-            description: "OBLIGATOIRE. Focus musculaire de la séance. Déduis-le du message de l'utilisateur.",
-          },
-          intensity: {
-            type: "string",
-            enum: ["light", "moderate", "intense"],
-            description: "OBLIGATOIRE. Intensité souhaitée. Déduis-la du message de l'utilisateur.",
-          },
-          duration_min: {
-            type: "number",
-            description: "Durée souhaitée en minutes (optionnel, défaut: 45-60)",
-          },
-          exclude_exercises: {
-            type: "array",
-            items: { type: "string" },
-            description: "Exercices à éviter (optionnel)",
-          },
-          special_request: {
-            type: "string",
-            description: "Demande spéciale de l'utilisateur (ex: 'plus de cardio', 'exercices sans machine', 'focus biceps')",
-          },
-        },
-        required: ["focus", "intensity"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_recent_workout_sessions",
-      description: "Récupère les séances d'entraînement TERMINÉES (completed) récentes de l'utilisateur, incluant les workout_sessions ET les activités libres. Supporte le filtrage par plage de dates (date_from/date_to) pour des requêtes précises comme 'cette semaine'. N'inclut PAS les séances avortées ou en cours.",
-      parameters: {
-        type: "object",
-        properties: {
-          limit: {
-            type: "number",
-            description: "Nombre de séances à récupérer (défaut: 20)",
-          },
-          date: {
-            type: "string",
-            description: "Date spécifique au format YYYY-MM-DD pour filtrer un seul jour (optionnel).",
-          },
-          date_from: {
-            type: "string",
-            description: "Date de début (incluse) au format YYYY-MM-DD pour filtrer une plage. Utiliser pour 'cette semaine' (lundi), 'ce mois', etc.",
-          },
-          date_to: {
-            type: "string",
-            description: "Date de fin (incluse) au format YYYY-MM-DD pour filtrer une plage. Utiliser pour 'cette semaine' (dimanche), 'ce mois', etc.",
-          },
-        },
-        required: [],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_workout_exercises",
-      description: "Récupère les exercices détaillés d'une séance spécifique",
-      parameters: {
-        type: "object",
-        properties: {
-          session_id: {
-            type: "string",
-            description: "ID de la séance (obtenu via get_recent_workout_sessions)",
-          },
-        },
-        required: ["session_id"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "update_workout_exercise",
-      description: "Modifie un exercice d'une séance d'entraînement. Utiliser get_workout_exercises d'abord pour obtenir l'ID.",
-      parameters: {
-        type: "object",
-        properties: {
-          exercise_id: {
-            type: "string",
-            description: "ID de l'exercice à modifier (obtenu via get_workout_exercises)",
-          },
-          actual_sets: {
-            type: "number",
-            description: "Nombre de séries réellement effectuées",
-          },
-          actual_reps: {
-            type: "string",
-            description: "Répétitions réellement effectuées (ex: '10-10-8' ou '12')",
-          },
-          actual_weight: {
-            type: "string",
-            description: "Poids réellement utilisé (ex: '80kg' ou '70-75-80')",
-          },
-          notes: {
-            type: "string",
-            description: "Notes ou commentaires sur l'exercice",
-          },
-          skipped: {
-            type: "boolean",
-            description: "Marquer l'exercice comme sauté",
-          },
-        },
-        required: ["exercise_id"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "delete_workout_exercise",
-      description: "Supprime un exercice d'une séance",
-      parameters: {
-        type: "object",
-        properties: {
-          exercise_id: {
-            type: "string",
-            description: "ID de l'exercice à supprimer",
-          },
-        },
-        required: ["exercise_id"],
-      },
-    },
-  },
-];
-
-// Execute tool calls
-async function executeToolCall(
-  supabase: any,
-  userId: string,
-  toolCall: ToolCall
-): Promise<{ success: boolean; message: string; data?: unknown }> {
-  const { name, arguments: argsStr } = toolCall.function;
-  let args: any;
-  try {
-    args = JSON.parse(argsStr);
-  } catch {
-    return { success: false, message: "Paramètres invalides (JSON malformé)" };
-  }
-
-  // Validate args against schema if available
-  const schema = toolSchemas[name];
-  if (schema) {
-    const result = schema.safeParse(args);
-    if (!result.success) {
-      console.error(`Validation error for ${name}:`, result.error.errors);
-      return {
-        success: false,
-        message: `Données invalides: ${result.error.errors.map((e: any) => `${e.path.join(".")}: ${e.message}`).join(", ")}`,
-      };
-    }
-    args = result.data;
-  }
-
-  const today = getLocalDate(); // Use Paris timezone
-
-  console.log(`Executing tool: ${name}`, args);
-
-  try {
-    switch (name) {
-      case "log_water": {
-        // Use specified date or default to today (Paris timezone)
-        const targetDate = getLocalDate(args.date);
-        
-        // Get current water and add to it
-        const { data: current } = await supabase
-          .from("daily_metrics")
-          .select("water_ml")
-          .eq("user_id", userId)
-          .eq("date", targetDate)
-          .maybeSingle();
-
-        const currentWater = current?.water_ml || 0;
-        const newTotal = currentWater + args.amount_ml;
-
-        const { error } = await supabase.from("daily_metrics").upsert(
-          {
-            user_id: userId,
-            date: targetDate,
-            water_ml: newTotal,
-          },
-          { onConflict: "user_id,date" }
-        );
-
-        if (error) throw error;
-        
-        const isToday = targetDate === today;
-        const dateLabel = isToday ? "" : ` (${targetDate})`;
-        
-        return {
-          success: true,
-          message: `💧 ${args.amount_ml}ml d'eau ajoutés${dateLabel} (total: ${newTotal}ml)`,
-          data: { total: newTotal, date: targetDate },
-        };
-      }
-
-      case "remove_water": {
-        // Use specified date or default to today (Paris timezone)
-        const targetDate = getLocalDate(args.date);
-        
-        // Get current water
-        const { data: current } = await supabase
-          .from("daily_metrics")
-          .select("water_ml")
-          .eq("user_id", userId)
-          .eq("date", targetDate)
-          .maybeSingle();
-
-        const currentWater = current?.water_ml || 0;
-        const newTotal = Math.max(0, currentWater - args.amount_ml);
-
-        const { error } = await supabase.from("daily_metrics").upsert(
-          {
-            user_id: userId,
-            date: targetDate,
-            water_ml: newTotal,
-          },
-          { onConflict: "user_id,date" }
-        );
-
-        if (error) throw error;
-        
-        const isToday = targetDate === today;
-        const dateLabel = isToday ? "" : ` (${targetDate})`;
-        
-        return {
-          success: true,
-          message: `💧 ${args.amount_ml}ml d'eau retirés${dateLabel} (nouveau total: ${newTotal}ml)`,
-          data: { total: newTotal, date: targetDate, removed: args.amount_ml },
-        };
-      }
-
-      case "log_meal": {
-        // Calculate logged_at based on meal type and estimated time
-        // Use estimated_time if provided, otherwise use default for meal type
-        const timeToUse =
-          normalizeTimeToHHMM(args.estimated_time) ||
-          MEAL_DEFAULT_TIMES[args.meal_type] ||
-          "12:00";
-
-        // Backward compatibility in case a model still outputs "snack"
-        let normalizedMealType = args.meal_type;
-        if (normalizedMealType === "snack") {
-          const hour = parseInt(String(timeToUse).split(":")[0] || "12", 10);
-          normalizedMealType = hour >= 14 ? "afternoon_snack" : "morning_snack";
-        }
-
-        const dateToUse = args.date || today;
-        const loggedAt = `${dateToUse}T${timeToUse}:00`;
-        
-        const { error } = await supabase.from("nutrition_logs").insert({
-          user_id: userId,
-          meal_type: normalizedMealType,
-          food_name: args.food_name,
-          calories: args.calories || 0,
-          protein: args.protein || 0,
-          carbs: args.carbs || 0,
-          fat: args.fat || 0,
-          logged_at: loggedAt,
-        });
-
-        if (error) throw error;
-
-        // Also update daily calories
-        const { data: currentMetrics } = await supabase
-          .from("daily_metrics")
-          .select("calories_in")
-          .eq("user_id", userId)
-          .eq("date", dateToUse)
-          .maybeSingle();
-
-        const currentCals = currentMetrics?.calories_in || 0;
-        const newCalories = currentCals + (args.calories || 0);
-
-        await supabase.from("daily_metrics").upsert(
-          {
-            user_id: userId,
-            date: dateToUse,
-            calories_in: newCalories,
-          },
-          { onConflict: "user_id,date" }
-        );
-
-        return {
-          success: true,
-          message: `🍽️ ${args.food_name} enregistré en ${MEAL_TYPE_LABELS[normalizedMealType] || normalizedMealType} (${args.calories} kcal)`,
-          data: args,
-        };
-      }
-
-      case "get_recent_meals": {
-        const limit = args.limit || 5;
-        const { data: meals, error } = await supabase
-          .from("nutrition_logs")
-          .select("id, food_name, meal_type, calories, protein, carbs, fat, logged_at")
-          .eq("user_id", userId)
-          .order("logged_at", { ascending: false })
-          .limit(limit);
-
-        if (error) throw error;
-
-        const formattedMeals = (meals || []).map((m: any) => ({
-          id: m.id,
-          food_name: m.food_name,
-          meal_type: m.meal_type,
-          calories: m.calories,
-          protein: m.protein,
-          carbs: m.carbs,
-          fat: m.fat,
-          logged_at: m.logged_at,
-          time_ago: getTimeAgo(m.logged_at),
-        }));
-
-        return {
-          success: true,
-          message: `${formattedMeals.length} repas récent(s) trouvé(s)`,
-          data: formattedMeals,
-        };
-      }
-
-      case "update_meal": {
-        // First get the current meal to calculate calorie difference
-        const { data: currentMeal } = await supabase
-          .from("nutrition_logs")
-          .select("calories, food_name, logged_at, meal_type")
-          .eq("id", args.meal_id)
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        if (!currentMeal) {
-          return { success: false, message: "Repas non trouvé" };
-        }
-
-        const updates: any = {};
-        if (args.meal_type !== undefined) updates.meal_type = args.meal_type;
-        if (args.food_name !== undefined) updates.food_name = args.food_name;
-        if (args.calories !== undefined) updates.calories = args.calories;
-        if (args.protein !== undefined) updates.protein = args.protein;
-        if (args.carbs !== undefined) updates.carbs = args.carbs;
-        if (args.fat !== undefined) updates.fat = args.fat;
-
-        // If the user specifies an hour (or changes meal type), update logged_at accordingly
-        const currentLoggedAtStr = String(currentMeal.logged_at || `${today}T12:00:00`);
-        const mealDate = currentLoggedAtStr.includes("T")
-          ? currentLoggedAtStr.split("T")[0]
-          : today;
-
-        let timeToUse: string | null = normalizeTimeToHHMM(args.estimated_time);
-
-        // If meal type changed but no explicit time, snap to typical time to place it in the right slot.
-        if (
-          !timeToUse &&
-          args.meal_type !== undefined &&
-          args.meal_type !== currentMeal.meal_type
-        ) {
-          timeToUse = MEAL_DEFAULT_TIMES[args.meal_type] || null;
-        }
-
-        if (timeToUse) {
-          updates.logged_at = `${mealDate}T${timeToUse}:00`;
-        }
-
-        const { error } = await supabase
-          .from("nutrition_logs")
-          .update(updates)
-          .eq("id", args.meal_id)
-          .eq("user_id", userId);
-
-        if (error) throw error;
-
-        // Update daily calories if calories changed
-        if (args.calories !== undefined && args.calories !== currentMeal.calories) {
-          const calorieDiff = args.calories - (currentMeal.calories || 0);
-          const { data: metrics } = await supabase
-            .from("daily_metrics")
-            .select("calories_in")
-            .eq("user_id", userId)
-            .eq("date", mealDate)
-            .maybeSingle();
-
-          const newCalories = (metrics?.calories_in || 0) + calorieDiff;
-          await supabase.from("daily_metrics").upsert(
-            { user_id: userId, date: mealDate, calories_in: Math.max(0, newCalories) },
-            { onConflict: "user_id,date" }
-          );
-        }
-
-        const nextMealType = updates.meal_type || currentMeal.meal_type;
-        const nextTime = updates.logged_at
-          ? String(updates.logged_at).split("T")[1]?.slice(0, 5)
-          : null;
-        const movedSuffix =
-          args.meal_type !== undefined || args.estimated_time !== undefined
-            ? ` → ${MEAL_TYPE_LABELS[nextMealType] || nextMealType}${nextTime ? ` (${nextTime})` : ""}`
-            : "";
-
-        return {
-          success: true,
-          message: `✏️ "${currentMeal.food_name}" mis à jour${movedSuffix}${args.protein ? ` (${args.protein}g protéines)` : ""}`,
-          data: updates,
-        };
-      }
-
-      case "delete_meal": {
-        // Get meal calories before deleting
-        const { data: meal } = await supabase
-          .from("nutrition_logs")
-          .select("calories, food_name")
-          .eq("id", args.meal_id)
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        if (!meal) {
-          return { success: false, message: "Repas non trouvé" };
-        }
-
-        const { error } = await supabase
-          .from("nutrition_logs")
-          .delete()
-          .eq("id", args.meal_id)
-          .eq("user_id", userId);
-
-        if (error) throw error;
-
-        // Update daily calories
-        if (meal.calories) {
-          const { data: metrics } = await supabase
-            .from("daily_metrics")
-            .select("calories_in")
-            .eq("user_id", userId)
-            .eq("date", today)
-            .maybeSingle();
-
-          const newCalories = (metrics?.calories_in || 0) - meal.calories;
-          await supabase.from("daily_metrics").upsert(
-            { user_id: userId, date: today, calories_in: Math.max(0, newCalories) },
-            { onConflict: "user_id,date" }
-          );
-        }
-
-        return {
-          success: true,
-          message: `🗑️ "${meal.food_name}" supprimé`,
-        };
-      }
-
-      case "get_recent_activities": {
-        const limit = args.limit || 5;
-        const { data: sessions, error } = await supabase
-          .from("workout_sessions")
-          .select("id, workout_name, started_at, completed_at, status, total_duration_seconds, calories_burned, distance_km, notes, target_muscles")
-          .eq("user_id", userId)
-          .order("started_at", { ascending: false })
-          .limit(limit);
-
-        if (error) throw error;
-
-        const formattedActivities = (sessions || []).map((s: any) => ({
-          id: s.id,
-          activity_type: s.workout_name,
-          duration_min: s.total_duration_seconds ? Math.round(s.total_duration_seconds / 60) : null,
-          calories_burned: s.calories_burned,
-          distance_km: s.distance_km,
-          notes: s.notes,
-          performed_at: s.started_at,
-          status: s.status,
-          target_muscles: s.target_muscles,
-          time_ago: getTimeAgo(s.started_at),
-        }));
-
-        return {
-          success: true,
-          message: `${formattedActivities.length} activité(s) récente(s) trouvée(s)`,
-          data: formattedActivities,
-        };
-      }
-
-      case "update_activity": {
-        const { data: currentSession } = await supabase
-          .from("workout_sessions")
-          .select("workout_name, calories_burned")
-          .eq("id", args.activity_id)
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        if (!currentSession) {
-          return { success: false, message: "Activité/séance non trouvée" };
-        }
-
-        const updates: any = {};
-        if (args.activity_type !== undefined) updates.workout_name = args.activity_type;
-        if (args.duration_min !== undefined) updates.total_duration_seconds = args.duration_min * 60;
-        if (args.calories_burned !== undefined) updates.calories_burned = args.calories_burned;
-        if (args.distance_km !== undefined) updates.distance_km = args.distance_km;
-        if (args.notes !== undefined) updates.notes = args.notes;
-
-        const { error } = await supabase
-          .from("workout_sessions")
-          .update(updates)
-          .eq("id", args.activity_id)
-          .eq("user_id", userId);
-
-        if (error) throw error;
-
-        // Update daily calories burned if changed
-        if (args.calories_burned !== undefined && args.calories_burned !== currentSession.calories_burned) {
-          const calorieDiff = args.calories_burned - (currentSession.calories_burned || 0);
-          const { data: metrics } = await supabase
-            .from("daily_metrics")
-            .select("calories_burned")
-            .eq("user_id", userId)
-            .eq("date", today)
-            .maybeSingle();
-
-          const newBurned = (metrics?.calories_burned || 0) + calorieDiff;
-          await supabase.from("daily_metrics").upsert(
-            { user_id: userId, date: today, calories_burned: Math.max(0, newBurned) },
-            { onConflict: "user_id,date" }
-          );
-        }
-
-        return {
-          success: true,
-          message: `✏️ ${currentSession.workout_name} mis à jour`,
-          data: updates,
-        };
-      }
-
-      case "delete_activity": {
-        console.info(`DELETE_ACTIVITY called with activity_id: ${args.activity_id}`);
-        const { data: session } = await supabase
-          .from("workout_sessions")
-          .select("workout_name, calories_burned")
-          .eq("id", args.activity_id)
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        if (!session) {
-          return { success: false, message: "Activité/séance non trouvée" };
-        }
-
-        // Delete associated exercise logs first
-        await supabase
-          .from("workout_exercise_logs")
-          .delete()
-          .eq("session_id", args.activity_id)
-          .eq("user_id", userId);
-
-        // Delete the session
-        const { error } = await supabase
-          .from("workout_sessions")
-          .delete()
-          .eq("id", args.activity_id)
-          .eq("user_id", userId);
-
-        if (error) throw error;
-
-        // Update daily calories burned
-        if (session.calories_burned) {
-          const { data: metrics } = await supabase
-            .from("daily_metrics")
-            .select("calories_burned")
-            .eq("user_id", userId)
-            .eq("date", today)
-            .maybeSingle();
-
-          const newBurned = (metrics?.calories_burned || 0) - session.calories_burned;
-          await supabase.from("daily_metrics").upsert(
-            { user_id: userId, date: today, calories_burned: Math.max(0, newBurned) },
-            { onConflict: "user_id,date" }
-          );
-        }
-
-        return {
-          success: true,
-          message: `🗑️ "${session.workout_name}" supprimé`,
-        };
-      }
-
-      case "get_daily_summary": {
-        // Support custom date or default to today
-        const queryDate = args.date || today;
-        
-        const { data: metrics } = await supabase
-          .from("daily_metrics")
-          .select("*")
-          .eq("user_id", userId)
-          .eq("date", queryDate)
-          .maybeSingle();
-
-        const { data: meals } = await supabase
-          .from("nutrition_logs")
-          .select("*")
-          .eq("user_id", userId)
-          .gte("logged_at", `${queryDate}T00:00:00`)
-          .lte("logged_at", `${queryDate}T23:59:59`)
-          .order("logged_at", { ascending: true });
-
-        const { data: activities } = await supabase
-          .from("workout_sessions")
-          .select("*")
-          .eq("user_id", userId)
-          .gte("started_at", `${queryDate}T00:00:00`)
-          .lte("started_at", `${queryDate}T23:59:59`);
-
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("target_calories, target_water_ml, target_weight_kg, weight_kg, goal, current_body_fat_pct, target_body_fat_pct")
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        // Get latest body fat from daily metrics
-        const { data: latestBodyFat } = await supabase
-          .from("daily_metrics")
-          .select("body_fat_pct, date")
-          .eq("user_id", userId)
-          .not("body_fat_pct", "is", null)
-          .order("date", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        // Calculate totals directly from nutrition_logs (more accurate than daily_metrics.calories_in)
-        const totalCalories = (meals || []).reduce((sum: number, m: any) => sum + (m.calories || 0), 0);
-        const totalProtein = (meals || []).reduce((sum: number, m: any) => sum + (m.protein || 0), 0);
-        const totalCarbs = (meals || []).reduce((sum: number, m: any) => sum + (m.carbs || 0), 0);
-        const totalFat = (meals || []).reduce((sum: number, m: any) => sum + (m.fat || 0), 0);
-        const totalCaloriesBurned = (activities || []).reduce((sum: number, a: any) => sum + (a.calories_burned || 0), 0);
-
-        // Compute protein goal (2g per kg body weight)
-        const weight = profile?.weight_kg || 70;
-        const proteinGoal = Math.round(weight * 2);
-
-        const isToday = queryDate === today;
-        const dateLabel = isToday ? "aujourd'hui" : queryDate;
-
-        return {
-          success: true,
-          message: `Résumé du ${dateLabel} récupéré`,
-          data: {
-            date: queryDate,
-            is_today: isToday,
-            // Nutrition from actual logs
-            calories_consumed: totalCalories,
-            protein_consumed: totalProtein,
-            carbs_consumed: totalCarbs,
-            fat_consumed: totalFat,
-            target_calories: profile?.target_calories || 2000,
-            protein_goal: proteinGoal,
-            // Activity
-            calories_burned: totalCaloriesBurned,
-            // Hydration
-            water_ml: metrics?.water_ml || 0,
-            target_water_ml: profile?.target_water_ml || 2000,
-            // Weight & body composition
-            weight: metrics?.weight || profile?.weight_kg,
-            target_weight: profile?.target_weight_kg,
-            goal: profile?.goal,
-            current_body_fat_pct: profile?.current_body_fat_pct,
-            target_body_fat_pct: profile?.target_body_fat_pct,
-            latest_body_fat: latestBodyFat?.body_fat_pct,
-            latest_body_fat_date: latestBodyFat?.date,
-            // Details
-            meals_count: meals?.length || 0,
-            meals: (meals || []).map((m: any) => ({
-              id: m.id,
-              meal_type: m.meal_type,
-              food_name: m.food_name,
-              calories: m.calories,
-              protein: m.protein,
-              carbs: m.carbs,
-              fat: m.fat,
-              logged_at: m.logged_at,
-            })),
-            activities_count: activities?.length || 0,
-            activities: activities || [],
-          },
-        };
-      }
-
-      case "log_weight": {
-        const { error } = await supabase.from("daily_metrics").upsert(
-          {
-            user_id: userId,
-            date: today,
-            weight: args.weight_kg,
-          },
-          { onConflict: "user_id,date" }
-        );
-
-        if (error) throw error;
-
-        // Also update profile weight
-        await supabase
-          .from("profiles")
-          .update({ weight_kg: args.weight_kg })
-          .eq("user_id", userId);
-
-        return {
-          success: true,
-          message: `⚖️ Poids enregistré: ${args.weight_kg} kg`,
-          data: { weight: args.weight_kg },
-        };
-      }
-
-      case "log_activity": {
-        // Estimate calories if not provided based on activity type and duration
-        let caloriesBurned = args.calories_burned;
-        if (!caloriesBurned) {
-          // Get user weight for better estimation
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("weight_kg")
-            .eq("user_id", userId)
-            .maybeSingle();
-          
-          const weight = profile?.weight_kg || 70; // default 70kg
-          const duration = args.duration_min;
-          const activityLower = args.activity_type.toLowerCase();
-          
-          // MET values for different activities (calories = MET * weight * hours)
-          let met = 4; // default moderate activity
-          if (activityLower.includes("course") || activityLower.includes("running") || activityLower.includes("jogging")) {
-            met = 8;
-          } else if (activityLower.includes("musculation") || activityLower.includes("muscu") || activityLower.includes("poids") || activityLower.includes("weight")) {
-            met = 5;
-          } else if (activityLower.includes("hiit") || activityLower.includes("crossfit") || activityLower.includes("hyrox")) {
-            met = 10;
-          } else if (activityLower.includes("vélo") || activityLower.includes("cycling") || activityLower.includes("bike")) {
-            met = 7;
-          } else if (activityLower.includes("natation") || activityLower.includes("swimming") || activityLower.includes("nage")) {
-            met = 7;
-          } else if (activityLower.includes("yoga") || activityLower.includes("stretching") || activityLower.includes("pilates")) {
-            met = 3;
-          } else if (activityLower.includes("marche") || activityLower.includes("walk")) {
-            met = 3.5;
-          } else if (activityLower.includes("rameur") || activityLower.includes("rowing")) {
-            met = 7;
-          } else if (activityLower.includes("boxe") || activityLower.includes("boxing") || activityLower.includes("combat")) {
-            met = 9;
-          } else if (activityLower.includes("escalade") || activityLower.includes("climbing")) {
-            met = 8;
-          } else if (activityLower.includes("elliptique") || activityLower.includes("elliptical")) {
-            met = 5;
-          }
-          
-          caloriesBurned = Math.round(met * weight * (duration / 60));
-        }
-
-        // Validate date: if the year is wrong (e.g. AI uses 2025 instead of 2026), use today
-        let activityDateToUse = args.date;
-        if (activityDateToUse) {
-          const yearInDate = parseInt(activityDateToUse.slice(0, 4));
-          const currentYear = new Date().getFullYear();
-          if (yearInDate < currentYear) {
-            console.warn(`[log_activity] AI passed wrong year ${yearInDate}, correcting to ${currentYear}`);
-            activityDateToUse = today; // use server's today
-          }
-        }
-        const performedAt = activityDateToUse ? `${activityDateToUse}T12:00:00` : new Date().toISOString();
-        const { error } = await supabase.from("workout_sessions").insert({
-          user_id: userId,
-          workout_name: args.activity_type,
-          started_at: performedAt,
-          completed_at: performedAt,
-          status: "completed",
-          total_duration_seconds: args.duration_min * 60,
-          calories_burned: caloriesBurned,
-          distance_km: args.distance_km || null,
-          notes: args.notes || null,
-        });
-
-        if (error) throw error;
-
-        // Also update daily calories burned - use validated date
-        const activityDate = activityDateToUse || today;
-        const { data: currentMetrics } = await supabase
-          .from("daily_metrics")
-          .select("calories_burned")
-          .eq("user_id", userId)
-          .eq("date", activityDate)
-          .maybeSingle();
-
-        const currentBurned = currentMetrics?.calories_burned || 0;
-        const newBurned = currentBurned + caloriesBurned;
-
-        await supabase.from("daily_metrics").upsert(
-          {
-            user_id: userId,
-            date: activityDate,
-            calories_burned: newBurned,
-          },
-          { onConflict: "user_id,date" }
-        );
-
-        return {
-          success: true,
-          message: `🏋️ ${args.activity_type} enregistré (${args.duration_min} min, ~${caloriesBurned} kcal brûlées)`,
-          data: { ...args, calories_burned: caloriesBurned },
-        };
-      }
-
-      case "log_body_fat": {
-        const { error } = await supabase.from("daily_metrics").upsert(
-          {
-            user_id: userId,
-            date: today,
-            body_fat_pct: args.body_fat_pct,
-          },
-          { onConflict: "user_id,date" }
-        );
-
-        if (error) throw error;
-
-        // Get profile goal info for progress feedback
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("current_body_fat_pct, target_body_fat_pct")
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        let progressMsg = "";
-        if (profile?.current_body_fat_pct && profile?.target_body_fat_pct) {
-          const start = profile.current_body_fat_pct;
-          const target = profile.target_body_fat_pct;
-          const current = args.body_fat_pct;
-          const totalToLose = start - target;
-          const lost = start - current;
-          const progressPct = Math.round((lost / totalToLose) * 100);
-          
-          if (progressPct > 0 && progressPct <= 100) {
-            progressMsg = ` Tu as atteint ${progressPct}% de ton objectif ! (${start}% → ${current}% → ${target}%)`;
-          } else if (current <= target) {
-            progressMsg = " 🎉 Tu as atteint ton objectif !";
-          }
-        }
-
-        return {
-          success: true,
-          message: `📊 Masse grasse enregistrée: ${args.body_fat_pct}%${progressMsg}`,
-          data: { body_fat_pct: args.body_fat_pct },
-        };
-      }
-
-      case "log_body_composition": {
-        // Build the record with all provided values
-        const record: Record<string, unknown> = {
-          user_id: userId,
-          measured_at: new Date().toISOString(),
-        };
-        
-        // Map all possible fields
-        const fieldMappings: Record<string, string> = {
-          weight_kg: "weight_kg",
-          body_fat_pct: "body_fat_pct",
-          muscle_mass_kg: "muscle_mass_kg",
-          lean_mass_kg: "lean_mass_kg",
-          bone_mass_kg: "bone_mass_kg",
-          water_pct: "water_pct",
-          bmi: "bmi",
-          bmr_kcal: "bmr_kcal",
-          visceral_fat_index: "visceral_fat_index",
-          body_age: "body_age",
-          protein_pct: "protein_pct",
-          protein_kg: "protein_kg",
-          subcutaneous_fat_pct: "subcutaneous_fat_pct",
-          fat_mass_kg: "fat_mass_kg",
-          skeletal_muscle_pct: "skeletal_muscle_pct",
-          standard_weight_kg: "standard_weight_kg",
-        };
-        
-        let metricsCount = 0;
-        for (const [argKey, dbKey] of Object.entries(fieldMappings)) {
-          if (args[argKey] !== undefined && args[argKey] !== null) {
-            record[dbKey] = args[argKey];
-            metricsCount++;
-          }
-        }
-        
-        if (metricsCount === 0) {
-          return { success: false, message: "Aucune métrique fournie" };
-        }
-
-        const { error } = await supabase.from("body_composition").insert(record);
-        if (error) throw error;
-
-        // Also update daily_metrics with weight and body fat if provided
-        if (args.weight_kg || args.body_fat_pct) {
-          const dailyUpdate: Record<string, unknown> = {
-            user_id: userId,
-            date: today,
-          };
-          if (args.weight_kg) dailyUpdate.weight = args.weight_kg;
-          if (args.body_fat_pct) dailyUpdate.body_fat_pct = args.body_fat_pct;
-          
-          await supabase.from("daily_metrics").upsert(dailyUpdate, { onConflict: "user_id,date" });
-        }
-
-        // Update profile weight if provided
-        if (args.weight_kg) {
-          await supabase.from("profiles").update({ weight_kg: args.weight_kg }).eq("user_id", userId);
-        }
-
-        // Get last measurement for comparison
-        const { data: previous } = await supabase
-          .from("body_composition")
-          .select("weight_kg, body_fat_pct, muscle_mass_kg, measured_at")
-          .eq("user_id", userId)
-          .order("measured_at", { ascending: false })
-          .range(1, 1)
-          .maybeSingle();
-
-        let comparisonMsg = "";
-        if (previous) {
-          const changes: string[] = [];
-          if (args.weight_kg && previous.weight_kg) {
-            const diff = args.weight_kg - previous.weight_kg;
-            if (Math.abs(diff) >= 0.1) {
-              changes.push(`poids ${diff > 0 ? "+" : ""}${diff.toFixed(1)}kg`);
-            }
-          }
-          if (args.body_fat_pct && previous.body_fat_pct) {
-            const diff = args.body_fat_pct - previous.body_fat_pct;
-            if (Math.abs(diff) >= 0.1) {
-              changes.push(`masse grasse ${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`);
-            }
-          }
-          if (args.muscle_mass_kg && previous.muscle_mass_kg) {
-            const diff = args.muscle_mass_kg - previous.muscle_mass_kg;
-            if (Math.abs(diff) >= 0.1) {
-              changes.push(`muscle ${diff > 0 ? "+" : ""}${diff.toFixed(1)}kg`);
-            }
-          }
-          if (changes.length > 0) {
-            comparisonMsg = ` Évolution: ${changes.join(", ")}`;
-          }
-        }
-
-        // Build summary of what was recorded
-        const recorded: string[] = [];
-        if (args.weight_kg) recorded.push(`${args.weight_kg}kg`);
-        if (args.body_fat_pct) recorded.push(`${args.body_fat_pct}% gras`);
-        if (args.muscle_mass_kg) recorded.push(`${args.muscle_mass_kg}kg muscle`);
-        if (args.lean_mass_kg) recorded.push(`${args.lean_mass_kg}kg maigre`);
-        if (args.bmi) recorded.push(`IMC ${args.bmi}`);
-        if (args.bmr_kcal) recorded.push(`BMR ${args.bmr_kcal}kcal`);
-        if (args.visceral_fat_index) recorded.push(`graisse viscérale ${args.visceral_fat_index}`);
-        if (args.body_age) recorded.push(`âge corporel ${args.body_age}`);
-
-        return {
-          success: true,
-          message: `📊 Mesure complète enregistrée (${metricsCount} métriques): ${recorded.slice(0, 4).join(", ")}${recorded.length > 4 ? "..." : ""}${comparisonMsg}`,
-          data: record,
-        };
-      }
-
-      case "get_body_composition_history": {
-        const limit = args.limit || 5;
-        const { data: measurements, error } = await supabase
-          .from("body_composition")
-          .select("*")
-          .eq("user_id", userId)
-          .order("measured_at", { ascending: false })
-          .limit(limit);
-
-        if (error) throw error;
-
-        // Get profile targets for context
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("target_weight_kg, target_body_fat_pct, target_muscle_mass_kg, current_body_fat_pct")
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        const formatted = (measurements || []).map((m: Record<string, unknown>) => ({
-          date: new Date(m.measured_at as string).toLocaleDateString("fr-FR"),
-          weight_kg: m.weight_kg,
-          body_fat_pct: m.body_fat_pct,
-          muscle_mass_kg: m.muscle_mass_kg,
-          lean_mass_kg: m.lean_mass_kg,
-          bmi: m.bmi,
-          bmr_kcal: m.bmr_kcal,
-          visceral_fat_index: m.visceral_fat_index,
-          body_age: m.body_age,
-        }));
-
-        return {
-          success: true,
-          message: `${formatted.length} mesure(s) trouvée(s)`,
-          data: {
-            measurements: formatted,
-            targets: profile ? {
-              target_weight_kg: profile.target_weight_kg,
-              target_body_fat_pct: profile.target_body_fat_pct,
-              starting_body_fat_pct: profile.current_body_fat_pct,
-              target_muscle_mass_kg: profile.target_muscle_mass_kg,
-            } : null,
-          },
-        };
-      }
-
-      case "save_health_context": {
-        // Check if this key already exists
-        const { data: existing } = await supabase
-          .from("user_context")
-          .select("id")
-          .eq("user_id", userId)
-          .eq("key", `health_${args.category}_${args.key}`)
-          .maybeSingle();
-
-        const contextValue = JSON.stringify({
-          category: args.category,
-          description: args.value,
-          severity: args.severity,
-          recorded_at: new Date().toISOString(),
-        });
-
-        if (existing) {
-          // Update existing entry
-          const { error } = await supabase
-            .from("user_context")
-            .update({ value: contextValue, updated_at: new Date().toISOString() })
-            .eq("id", existing.id);
-          
-          if (error) throw error;
-          
-          return {
-            success: true,
-            message: `📋 Information mise à jour: ${args.key}`,
-            data: { key: args.key, category: args.category },
-          };
-        } else {
-          // Insert new entry
-          const { error } = await supabase.from("user_context").insert({
-            user_id: userId,
-            key: `health_${args.category}_${args.key}`,
-            value: contextValue,
-          });
-
-          if (error) throw error;
-
-          const severityEmojis: Record<string, string> = {
-            low: "📝",
-            medium: "⚠️",
-            high: "🔶",
-            critical: "🚨",
-          };
-
-          return {
-            success: true,
-            message: `${severityEmojis[args.severity] || "📋"} Information de santé enregistrée: ${args.key} (${args.category})`,
-            data: { key: args.key, category: args.category, severity: args.severity },
-          };
-        }
-      }
-
-      case "get_health_context": {
-        const { data: contexts, error } = await supabase
-          .from("user_context")
-          .select("key, value, updated_at")
-          .eq("user_id", userId)
-          .like("key", "health_%");
-
-        if (error) throw error;
-
-        const formatted = (contexts || []).map((c: { key: string; value: string; updated_at: string }) => {
-          try {
-            const parsed = JSON.parse(c.value);
-            return {
-              key: c.key.replace(/^health_[^_]+_/, ""),
-              category: parsed.category,
-              description: parsed.description,
-              severity: parsed.severity,
-              recorded_at: parsed.recorded_at,
-            };
-          } catch {
-            return {
-              key: c.key,
-              description: c.value,
-              category: "other",
-              severity: "medium",
-            };
-          }
-        });
-
-        return {
-          success: true,
-          message: `${formatted.length} information(s) de santé trouvée(s)`,
-          data: formatted,
-        };
-      }
-
-      case "delete_health_context": {
-        // Find and delete the context entry
-        const { data: deleted, error } = await supabase
-          .from("user_context")
-          .delete()
-          .eq("user_id", userId)
-          .like("key", `health_%_${args.key}`)
-          .select("key");
-
-        if (error) throw error;
-
-        if (!deleted || deleted.length === 0) {
-          return {
-            success: false,
-            message: `Information "${args.key}" non trouvée`,
-          };
-        }
-
-        return {
-          success: true,
-          message: `🗑️ Information supprimée: ${args.key}`,
-        };
-      }
-
-      case "get_prepared_workout": {
-        console.log("=== GET_PREPARED_WORKOUT CALLED ===");
-        const { data: pwData, error: pwError } = await supabase
-          .from("user_context")
-          .select("value, updated_at")
-          .eq("user_id", userId)
-          .eq("key", "prepared_workout")
-          .maybeSingle();
-
-        if (pwError) {
-          return { error: `Erreur: ${pwError.message}` };
-        }
-        if (!pwData?.value) {
-          return { result: "Aucune séance n'est actuellement préparée dans l'aperçu. Tu peux en générer une avec generate_workout." };
-        }
-        try {
-          const pw = JSON.parse(pwData.value);
-          return {
-            workout_name: pw.workout_name,
-            estimated_duration_min: pw.estimated_duration_min,
-            target_muscles: pw.target_muscles,
-            exercises: pw.exercises?.map((e: any) => ({
-              name: e.name,
-              sets: e.sets,
-              reps: e.reps,
-              weight_recommendation: e.weight_recommendation,
-              rest_seconds: e.rest_seconds,
-              notes: e.notes,
-            })),
-            warmup_notes: pw.warmup_notes,
-            coach_advice: pw.coach_advice,
-            updated_at: pwData.updated_at,
-          };
-        } catch {
-          return { error: "Erreur de lecture de la séance préparée" };
-        }
-      }
-
-      case "generate_workout": {
-        console.log("=== GENERATE_WORKOUT CALLED ===");
-        console.log("Args received:", JSON.stringify(args));
-        console.log("Focus:", args.focus, "Intensity:", args.intensity);
-        
-        // Get user profile and goals
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        // Get recent workout sessions (last 2 weeks)
-        const twoWeeksAgo = new Date();
-        twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-        
-        const { data: recentSessions } = await supabase
-          .from("workout_sessions")
-          .select("id, workout_name, started_at, completed_at, status, target_muscles, total_duration_seconds, calories_burned, notes")
-          .eq("user_id", userId)
-          .gte("started_at", twoWeeksAgo.toISOString())
-          .order("started_at", { ascending: false });
-
-        // Get health context (injuries, limitations)
-        const { data: healthContext } = await supabase
-          .from("user_context")
-          .select("*")
-          .eq("user_id", userId);
-
-        // Get user's available equipment
-        const equipmentContext = healthContext?.find((c: { key: string }) => c.key === "gym_equipment");
-        const availableEquipment = equipmentContext?.value || "Standard gym equipment";
-
-        // Build context
-        const goal = profile?.goal || "general_fitness";
-        const injuries = healthContext?.filter((c: { key: string }) => 
-          c.key.includes("injury") || c.key.includes("limitation") || c.key.includes("blessure")
-        ) || [];
-
-        const recentWorkoutTypes = recentSessions?.map((s: { workout_name: string }) => s.workout_name) || [];
-        const lastWorkout = recentSessions?.[0];
-        const daysSinceLastWorkout = lastWorkout 
-          ? Math.floor((Date.now() - new Date(lastWorkout.started_at).getTime()) / (1000 * 60 * 60 * 24))
-          : 7;
-        
-        // Get exercise details of last few sessions for smarter programming
-        const lastSessionIds = (recentSessions || []).slice(0, 3).map((s: any) => s.id);
-        let recentExercises: any[] = [];
-        if (lastSessionIds.length > 0) {
-          const { data: exercises } = await supabase
-            .from("workout_exercise_logs")
-            .select("exercise_name, planned_sets, planned_reps, planned_weight, actual_weight, session_id")
-            .eq("user_id", userId)
-            .in("session_id", lastSessionIds);
-          recentExercises = exercises || [];
-        }
-
-        // Count workout types in last 2 weeks for balance
-        const workoutCounts: Record<string, number> = {};
-        recentWorkoutTypes.forEach((type: string) => {
-          const normalized = type.toLowerCase();
-          if (normalized.includes("jambes") || normalized.includes("leg") || normalized.includes("squat") || normalized.includes("bas du corps") || normalized.includes("lower")) {
-            workoutCounts["legs"] = (workoutCounts["legs"] || 0) + 1;
-          } else if (normalized.includes("dos") || normalized.includes("back") || normalized.includes("tirage") || normalized.includes("pull")) {
-            workoutCounts["back"] = (workoutCounts["back"] || 0) + 1;
-          } else if (normalized.includes("pec") || normalized.includes("chest") || normalized.includes("poitrine") || normalized.includes("push")) {
-            workoutCounts["chest"] = (workoutCounts["chest"] || 0) + 1;
-          } else if (normalized.includes("épaule") || normalized.includes("shoulder")) {
-            workoutCounts["shoulders"] = (workoutCounts["shoulders"] || 0) + 1;
-          } else if (normalized.includes("bras") || normalized.includes("biceps") || normalized.includes("triceps") || normalized.includes("arm")) {
-            workoutCounts["arms"] = (workoutCounts["arms"] || 0) + 1;
-          } else if (normalized.includes("haut du corps") || normalized.includes("upper")) {
-            workoutCounts["upper_body"] = (workoutCounts["upper_body"] || 0) + 1;
-          } else if (normalized.includes("cardio") || normalized.includes("course") || normalized.includes("vélo")) {
-            workoutCounts["cardio"] = (workoutCounts["cardio"] || 0) + 1;
-          } else {
-            workoutCounts["full_body"] = (workoutCounts["full_body"] || 0) + 1;
-          }
-        });
-
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-        if (!GEMINI_API_KEY) {
-          return { success: false, message: "GEMINI_API_KEY not configured" };
-        }
-
-        // Build focus instruction based on args
-        let focusInstruction = "";
-        if (args.focus) {
-          const focusMap: Record<string, string> = {
-            upper_body: "haut du corps (pectoraux, dos, épaules, bras)",
-            lower_body: "bas du corps (quadriceps, ischio-jambiers, mollets, fessiers)",
-            full_body: "corps entier (exercices polyarticulaires)",
-            push: "mouvements de poussée (pectoraux, épaules, triceps)",
-            pull: "mouvements de tirage (dos, biceps)",
-            cardio: "cardio et endurance",
-            core: "abdominaux et gainage",
-          };
-          focusInstruction = `\nFOCUS DEMANDÉ: ${focusMap[args.focus] || args.focus}`;
-        }
-
-        let intensityInstruction = "";
-        if (args.intensity) {
-          const intensityMap: Record<string, string> = {
-            light: "Légère - récupération active, poids légers, repos longs",
-            moderate: "Modérée - charge standard, 60-75% du max",
-            intense: "Intense - charge lourde, 80-90% du max, techniques d'intensification",
-          };
-          intensityInstruction = `\nINTENSITÉ: ${intensityMap[args.intensity] || args.intensity}`;
-        }
-
-        // Build recent exercises summary for context
-        const recentExerciseSummary = recentSessions?.slice(0, 3).map((s: any) => {
-          const sessionExercises = recentExercises.filter((e: any) => e.session_id === s.id);
-          return `- ${s.workout_name} (${getTimeAgo(s.started_at)}): ${sessionExercises.map((e: any) => e.exercise_name).join(", ") || "détails non disponibles"}`;
-        }).join("\n") || "Aucune séance récente";
-
-        // Get current date/time for the workout generation context
-        const workoutNow = new Date();
-        const workoutTime = new Intl.DateTimeFormat("fr-FR", {
-          timeZone: "Europe/Paris",
-          weekday: "long",
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }).format(workoutNow);
-
-        const systemPrompt = `Tu es un coach fitness expert. Tu dois générer un programme d'entraînement personnalisé.
-
-⏰ NOUS SOMMES LE: ${workoutTime} (Europe/Paris)
-
-PROFIL UTILISATEUR:
-- Objectif: ${goal === "lose_fat" ? "Perte de gras" : goal === "build_muscle" ? "Prise de muscle" : goal === "maintain" ? "Maintien" : "Forme générale"}
-- Poids actuel: ${profile?.weight_kg || "Non renseigné"} kg
-- Poids cible: ${profile?.target_weight_kg || "Non renseigné"} kg
-
-CONTRAINTES DE SANTÉ:
-${injuries.length > 0 ? injuries.map((i: { value: string }) => `- ${i.value}`).join("\n") : "Aucune contrainte particulière"}
-⚠️ Les contraintes de santé servent à ADAPTER le choix d'exercices (ex: remplacer un exercice dangereux par un équivalent sûr), JAMAIS à changer le focus ou l'intensité demandés.
-
-ÉQUIPEMENT DISPONIBLE:
-${availableEquipment}
-
-HISTORIQUE RÉCENT (2 semaines):
-- Dernière séance: ${lastWorkout ? `${lastWorkout.workout_name} il y a ${daysSinceLastWorkout} jour(s)` : "Aucune séance récente"}
-- Répartition: ${Object.entries(workoutCounts).map(([k, v]) => `${k}: ${v}x`).join(", ") || "Aucune donnée"}
-- Détail des dernières séances:
-${recentExerciseSummary}
-${focusInstruction}
-${intensityInstruction}
-${args.special_request ? `\nDEMANDE SPÉCIALE: ${args.special_request}` : ""}
-${args.exclude_exercises?.length ? `\nEXERCICES À ÉVITER: ${args.exclude_exercises.join(", ")}` : ""}
-${args.duration_min ? `\nDURÉE SOUHAITÉE: ${args.duration_min} minutes` : ""}
-
-═══════════════════════════════════════════════
-RÈGLES ABSOLUES - VIOLATION = ÉCHEC TOTAL:
-═══════════════════════════════════════════════
-
-1. **FOCUS** = LOI. Si focus = "upper_body" → 100% exercices haut du corps (pecs, dos, épaules, bras). ZÉRO squat, ZÉRO fente, ZÉRO leg press, ZÉRO glute bridge, ZÉRO mollets.
-   Si focus = "lower_body" → 100% exercices bas du corps (quadriceps, ischio-jambiers, fessiers, mollets). ZÉRO pompes, ZÉRO tirage, ZÉRO développé, ZÉRO curl biceps.
-   Si focus = "push" → pecs, épaules, triceps uniquement. Si focus = "pull" → dos, biceps uniquement.
-
-2. **INTENSITÉ** = LOI. Si intensité = "intense" → charges 80-90% du max, séries de 4-8 reps, repos courts (60-90s), techniques d'intensification (drop sets, supersets, rest-pause). PAS de séries de 15-20 reps légères.
-   Si intensité = "light" → récupération active, charges légères, séries de 15-20 reps, repos longs.
-
-3. **NOM DE LA SÉANCE** doit refléter le focus + intensité (ex: "Haut du Corps Intense", "Bas du Corps Récupération").
-
-4. **VARIÉTÉ**: Évite de reproposer les mêmes exercices que les 2-3 dernières séances. Propose des alternatives et des variantes.
-
-5. **COHÉRENCE PROGRAMME**: La séance doit s'intégrer logiquement dans le programme global de l'utilisateur (objectif, historique, récupération).
-
-IMPORTANT: Retourne un JSON valide avec cette structure exacte:
-{
-  "workout_name": "Nom de la séance",
-  "target_muscles": ["groupe1", "groupe2"],
-  "estimated_duration_min": 45,
-  "exercises": [
-    {
-      "name": "Nom de l'exercice",
-      "sets": 3,
-      "reps": "10-12",
-      "weight_recommendation": "70% du max ou 20kg",
-      "rest_seconds": 90,
-      "notes": "Conseil technique optionnel"
-    }
-  ],
-  "warmup_notes": "Conseil d'échauffement",
-  "coach_advice": "Conseil personnalisé pour cette séance"
-}`;
-
-        const aiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${GEMINI_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "gemini-2.5-flash",
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: "Génère ma prochaine séance d'entraînement selon les paramètres." },
-            ],
-            response_format: { type: "json_object" },
-          }),
-        });
-
-        if (!aiResponse.ok) {
-          console.error("AI gateway error:", aiResponse.status);
-          return { success: false, message: "Erreur lors de la génération du workout" };
-        }
-
-        const aiResult = await aiResponse.json();
-        const content = aiResult.choices?.[0]?.message?.content;
-
-        if (!content) {
-          return { success: false, message: "Pas de réponse de l'IA" };
-        }
-
-        // Parse the JSON response
-        let workout;
-        try {
-          workout = JSON.parse(content);
-        } catch {
-          const jsonMatch = content.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            workout = JSON.parse(jsonMatch[0]);
-          } else {
-            return { success: false, message: "Format de réponse invalide" };
-          }
-        }
-
-        // SERVER-SIDE EXERCISE VALIDATION: Filter out exercises that don't match the focus
-        if (args.focus && workout.exercises && Array.isArray(workout.exercises)) {
-          const upperBodyKeywords = ["pec", "chest", "bench", "développé", "dips", "pompe", "push", "épaule", "shoulder", "press", "dos", "back", "row", "tirage", "pull", "lat", "bicep", "tricep", "curl", "bras", "arm", "shrug", "trapèz"];
-          const lowerBodyKeywords = ["squat", "jambe", "leg", "fente", "lunge", "mollet", "calf", "cuisse", "quad", "ischio", "hamstring", "fessier", "glute", "hip", "hanche", "deadlift", "soulevé", "presse"];
-          const coreKeywords = ["gainage", "plank", "bird dog", "crunch", "abdo", "oblique", "core", "pallof"];
-
-          const matchesFocus = (exerciseName: string, focus: string): boolean => {
-            const name = exerciseName.toLowerCase();
-            switch (focus) {
-              case "upper_body":
-              case "push":
-              case "pull":
-                // Reject lower body and pure core exercises
-                if (lowerBodyKeywords.some(k => name.includes(k))) return false;
-                if (coreKeywords.some(k => name.includes(k)) && !upperBodyKeywords.some(k => name.includes(k))) return false;
-                return true;
-              case "lower_body":
-                // Reject upper body exercises
-                if (upperBodyKeywords.some(k => name.includes(k)) && !lowerBodyKeywords.some(k => name.includes(k))) return false;
-                if (coreKeywords.some(k => name.includes(k)) && !lowerBodyKeywords.some(k => name.includes(k))) return false;
-                return true;
-              default:
-                return true;
-            }
-          };
-
-          const originalCount = workout.exercises.length;
-          workout.exercises = workout.exercises.filter((ex: any) => matchesFocus(ex.name, args.focus));
-          const filteredCount = originalCount - workout.exercises.length;
-          if (filteredCount > 0) {
-            console.log(`SERVER FILTER: Removed ${filteredCount} exercises that didn't match focus "${args.focus}"`);
-          }
-        }
-
-        // Persist workout to user_context so it shows in the preview
-        try {
-          await supabase
-            .from("user_context")
-            .upsert({
-              user_id: userId,
-              key: "prepared_workout",
-              value: JSON.stringify(workout),
-              updated_at: new Date().toISOString(),
-            }, { onConflict: "user_id,key" });
-          console.log("Workout saved to user_context for preview");
-        } catch (saveErr) {
-          console.error("Error saving workout to user_context:", saveErr);
-        }
-
-        return {
-          success: true,
-          message: `💪 Séance générée: ${workout.workout_name} (~${workout.estimated_duration_min} min, ${workout.exercises?.length || 0} exercices)`,
-          data: { workout, type: "workout_generated" },
-        };
-      }
-
-      case "get_recent_workout_sessions": {
-        const limit = args.limit || 20;
-        let query = supabase
-          .from("workout_sessions")
-          .select("id, workout_name, started_at, completed_at, status, target_muscles, total_duration_seconds, notes")
-          .eq("user_id", userId)
-          .eq("status", "completed")
-          .order("started_at", { ascending: false })
-          .limit(limit);
-
-        // Filter by specific date if provided
-        if (args.date) {
-          const targetDate = getLocalDate(args.date);
-          query = query
-            .gte("started_at", `${targetDate}T00:00:00`)
-            .lt("started_at", `${targetDate}T23:59:59`);
-        }
-
-        // Filter by date range if provided
-        if (args.date_from) {
-          const fromDate = getLocalDate(args.date_from);
-          query = query.gte("started_at", `${fromDate}T00:00:00`);
-        }
-        if (args.date_to) {
-          const toDate = getLocalDate(args.date_to);
-          query = query.lte("started_at", `${toDate}T23:59:59`);
-        }
-
-        const { data: sessions, error } = await query;
-
-        if (error) throw error;
-
-        // Also fetch activities for a complete picture
-        let actQuery = supabase
-          .from("activities")
-          .select("id, activity_type, performed_at, duration_min, calories_burned, notes")
-          .eq("user_id", userId)
-          .order("performed_at", { ascending: false })
-          .limit(limit);
-
-        if (args.date_from) {
-          const fromDate = getLocalDate(args.date_from);
-          actQuery = actQuery.gte("performed_at", `${fromDate}T00:00:00`);
-        }
-        if (args.date_to) {
-          const toDate = getLocalDate(args.date_to);
-          actQuery = actQuery.lte("performed_at", `${toDate}T23:59:59`);
-        }
-        if (args.date) {
-          const targetDate = getLocalDate(args.date);
-          actQuery = actQuery
-            .gte("performed_at", `${targetDate}T00:00:00`)
-            .lt("performed_at", `${targetDate}T23:59:59`);
-        }
-
-        const { data: activities } = await actQuery;
-
-        const formattedSessions = (sessions || []).map((s: any) => ({
-          id: s.id,
-          source: "workout_session",
-          workout_name: s.workout_name,
-          started_at: s.started_at,
-          completed_at: s.completed_at,
-          target_muscles: s.target_muscles,
-          duration_min: s.total_duration_seconds ? Math.round(s.total_duration_seconds / 60) : null,
-          notes: s.notes,
-          time_ago: getTimeAgo(s.started_at),
-        }));
-
-        const formattedActivities = (activities || []).map((a: any) => ({
-          id: a.id,
-          source: "activity",
-          workout_name: a.activity_type,
-          started_at: a.performed_at,
-          duration_min: a.duration_min,
-          calories_burned: a.calories_burned,
-          notes: a.notes,
-          time_ago: getTimeAgo(a.performed_at),
-        }));
-
-        // Merge and sort by date
-        const allSessions = [...formattedSessions, ...formattedActivities]
-          .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())
-          .slice(0, limit);
-
-        return {
-          success: true,
-          message: `${allSessions.length} séance(s) trouvée(s) (terminées uniquement, incluant entraînements structurés et activités libres)`,
-          data: allSessions,
-        };
-      }
-
-      case "get_workout_exercises": {
-        const { data: exercises, error } = await supabase
-          .from("workout_exercise_logs")
-          .select("id, exercise_name, exercise_order, planned_sets, planned_reps, planned_weight, actual_sets, actual_reps, actual_weight, rest_seconds, notes, skipped")
-          .eq("session_id", args.session_id)
-          .eq("user_id", userId)
-          .order("exercise_order", { ascending: true });
-
-        if (error) throw error;
-
-        const formattedExercises = (exercises || []).map((e: any) => ({
-          id: e.id,
-          exercise_name: e.exercise_name,
-          order: e.exercise_order,
-          planned: {
-            sets: e.planned_sets,
-            reps: e.planned_reps,
-            weight: e.planned_weight,
-          },
-          actual: {
-            sets: e.actual_sets,
-            reps: e.actual_reps,
-            weight: e.actual_weight,
-          },
-          rest_seconds: e.rest_seconds,
-          notes: e.notes,
-          skipped: e.skipped,
-        }));
-
-        return {
-          success: true,
-          message: `${formattedExercises.length} exercice(s) dans cette séance`,
-          data: formattedExercises,
-        };
-      }
-
-      case "update_workout_exercise": {
-        // Get current exercise to show what was changed
-        const { data: currentExercise } = await supabase
-          .from("workout_exercise_logs")
-          .select("exercise_name, actual_sets, actual_reps, actual_weight")
-          .eq("id", args.exercise_id)
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        if (!currentExercise) {
-          return { success: false, message: "Exercice non trouvé" };
-        }
-
-        const updates: any = {};
-        if (args.actual_sets !== undefined) updates.actual_sets = args.actual_sets;
-        if (args.actual_reps !== undefined) updates.actual_reps = args.actual_reps;
-        if (args.actual_weight !== undefined) updates.actual_weight = args.actual_weight;
-        if (args.notes !== undefined) updates.notes = args.notes;
-        if (args.skipped !== undefined) updates.skipped = args.skipped;
-
-        const { error } = await supabase
-          .from("workout_exercise_logs")
-          .update(updates)
-          .eq("id", args.exercise_id)
-          .eq("user_id", userId);
-
-        if (error) throw error;
-
-        const changes: string[] = [];
-        if (args.actual_sets !== undefined) changes.push(`${args.actual_sets} séries`);
-        if (args.actual_reps !== undefined) changes.push(`${args.actual_reps} reps`);
-        if (args.actual_weight !== undefined) changes.push(`${args.actual_weight}`);
-
-        return {
-          success: true,
-          message: `✏️ "${currentExercise.exercise_name}" corrigé: ${changes.join(", ") || "mis à jour"}`,
-          data: updates,
-        };
-      }
-
-      case "delete_workout_exercise": {
-        const { data: exercise } = await supabase
-          .from("workout_exercise_logs")
-          .select("exercise_name")
-          .eq("id", args.exercise_id)
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        if (!exercise) {
-          return { success: false, message: "Exercice non trouvé" };
-        }
-
-        const { error } = await supabase
-          .from("workout_exercise_logs")
-          .delete()
-          .eq("id", args.exercise_id)
-          .eq("user_id", userId);
-
-        if (error) throw error;
-
-        return {
-          success: true,
-          message: `🗑️ "${exercise.exercise_name}" supprimé de la séance`,
-        };
-      }
-
-      default:
-        return { success: false, message: `Outil inconnu: ${name}` };
-    }
-  } catch (error) {
-    console.error(`Error executing ${name}:`, error);
-    return {
-      success: false,
-      message: `Erreur lors de l'exécution de ${name}: ${error instanceof Error ? error.message : "Unknown"}`,
-    };
-  }
-}
-
-// Helper function to format time ago
 function getTimeAgo(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
+  const diffMs = Date.now() - new Date(dateString).getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
-
   if (diffMins < 1) return "à l'instant";
   if (diffMins < 60) return `il y a ${diffMins} min`;
   if (diffHours < 24) return `il y a ${diffHours}h`;
@@ -2390,880 +147,1187 @@ function getTimeAgo(dateString: string): string {
   return `il y a ${diffDays} jours`;
 }
 
-serve(async (req) => {
-  // Handle CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+// ─── TOOL DEFINITIONS (Claude format) ───────────────────────────────────────
+const tools = [
+  {
+    name: "log_water",
+    description: "Enregistre une consommation d'eau. Par défaut aujourd'hui (Paris).",
+    input_schema: {
+      type: "object",
+      properties: {
+        amount_ml: { type: "number", description: "Quantité en ml (250 = 1 verre)" },
+        date: { type: "string", description: "Date YYYY-MM-DD (défaut: aujourd'hui)" },
+      },
+      required: ["amount_ml"],
+    },
+  },
+  {
+    name: "remove_water",
+    description: "Retire une quantité d'eau (correction d'erreur).",
+    input_schema: {
+      type: "object",
+      properties: {
+        amount_ml: { type: "number", description: "Quantité à retirer en ml" },
+        date: { type: "string", description: "Date YYYY-MM-DD (défaut: aujourd'hui)" },
+      },
+      required: ["amount_ml"],
+    },
+  },
+  {
+    name: "log_meal",
+    description: "Enregistre un NOUVEAU repas. Ne pas utiliser pour modifier un repas existant.",
+    input_schema: {
+      type: "object",
+      properties: {
+        meal_type: {
+          type: "string",
+          enum: ["breakfast", "morning_snack", "lunch", "afternoon_snack", "dinner", "dessert"],
+          description: "Type: breakfast=petit-déj, morning_snack=collation matin, lunch=déjeuner, afternoon_snack=goûter, dinner=dîner, dessert=dessert",
+        },
+        food_name: { type: "string", description: "Nom/description du repas" },
+        calories: { type: "number", description: "Calories estimées" },
+        protein: { type: "number", description: "Protéines en grammes" },
+        carbs: { type: "number", description: "Glucides en grammes" },
+        fat: { type: "number", description: "Lipides en grammes" },
+        estimated_time: { type: "string", description: "Heure HH:MM" },
+        date: { type: "string", description: "Date YYYY-MM-DD (défaut: aujourd'hui)" },
+      },
+      required: ["meal_type", "food_name", "calories"],
+    },
+  },
+  {
+    name: "get_recent_meals",
+    description: "Récupère les repas récents pour modifier ou vérifier.",
+    input_schema: {
+      type: "object",
+      properties: { limit: { type: "number", description: "Nombre de repas (défaut: 10)" } },
+      required: [],
+    },
+  },
+  {
+    name: "update_meal",
+    description: "Modifie un repas existant. Utiliser get_recent_meals d'abord pour l'ID.",
+    input_schema: {
+      type: "object",
+      properties: {
+        meal_id: { type: "string", description: "ID du repas (obtenu via get_recent_meals)" },
+        meal_type: { type: "string", enum: ["breakfast", "morning_snack", "lunch", "afternoon_snack", "dinner", "dessert"] },
+        food_name: { type: "string" },
+        estimated_time: { type: "string", description: "Heure HH:MM" },
+        calories: { type: "number" },
+        protein: { type: "number" },
+        carbs: { type: "number" },
+        fat: { type: "number" },
+      },
+      required: ["meal_id"],
+    },
+  },
+  {
+    name: "delete_meal",
+    description: "Supprime un repas existant.",
+    input_schema: {
+      type: "object",
+      properties: { meal_id: { type: "string", description: "ID du repas" } },
+      required: ["meal_id"],
+    },
+  },
+  {
+    name: "get_recent_activities",
+    description: "Récupère les séances sportives récentes.",
+    input_schema: {
+      type: "object",
+      properties: { limit: { type: "number", description: "Nombre d'activités (défaut: 5)" } },
+      required: [],
+    },
+  },
+  {
+    name: "update_activity",
+    description: "Modifie une séance existante.",
+    input_schema: {
+      type: "object",
+      properties: {
+        activity_id: { type: "string" },
+        activity_type: { type: "string" },
+        duration_min: { type: "number" },
+        calories_burned: { type: "number" },
+        distance_km: { type: "number" },
+        notes: { type: "string" },
+      },
+      required: ["activity_id"],
+    },
+  },
+  {
+    name: "delete_activity",
+    description: "Supprime une séance sportive.",
+    input_schema: {
+      type: "object",
+      properties: { activity_id: { type: "string" } },
+      required: ["activity_id"],
+    },
+  },
+  {
+    name: "get_daily_summary",
+    description: "Récupère le résumé complet d'une journée (calories, protéines, eau, activités, poids). Appeler systématiquement pour tout bilan ou question sur le jour.",
+    input_schema: {
+      type: "object",
+      properties: { date: { type: "string", description: "Date YYYY-MM-DD (défaut: aujourd'hui)" } },
+      required: [],
+    },
+  },
+  {
+    name: "log_weight",
+    description: "Enregistre le poids de l'utilisateur.",
+    input_schema: {
+      type: "object",
+      properties: { weight_kg: { type: "number", description: "Poids en kg" } },
+      required: ["weight_kg"],
+    },
+  },
+  {
+    name: "log_activity",
+    description: "Enregistre une NOUVELLE séance de sport.",
+    input_schema: {
+      type: "object",
+      properties: {
+        activity_type: { type: "string", description: "Type d'activité (musculation, course, etc.)" },
+        duration_min: { type: "number", description: "Durée en minutes" },
+        calories_burned: { type: "number" },
+        distance_km: { type: "number" },
+        notes: { type: "string" },
+        date: { type: "string", description: "Date YYYY-MM-DD (défaut: aujourd'hui)" },
+      },
+      required: ["activity_type", "duration_min"],
+    },
+  },
+  {
+    name: "log_body_fat",
+    description: "Enregistre le pourcentage de masse grasse.",
+    input_schema: {
+      type: "object",
+      properties: { body_fat_pct: { type: "number" } },
+      required: ["body_fat_pct"],
+    },
+  },
+  {
+    name: "log_body_composition",
+    description: "Enregistre une mesure complète d'impédancemètre (poids, masse grasse, musculaire, eau, etc.).",
+    input_schema: {
+      type: "object",
+      properties: {
+        weight_kg: { type: "number" }, body_fat_pct: { type: "number" },
+        muscle_mass_kg: { type: "number" }, lean_mass_kg: { type: "number" },
+        bone_mass_kg: { type: "number" }, water_pct: { type: "number" },
+        bmi: { type: "number" }, bmr_kcal: { type: "number" },
+        visceral_fat_index: { type: "number" }, body_age: { type: "number" },
+        protein_pct: { type: "number" }, protein_kg: { type: "number" },
+        subcutaneous_fat_pct: { type: "number" }, fat_mass_kg: { type: "number" },
+        skeletal_muscle_pct: { type: "number" }, standard_weight_kg: { type: "number" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_body_composition_history",
+    description: "Récupère l'historique des mesures corporelles pour voir la progression.",
+    input_schema: {
+      type: "object",
+      properties: { limit: { type: "number", description: "Nombre de mesures (défaut: 5)" } },
+      required: [],
+    },
+  },
+  {
+    name: "save_health_context",
+    description: "Sauvegarde une information importante sur l'utilisateur (blessure, allergie, préférence d'entraînement, équipement, objectif, etc.). À appeler dès qu'une info structurante est mentionnée.",
+    input_schema: {
+      type: "object",
+      properties: {
+        category: {
+          type: "string",
+          enum: ["injury", "allergy", "medical_condition", "physical_limitation", "preference", "training_preference", "equipment", "lifestyle", "other"],
+          description: "Catégorie de l'info",
+        },
+        key: { type: "string", description: "Identifiant court (ex: 'split_haut_bas', 'allergie_gluten', 'equipement_dispo')" },
+        value: { type: "string", description: "Description détaillée" },
+        severity: { type: "string", enum: ["low", "medium", "high", "critical"] },
+      },
+      required: ["category", "key", "value", "severity"],
+    },
+  },
+  {
+    name: "get_health_context",
+    description: "Récupère toutes les informations sauvegardées sur l'utilisateur (blessures, préférences, équipement, etc.). Appeler en début de session et avant toute génération de séance.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "delete_health_context",
+    description: "Supprime une information de santé obsolète.",
+    input_schema: {
+      type: "object",
+      properties: { key: { type: "string" } },
+      required: ["key"],
+    },
+  },
+  {
+    name: "get_prepared_workout",
+    description: "Récupère la séance actuellement préparée dans l'aperçu de l'app.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "generate_workout",
+    description: "Génère un programme d'entraînement personnalisé et le sauvegarde dans l'aperçu. Toujours appeler get_health_context et get_recent_workout_sessions AVANT pour personnaliser.",
+    input_schema: {
+      type: "object",
+      properties: {
+        focus: {
+          type: "string",
+          enum: ["upper_body", "lower_body", "full_body", "push", "pull", "cardio", "core"],
+          description: "Focus musculaire",
+        },
+        intensity: {
+          type: "string",
+          enum: ["light", "moderate", "intense"],
+          description: "Intensité",
+        },
+        duration_min: { type: "number" },
+        exclude_exercises: { type: "array", items: { type: "string" } },
+        special_request: { type: "string" },
+      },
+      required: ["focus", "intensity"],
+    },
+  },
+  {
+    name: "get_recent_workout_sessions",
+    description: "Récupère les séances terminées. Utiliser date_from/date_to pour filtrer par période. Pour 'cette semaine': date_from=lundi, date_to=dimanche.",
+    input_schema: {
+      type: "object",
+      properties: {
+        limit: { type: "number", description: "Nombre de séances (défaut: 20)" },
+        date: { type: "string", description: "Date spécifique YYYY-MM-DD" },
+        date_from: { type: "string", description: "Date début YYYY-MM-DD" },
+        date_to: { type: "string", description: "Date fin YYYY-MM-DD" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_workout_exercises",
+    description: "Récupère les exercices détaillés d'une séance spécifique.",
+    input_schema: {
+      type: "object",
+      properties: { session_id: { type: "string" } },
+      required: ["session_id"],
+    },
+  },
+  {
+    name: "update_workout_exercise",
+    description: "Modifie un exercice d'une séance (sets, reps, poids).",
+    input_schema: {
+      type: "object",
+      properties: {
+        exercise_id: { type: "string" },
+        actual_sets: { type: "number" },
+        actual_reps: { type: "string" },
+        actual_weight: { type: "string" },
+        notes: { type: "string" },
+        skipped: { type: "boolean" },
+      },
+      required: ["exercise_id"],
+    },
+  },
+  {
+    name: "delete_workout_exercise",
+    description: "Supprime un exercice d'une séance.",
+    input_schema: {
+      type: "object",
+      properties: { exercise_id: { type: "string" } },
+      required: ["exercise_id"],
+    },
+  },
+];
+
+// ─── TOOL EXECUTOR ───────────────────────────────────────────────────────────
+async function executeToolCall(
+  supabase: any, userId: string, toolName: string, toolInput: any
+): Promise<{ success: boolean; message: string; data?: unknown }> {
+  const schema = toolSchemas[toolName];
+  if (schema) {
+    const result = schema.safeParse(toolInput);
+    if (!result.success) {
+      return { success: false, message: `Données invalides: ${result.error.errors.map((e: any) => `${e.path.join(".")}: ${e.message}`).join(", ")}` };
+    }
+    toolInput = result.data;
   }
 
+  const today = getLocalDate();
+
   try {
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!GEMINI_API_KEY) {
-      throw new Error("GEMINI_API_KEY is not configured");
+    switch (toolName) {
+      case "log_water": {
+        const targetDate = getLocalDate(toolInput.date);
+        const { data: current } = await supabase.from("daily_metrics").select("water_ml").eq("user_id", userId).eq("date", targetDate).maybeSingle();
+        const newTotal = (current?.water_ml || 0) + toolInput.amount_ml;
+        const { error } = await supabase.from("daily_metrics").upsert({ user_id: userId, date: targetDate, water_ml: newTotal }, { onConflict: "user_id,date" });
+        if (error) throw error;
+        return { success: true, message: `💧 ${toolInput.amount_ml}ml ajoutés (total: ${newTotal}ml)`, data: { total: newTotal, date: targetDate } };
+      }
+
+      case "remove_water": {
+        const targetDate = getLocalDate(toolInput.date);
+        const { data: current } = await supabase.from("daily_metrics").select("water_ml").eq("user_id", userId).eq("date", targetDate).maybeSingle();
+        const newTotal = Math.max(0, (current?.water_ml || 0) - toolInput.amount_ml);
+        const { error } = await supabase.from("daily_metrics").upsert({ user_id: userId, date: targetDate, water_ml: newTotal }, { onConflict: "user_id,date" });
+        if (error) throw error;
+        return { success: true, message: `💧 ${toolInput.amount_ml}ml retirés (nouveau total: ${newTotal}ml)`, data: { total: newTotal } };
+      }
+
+      case "log_meal": {
+        let normalizedMealType = toolInput.meal_type;
+        if (normalizedMealType === "snack") {
+          const hour = parseInt((normalizeTimeToHHMM(toolInput.estimated_time) || "12:00").split(":")[0]);
+          normalizedMealType = hour >= 14 ? "afternoon_snack" : "morning_snack";
+        }
+        const timeToUse = normalizeTimeToHHMM(toolInput.estimated_time) || MEAL_DEFAULT_TIMES[normalizedMealType] || "12:00";
+        const dateToUse = getLocalDate(toolInput.date);
+        const { error } = await supabase.from("nutrition_logs").insert({
+          user_id: userId, meal_type: normalizedMealType, food_name: toolInput.food_name,
+          calories: toolInput.calories || 0, protein: toolInput.protein || 0,
+          carbs: toolInput.carbs || 0, fat: toolInput.fat || 0,
+          logged_at: `${dateToUse}T${timeToUse}:00`,
+        });
+        if (error) throw error;
+        const { data: currentMetrics } = await supabase.from("daily_metrics").select("calories_in").eq("user_id", userId).eq("date", dateToUse).maybeSingle();
+        const { error: metricsErr } = await supabase.from("daily_metrics").upsert({ user_id: userId, date: dateToUse, calories_in: (currentMetrics?.calories_in || 0) + (toolInput.calories || 0) }, { onConflict: "user_id,date" });
+        if (metricsErr) console.error("daily_metrics sync failed:", metricsErr.message);
+        return { success: true, message: `🍽️ ${toolInput.food_name} enregistré (${MEAL_TYPE_LABELS[normalizedMealType]}, ${toolInput.calories} kcal)`, data: toolInput };
+      }
+
+      case "get_recent_meals": {
+        const { data: meals, error } = await supabase.from("nutrition_logs").select("id, food_name, meal_type, calories, protein, carbs, fat, logged_at").eq("user_id", userId).order("logged_at", { ascending: false }).limit(toolInput.limit || 10);
+        if (error) throw error;
+        return { success: true, message: `${meals?.length || 0} repas trouvés`, data: (meals || []).map((m: any) => ({ ...m, time_ago: getTimeAgo(m.logged_at) })) };
+      }
+
+      case "update_meal": {
+        const { data: currentMeal } = await supabase.from("nutrition_logs").select("calories, food_name, logged_at, meal_type").eq("id", toolInput.meal_id).eq("user_id", userId).maybeSingle();
+        if (!currentMeal) return { success: false, message: "Repas non trouvé" };
+        const updates: any = {};
+        if (toolInput.meal_type !== undefined) updates.meal_type = toolInput.meal_type;
+        if (toolInput.food_name !== undefined) updates.food_name = toolInput.food_name;
+        if (toolInput.calories !== undefined) updates.calories = toolInput.calories;
+        if (toolInput.protein !== undefined) updates.protein = toolInput.protein;
+        if (toolInput.carbs !== undefined) updates.carbs = toolInput.carbs;
+        if (toolInput.fat !== undefined) updates.fat = toolInput.fat;
+        const mealDate = (currentMeal.logged_at || `${today}T12:00:00`).split("T")[0];
+        let timeToUse = normalizeTimeToHHMM(toolInput.estimated_time);
+        if (!timeToUse && toolInput.meal_type && toolInput.meal_type !== currentMeal.meal_type) timeToUse = MEAL_DEFAULT_TIMES[toolInput.meal_type] || null;
+        if (timeToUse) updates.logged_at = `${mealDate}T${timeToUse}:00`;
+        const { error } = await supabase.from("nutrition_logs").update(updates).eq("id", toolInput.meal_id).eq("user_id", userId);
+        if (error) throw error;
+        if (toolInput.calories !== undefined && toolInput.calories !== currentMeal.calories) {
+          const diff = toolInput.calories - (currentMeal.calories || 0);
+          const { data: metrics } = await supabase.from("daily_metrics").select("calories_in").eq("user_id", userId).eq("date", mealDate).maybeSingle();
+          const { error: metricsErr } = await supabase.from("daily_metrics").upsert({ user_id: userId, date: mealDate, calories_in: Math.max(0, (metrics?.calories_in || 0) + diff) }, { onConflict: "user_id,date" });
+          if (metricsErr) console.error("daily_metrics sync failed:", metricsErr.message);
+        }
+        return { success: true, message: `✏️ "${currentMeal.food_name}" mis à jour`, data: updates };
+      }
+
+      case "delete_meal": {
+        const { data: meal } = await supabase.from("nutrition_logs").select("calories, food_name, logged_at").eq("id", toolInput.meal_id).eq("user_id", userId).maybeSingle();
+        if (!meal) return { success: false, message: "Repas non trouvé" };
+        const { error } = await supabase.from("nutrition_logs").delete().eq("id", toolInput.meal_id).eq("user_id", userId);
+        if (error) throw error;
+        if (meal.calories) {
+          const mealDate = (meal.logged_at || `${today}T12:00:00`).split("T")[0];
+          const { data: metrics } = await supabase.from("daily_metrics").select("calories_in").eq("user_id", userId).eq("date", mealDate).maybeSingle();
+          const { error: metricsErr } = await supabase.from("daily_metrics").upsert({ user_id: userId, date: mealDate, calories_in: Math.max(0, (metrics?.calories_in || 0) - meal.calories) }, { onConflict: "user_id,date" });
+          if (metricsErr) console.error("daily_metrics sync failed:", metricsErr.message);
+        }
+        return { success: true, message: `🗑️ "${meal.food_name}" supprimé` };
+      }
+
+      case "get_recent_activities": {
+        const { data: sessions, error } = await supabase.from("workout_sessions").select("id, workout_name, started_at, completed_at, status, total_duration_seconds, calories_burned, target_muscles, notes").eq("user_id", userId).order("started_at", { ascending: false }).limit(toolInput.limit || 5);
+        if (error) throw error;
+        return { success: true, message: `${sessions?.length || 0} activités trouvées`, data: (sessions || []).map((s: any) => ({ id: s.id, activity_type: s.workout_name, duration_min: s.total_duration_seconds ? Math.round(s.total_duration_seconds / 60) : null, calories_burned: s.calories_burned, notes: s.notes, performed_at: s.started_at, status: s.status, target_muscles: s.target_muscles, time_ago: getTimeAgo(s.started_at) })) };
+      }
+
+      case "update_activity": {
+        const { data: current } = await supabase.from("workout_sessions").select("workout_name, calories_burned").eq("id", toolInput.activity_id).eq("user_id", userId).maybeSingle();
+        if (!current) return { success: false, message: "Activité non trouvée" };
+        const updates: any = {};
+        if (toolInput.activity_type !== undefined) updates.workout_name = toolInput.activity_type;
+        if (toolInput.duration_min !== undefined) updates.total_duration_seconds = toolInput.duration_min * 60;
+        if (toolInput.calories_burned !== undefined) updates.calories_burned = toolInput.calories_burned;
+        if (toolInput.distance_km !== undefined) updates.distance_km = toolInput.distance_km;
+        if (toolInput.notes !== undefined) updates.notes = toolInput.notes;
+        const { error } = await supabase.from("workout_sessions").update(updates).eq("id", toolInput.activity_id).eq("user_id", userId);
+        if (error) throw error;
+        return { success: true, message: `✏️ "${current.workout_name}" mis à jour`, data: updates };
+      }
+
+      case "delete_activity": {
+        const { data: session } = await supabase.from("workout_sessions").select("workout_name, calories_burned").eq("id", toolInput.activity_id).eq("user_id", userId).maybeSingle();
+        if (!session) return { success: false, message: "Activité non trouvée" };
+        const { error: logsErr } = await supabase.from("workout_exercise_logs").delete().eq("session_id", toolInput.activity_id).eq("user_id", userId);
+        if (logsErr) console.error("exercise logs cleanup failed:", logsErr.message);
+        const { error } = await supabase.from("workout_sessions").delete().eq("id", toolInput.activity_id).eq("user_id", userId);
+        if (error) throw error;
+        if (session.calories_burned) {
+          const { data: metrics } = await supabase.from("daily_metrics").select("calories_burned").eq("user_id", userId).eq("date", today).maybeSingle();
+          const { error: metricsErr } = await supabase.from("daily_metrics").upsert({ user_id: userId, date: today, calories_burned: Math.max(0, (metrics?.calories_burned || 0) - session.calories_burned) }, { onConflict: "user_id,date" });
+          if (metricsErr) console.error("daily_metrics sync failed:", metricsErr.message);
+        }
+        return { success: true, message: `🗑️ "${session.workout_name}" supprimé` };
+      }
+
+      case "get_daily_summary": {
+        const queryDate = getLocalDate(toolInput.date);
+        const [metricsRes, mealsRes, activitiesRes, profileRes, latestBFRes] = await Promise.all([
+          supabase.from("daily_metrics").select("*").eq("user_id", userId).eq("date", queryDate).maybeSingle(),
+          supabase.from("nutrition_logs").select("*").eq("user_id", userId).gte("logged_at", `${queryDate}T00:00:00`).lte("logged_at", `${queryDate}T23:59:59`).order("logged_at", { ascending: true }),
+          supabase.from("workout_sessions").select("*").eq("user_id", userId).gte("started_at", `${queryDate}T00:00:00`).lte("started_at", `${queryDate}T23:59:59`),
+          supabase.from("profiles").select("target_calories, target_water_ml, target_weight_kg, weight_kg, goal, current_body_fat_pct, target_body_fat_pct").eq("user_id", userId).maybeSingle(),
+          supabase.from("daily_metrics").select("body_fat_pct, date").eq("user_id", userId).not("body_fat_pct", "is", null).order("date", { ascending: false }).limit(1).maybeSingle(),
+        ]);
+        const meals = mealsRes.data || [];
+        const activities = activitiesRes.data || [];
+        const profile = profileRes.data;
+        const totalCalories = meals.reduce((s: number, m: any) => s + (m.calories || 0), 0);
+        const totalProtein = meals.reduce((s: number, m: any) => s + (m.protein || 0), 0);
+        const totalCarbs = meals.reduce((s: number, m: any) => s + (m.carbs || 0), 0);
+        const totalFat = meals.reduce((s: number, m: any) => s + (m.fat || 0), 0);
+        return {
+          success: true, message: `Résumé du ${queryDate}`,
+          data: {
+            date: queryDate, is_today: queryDate === today,
+            calories_consumed: totalCalories, protein_consumed: totalProtein,
+            carbs_consumed: totalCarbs, fat_consumed: totalFat,
+            target_calories: profile?.target_calories || 2000,
+            protein_goal: Math.round((profile?.weight_kg || 70) * 2),
+            water_ml: metricsRes.data?.water_ml || 0,
+            target_water_ml: profile?.target_water_ml || 2000,
+            calories_burned: activities.reduce((s: number, a: any) => s + (a.calories_burned || 0), 0),
+            weight: metricsRes.data?.weight || profile?.weight_kg,
+            target_weight: profile?.target_weight_kg, goal: profile?.goal,
+            current_body_fat_pct: profile?.current_body_fat_pct,
+            target_body_fat_pct: profile?.target_body_fat_pct,
+            latest_body_fat: latestBFRes.data?.body_fat_pct,
+            meals_count: meals.length,
+            meals: meals.map((m: any) => ({ id: m.id, meal_type: m.meal_type, food_name: m.food_name, calories: m.calories, protein: m.protein, carbs: m.carbs, fat: m.fat, logged_at: m.logged_at })),
+            activities_count: activities.length,
+            activities: activities,
+          },
+        };
+      }
+
+      case "log_weight": {
+        const { error } = await supabase.from("daily_metrics").upsert({ user_id: userId, date: today, weight: toolInput.weight_kg }, { onConflict: "user_id,date" });
+        if (error) throw error;
+        const { error: profileErr } = await supabase.from("profiles").update({ weight_kg: toolInput.weight_kg }).eq("user_id", userId);
+        if (profileErr) console.error("profile weight sync failed:", profileErr.message);
+        return { success: true, message: `⚖️ Poids enregistré: ${toolInput.weight_kg} kg`, data: { weight: toolInput.weight_kg } };
+      }
+
+      case "log_activity": {
+        let caloriesBurned = toolInput.calories_burned;
+        if (!caloriesBurned) {
+          const { data: profile } = await supabase.from("profiles").select("weight_kg").eq("user_id", userId).maybeSingle();
+          const weight = profile?.weight_kg || 70;
+          const actLower = toolInput.activity_type.toLowerCase();
+          let met = 4;
+          if (actLower.includes("course") || actLower.includes("running")) met = 8;
+          else if (actLower.includes("musculation") || actLower.includes("muscu")) met = 5;
+          else if (actLower.includes("hiit") || actLower.includes("crossfit")) met = 10;
+          else if (actLower.includes("vélo") || actLower.includes("cycling")) met = 7;
+          else if (actLower.includes("natation")) met = 7;
+          else if (actLower.includes("yoga") || actLower.includes("pilates")) met = 3;
+          else if (actLower.includes("marche") || actLower.includes("walk")) met = 3.5;
+          caloriesBurned = Math.round(met * weight * (toolInput.duration_min / 60));
+        }
+        const actDate = getLocalDate(toolInput.date);
+        const performedAt = toolInput.date ? `${actDate}T12:00:00` : new Date().toISOString();
+        const { error } = await supabase.from("workout_sessions").insert({
+          user_id: userId, workout_name: toolInput.activity_type,
+          started_at: performedAt, completed_at: performedAt, status: "completed",
+          total_duration_seconds: toolInput.duration_min * 60,
+          calories_burned: caloriesBurned, distance_km: toolInput.distance_km || null,
+          notes: toolInput.notes || null,
+        });
+        if (error) throw error;
+        const { data: currentMetrics } = await supabase.from("daily_metrics").select("calories_burned").eq("user_id", userId).eq("date", actDate).maybeSingle();
+        const { error: metricsErr } = await supabase.from("daily_metrics").upsert({ user_id: userId, date: actDate, calories_burned: (currentMetrics?.calories_burned || 0) + caloriesBurned }, { onConflict: "user_id,date" });
+        if (metricsErr) console.error("daily_metrics sync failed:", metricsErr.message);
+        return { success: true, message: `🏋️ ${toolInput.activity_type} enregistré (${toolInput.duration_min} min, ~${caloriesBurned} kcal)`, data: { ...toolInput, calories_burned: caloriesBurned } };
+      }
+
+      case "log_body_fat": {
+        const { error } = await supabase.from("daily_metrics").upsert({ user_id: userId, date: today, body_fat_pct: toolInput.body_fat_pct }, { onConflict: "user_id,date" });
+        if (error) throw error;
+        return { success: true, message: `📊 Masse grasse enregistrée: ${toolInput.body_fat_pct}%` };
+      }
+
+      case "log_body_composition": {
+        const record: any = { user_id: userId, measured_at: new Date().toISOString() };
+        const fields = ["weight_kg", "body_fat_pct", "muscle_mass_kg", "lean_mass_kg", "bone_mass_kg", "water_pct", "bmi", "bmr_kcal", "visceral_fat_index", "body_age", "protein_pct", "protein_kg", "subcutaneous_fat_pct", "fat_mass_kg", "skeletal_muscle_pct", "standard_weight_kg"];
+        let count = 0;
+        for (const f of fields) { if (toolInput[f] != null) { record[f] = toolInput[f]; count++; } }
+        if (count === 0) return { success: false, message: "Aucune métrique fournie" };
+        const { error } = await supabase.from("body_composition").insert(record);
+        if (error) throw error;
+        if (toolInput.weight_kg || toolInput.body_fat_pct) {
+          const upd: any = { user_id: userId, date: today };
+          if (toolInput.weight_kg) upd.weight = toolInput.weight_kg;
+          if (toolInput.body_fat_pct) upd.body_fat_pct = toolInput.body_fat_pct;
+          const { error: metricsErr } = await supabase.from("daily_metrics").upsert(upd, { onConflict: "user_id,date" });
+          if (metricsErr) console.error("daily_metrics sync failed:", metricsErr.message);
+        }
+        if (toolInput.weight_kg) {
+          const { error: profileErr } = await supabase.from("profiles").update({ weight_kg: toolInput.weight_kg }).eq("user_id", userId);
+          if (profileErr) console.error("profile weight sync failed:", profileErr.message);
+        }
+        const recorded: string[] = [];
+        if (toolInput.weight_kg) recorded.push(`${toolInput.weight_kg}kg`);
+        if (toolInput.body_fat_pct) recorded.push(`${toolInput.body_fat_pct}% gras`);
+        if (toolInput.muscle_mass_kg) recorded.push(`${toolInput.muscle_mass_kg}kg muscle`);
+        return { success: true, message: `📊 Mesure complète: ${recorded.join(", ")} (${count} métriques)`, data: record };
+      }
+
+      case "get_body_composition_history": {
+        const { data: measurements, error } = await supabase.from("body_composition").select("*").eq("user_id", userId).order("measured_at", { ascending: false }).limit(toolInput.limit || 5);
+        if (error) throw error;
+        const { data: profile } = await supabase.from("profiles").select("target_weight_kg, target_body_fat_pct, current_body_fat_pct").eq("user_id", userId).maybeSingle();
+        return { success: true, message: `${measurements?.length || 0} mesures trouvées`, data: { measurements: (measurements || []).map((m: any) => ({ date: new Date(m.measured_at).toLocaleDateString("fr-FR"), weight_kg: m.weight_kg, body_fat_pct: m.body_fat_pct, muscle_mass_kg: m.muscle_mass_kg, lean_mass_kg: m.lean_mass_kg, bmi: m.bmi, bmr_kcal: m.bmr_kcal, body_age: m.body_age })), targets: profile } };
+      }
+
+      case "save_health_context": {
+        const contextKey = `health_${toolInput.category}_${toolInput.key}`;
+        const contextValue = JSON.stringify({ category: toolInput.category, description: toolInput.value, severity: toolInput.severity, recorded_at: new Date().toISOString() });
+        const { data: existing } = await supabase.from("user_context").select("id").eq("user_id", userId).eq("key", contextKey).maybeSingle();
+        if (existing) {
+          const { error: upErr } = await supabase.from("user_context").update({ value: contextValue, updated_at: new Date().toISOString() }).eq("id", existing.id);
+          if (upErr) throw upErr;
+        } else {
+          const { error: insErr } = await supabase.from("user_context").insert({ user_id: userId, key: contextKey, value: contextValue });
+          if (insErr) throw insErr;
+        }
+        return { success: true, message: `✅ Sauvegardé: ${toolInput.key} (${toolInput.category})`, data: { key: toolInput.key, category: toolInput.category } };
+      }
+
+      case "get_health_context": {
+        const { data: contexts, error } = await supabase.from("user_context").select("key, value, updated_at").eq("user_id", userId).like("key", "health_%");
+        if (error) throw error;
+        const formatted = (contexts || []).map((c: any) => {
+          try {
+            const parsed = JSON.parse(c.value);
+            return { key: c.key.replace(/^health_[^_]+_/, ""), category: parsed.category, description: parsed.description, severity: parsed.severity, recorded_at: parsed.recorded_at };
+          } catch { return { key: c.key, description: c.value, category: "other", severity: "medium" }; }
+        });
+        return { success: true, message: `${formatted.length} info(s) trouvée(s)`, data: formatted };
+      }
+
+      case "delete_health_context": {
+        const { data: deleted, error } = await supabase.from("user_context").delete().eq("user_id", userId).like("key", `health_%_${toolInput.key}`).select("key");
+        if (error) throw error;
+        if (!deleted?.length) return { success: false, message: `"${toolInput.key}" non trouvé` };
+        return { success: true, message: `🗑️ "${toolInput.key}" supprimé` };
+      }
+
+      case "get_prepared_workout": {
+        const { data, error } = await supabase.from("user_context").select("value, updated_at").eq("user_id", userId).eq("key", "prepared_workout").maybeSingle();
+        if (error) return { success: false, message: `Erreur: ${error.message}` };
+        if (!data?.value) return { success: true, message: "Aucune séance préparée actuellement", data: null };
+        try {
+          const pw = JSON.parse(data.value);
+          return { success: true, message: "Séance préparée trouvée", data: { workout_name: pw.workout_name, estimated_duration_min: pw.estimated_duration_min, target_muscles: pw.target_muscles, exercises: pw.exercises?.map((e: any) => ({ name: e.name, sets: e.sets, reps: e.reps, weight_recommendation: e.weight_recommendation, rest_seconds: e.rest_seconds, notes: e.notes })), warmup_notes: pw.warmup_notes, coach_advice: pw.coach_advice, updated_at: data.updated_at } };
+        } catch { return { success: false, message: "Erreur de lecture de la séance" }; }
+      }
+
+      case "generate_workout": {
+        const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+        if (!ANTHROPIC_API_KEY) return { success: false, message: "ANTHROPIC_API_KEY non configurée" };
+
+        const [profileRes, recentSessionsRes, healthCtxRes] = await Promise.all([
+          supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
+          supabase.from("workout_sessions").select("id, workout_name, started_at, target_muscles, total_duration_seconds, notes").eq("user_id", userId).order("started_at", { ascending: false }).limit(10),
+          supabase.from("user_context").select("key, value").eq("user_id", userId),
+        ]);
+
+        const profile = profileRes.data;
+        const recentSessions = recentSessionsRes.data || [];
+        const allContext = healthCtxRes.data || [];
+
+        const sessionIds = recentSessions.map((s: any) => s.id);
+        let recentExercises: any[] = [];
+        if (sessionIds.length > 0) {
+          const { data: exLogs } = await supabase.from("workout_exercise_logs").select("session_id, exercise_name, planned_sets, planned_reps, actual_weight").eq("user_id", userId).in("session_id", sessionIds.slice(0, 3));
+          recentExercises = exLogs || [];
+        }
+
+        const healthContextItems = allContext.filter((c: any) => c.key.startsWith("health_")).map((c: any) => {
+          try { const p = JSON.parse(c.value); return `[${p.category}/${p.severity}] ${p.description}`; } catch { return c.value; }
+        });
+
+        const equipmentCtx = allContext.find((c: any) => c.key.includes("equipment"));
+        const equipment = equipmentCtx ? (() => { try { return JSON.parse(equipmentCtx.value).description; } catch { return equipmentCtx.value; } })() : "Salle de sport standard";
+
+        const recentSessionSummary = recentSessions.slice(0, 5).map((s: any) => {
+          const exercises = recentExercises.filter((e: any) => e.session_id === s.id).map((e: any) => e.exercise_name).join(", ");
+          return `- ${new Date(s.started_at).toLocaleDateString("fr-FR")}: ${s.workout_name} [${(s.target_muscles || []).join(", ")}] — ${exercises || "détail non dispo"}`;
+        }).join("\n");
+
+        const focusMap: Record<string, string> = { upper_body: "Haut du corps (pecs, dos, épaules, bras)", lower_body: "Bas du corps (quadriceps, ischio-jambiers, fessiers, mollets)", full_body: "Corps entier", push: "Poussée (pecs, épaules, triceps)", pull: "Tirage (dos, biceps)", cardio: "Cardio/endurance", core: "Abdos/gainage" };
+        const intensityMap: Record<string, string> = { light: "Légère - récupération, poids légers", moderate: "Modérée - 60-75% du max", intense: "Intense - 80-90% du max, techniques d'intensification" };
+
+        const workoutSystemPrompt = `Tu es un coach fitness expert. Génère un programme d'entraînement en JSON strict.
+
+PROFIL:
+- Objectif: ${profile?.goal || "forme générale"}
+- Poids: ${profile?.weight_kg || "?"}kg → Cible: ${profile?.target_weight_kg || "?"}kg
+
+CONTRAINTES DE SANTÉ ET PRÉFÉRENCES:
+${healthContextItems.length > 0 ? healthContextItems.join("\n") : "Aucune contrainte particulière"}
+
+ÉQUIPEMENT DISPONIBLE: ${equipment}
+
+FOCUS DEMANDÉ: ${focusMap[toolInput.focus] || toolInput.focus}
+INTENSITÉ: ${intensityMap[toolInput.intensity] || toolInput.intensity}
+${toolInput.duration_min ? `DURÉE: ${toolInput.duration_min} minutes` : ""}
+${toolInput.special_request ? `DEMANDE SPÉCIALE: ${toolInput.special_request}` : ""}
+${toolInput.exclude_exercises?.length ? `EXERCICES À ÉVITER: ${toolInput.exclude_exercises.join(", ")}` : ""}
+
+HISTORIQUE RÉCENT (NE PAS répéter les mêmes exercices):
+${recentSessionSummary || "Aucune séance récente"}
+
+RÈGLES ABSOLUES:
+1. Le focus est une LOI. Si upper_body: ZÉRO exercice jambes. Si lower_body: ZÉRO exercice haut du corps.
+2. Respecte strictement les contraintes de santé (adapte les exercices, ne change pas le focus).
+3. Varie les exercices par rapport aux séances récentes.
+4. Adapte les recommandations de charges à l'intensité demandée.
+
+Retourne UNIQUEMENT ce JSON:
+{
+  "workout_name": "Nom évocateur",
+  "target_muscles": ["muscle1", "muscle2"],
+  "estimated_duration_min": 45,
+  "exercises": [
+    {"name": "...", "sets": 4, "reps": "8-10", "weight_recommendation": "...", "rest_seconds": 90, "notes": "..."}
+  ],
+  "warmup_notes": "...",
+  "coach_advice": "Conseil personnalisé pour cette séance"
+}`;
+
+        const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-5",
+            max_tokens: 2000,
+            system: workoutSystemPrompt,
+            messages: [{ role: "user", content: "Génère la séance selon les paramètres." }],
+          }),
+        });
+
+        if (!aiRes.ok) return { success: false, message: "Erreur lors de la génération" };
+        const aiData = await aiRes.json();
+        const content = aiData.content?.[0]?.text || "";
+        let workout;
+        try {
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          workout = JSON.parse(jsonMatch ? jsonMatch[0] : content);
+        } catch { return { success: false, message: "Format de réponse invalide" }; }
+
+        await supabase.from("user_context").upsert({ user_id: userId, key: "prepared_workout", value: JSON.stringify(workout), updated_at: new Date().toISOString() }, { onConflict: "user_id,key" });
+        return { success: true, message: `💪 Séance générée: ${workout.workout_name} (~${workout.estimated_duration_min} min, ${workout.exercises?.length || 0} exercices)`, data: { workout, type: "workout_generated" } };
+      }
+
+      case "get_recent_workout_sessions": {
+        let query = supabase.from("workout_sessions").select("id, workout_name, started_at, completed_at, status, target_muscles, total_duration_seconds, notes").eq("user_id", userId).eq("status", "completed").order("started_at", { ascending: false }).limit(toolInput.limit || 20);
+        if (toolInput.date) { const d = getLocalDate(toolInput.date); query = query.gte("started_at", `${d}T00:00:00`).lt("started_at", `${d}T23:59:59`); }
+        if (toolInput.date_from) { const d = getLocalDate(toolInput.date_from); query = query.gte("started_at", `${d}T00:00:00`); }
+        if (toolInput.date_to) { const d = getLocalDate(toolInput.date_to); query = query.lte("started_at", `${d}T23:59:59`); }
+        const { data: sessions, error } = await query;
+        if (error) throw error;
+        let actQuery = supabase.from("activities").select("id, activity_type, performed_at, duration_min, calories_burned, notes").eq("user_id", userId).order("performed_at", { ascending: false }).limit(toolInput.limit || 20);
+        if (toolInput.date_from) { const d = getLocalDate(toolInput.date_from); actQuery = actQuery.gte("performed_at", `${d}T00:00:00`); }
+        if (toolInput.date_to) { const d = getLocalDate(toolInput.date_to); actQuery = actQuery.lte("performed_at", `${d}T23:59:59`); }
+        const { data: activities } = await actQuery;
+        const allSessions = [
+          ...(sessions || []).map((s: any) => ({ id: s.id, source: "workout_session", workout_name: s.workout_name, started_at: s.started_at, target_muscles: s.target_muscles, duration_min: s.total_duration_seconds ? Math.round(s.total_duration_seconds / 60) : null, notes: s.notes, time_ago: getTimeAgo(s.started_at) })),
+          ...(activities || []).map((a: any) => ({ id: a.id, source: "activity", workout_name: a.activity_type, started_at: a.performed_at, duration_min: a.duration_min, calories_burned: a.calories_burned, notes: a.notes, time_ago: getTimeAgo(a.performed_at) })),
+        ].sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()).slice(0, toolInput.limit || 20);
+        return { success: true, message: `${allSessions.length} séance(s) trouvée(s)`, data: allSessions };
+      }
+
+      case "get_workout_exercises": {
+        const { data: exercises, error } = await supabase.from("workout_exercise_logs").select("id, exercise_name, exercise_order, planned_sets, planned_reps, planned_weight, actual_sets, actual_reps, actual_weight, rest_seconds, notes, skipped").eq("session_id", toolInput.session_id).eq("user_id", userId).order("exercise_order", { ascending: true });
+        if (error) throw error;
+        return { success: true, message: `${exercises?.length || 0} exercice(s)`, data: (exercises || []).map((e: any) => ({ id: e.id, exercise_name: e.exercise_name, order: e.exercise_order, planned: { sets: e.planned_sets, reps: e.planned_reps, weight: e.planned_weight }, actual: { sets: e.actual_sets, reps: e.actual_reps, weight: e.actual_weight }, rest_seconds: e.rest_seconds, notes: e.notes, skipped: e.skipped })) };
+      }
+
+      case "update_workout_exercise": {
+        const { data: current } = await supabase.from("workout_exercise_logs").select("exercise_name").eq("id", toolInput.exercise_id).eq("user_id", userId).maybeSingle();
+        if (!current) return { success: false, message: "Exercice non trouvé" };
+        const updates: any = {};
+        if (toolInput.actual_sets !== undefined) updates.actual_sets = toolInput.actual_sets;
+        if (toolInput.actual_reps !== undefined) updates.actual_reps = toolInput.actual_reps;
+        if (toolInput.actual_weight !== undefined) updates.actual_weight = toolInput.actual_weight;
+        if (toolInput.notes !== undefined) updates.notes = toolInput.notes;
+        if (toolInput.skipped !== undefined) updates.skipped = toolInput.skipped;
+        const { error } = await supabase.from("workout_exercise_logs").update(updates).eq("id", toolInput.exercise_id).eq("user_id", userId);
+        if (error) throw error;
+        return { success: true, message: `✏️ "${current.exercise_name}" corrigé`, data: updates };
+      }
+
+      case "delete_workout_exercise": {
+        const { data: exercise } = await supabase.from("workout_exercise_logs").select("exercise_name").eq("id", toolInput.exercise_id).eq("user_id", userId).maybeSingle();
+        if (!exercise) return { success: false, message: "Exercice non trouvé" };
+        const { error } = await supabase.from("workout_exercise_logs").delete().eq("id", toolInput.exercise_id).eq("user_id", userId);
+        if (error) throw error;
+        return { success: true, message: `🗑️ "${exercise.exercise_name}" supprimé` };
+      }
+
+      default:
+        return { success: false, message: `Outil inconnu: ${toolName}` };
     }
+  } catch (error) {
+    console.error(`Error in ${toolName}:`, error);
+    return { success: false, message: `Erreur ${toolName}: ${error instanceof Error ? error.message : "Inconnue"}` };
+  }
+}
+
+// ─── SYSTEM PROMPT ───────────────────────────────────────────────────────────
+function buildSystemPrompt(ctx: {
+  today: string; yesterday: string; currentTime: string; formattedDate: string;
+  mondayStr: string; sundayStr: string;
+  userContext: string; healthContext: string; preparedWorkoutContext: string; workoutHistoryContext: string;
+  todayContext: string;
+  isFirstSession: boolean;
+}) {
+  return `Tu es un coach santé et fitness expert, bienveillant et direct. Tu parles français naturellement.
+
+═══════════════════════════════
+CONTEXTE TEMPOREL
+═══════════════════════════════
+- Aujourd'hui : ${ctx.formattedDate} (${ctx.today})
+- Hier : ${ctx.yesterday}
+- Heure Paris : ${ctx.currentTime}
+- Cette semaine : du ${ctx.mondayStr} (lundi) au ${ctx.sundayStr} (dimanche)
+  → Pour filtrer "cette semaine" : date_from="${ctx.mondayStr}", date_to="${ctx.sundayStr}"
+  → Une semaine commence TOUJOURS le lundi et finit le dimanche.
+
+${ctx.userContext}
+${ctx.healthContext}
+${ctx.todayContext}
+${ctx.workoutHistoryContext}
+${ctx.preparedWorkoutContext}
+
+═══════════════════════════════
+${ctx.isFirstSession ? `PREMIÈRE SESSION — ONBOARDING
+═══════════════════════════════
+C'est la première fois que cet utilisateur utilise l'app. Tu dois :
+1. Te présenter en 2-3 phrases : qui tu es, ce que tu peux faire (suivi nutrition, entraînements personnalisés, coaching quotidien).
+2. Poser des questions dans cet ordre EXACT, une à la fois, en attendant la réponse avant de passer à la suivante :
+   a) Quel est son objectif principal ? (prise de muscle, perte de gras, recomposition, endurance, bien-être)
+   b) Quel équipement a-t-il à disposition ? (salle complète, haltères à domicile, pas d'équipement, etc.)
+   c) Quelle est sa fréquence et son organisation d'entraînement souhaitée ? (combien de jours/semaine, split haut/bas, full body, PPL, etc.)
+   d) A-t-il des blessures, douleurs chroniques ou contraintes physiques à prendre en compte ?
+3. Sauvegarder CHAQUE réponse via save_health_context avant de poser la question suivante.
+4. Une fois l'onboarding terminé, faire un récap de ce que tu as compris et proposer de générer une première séance.
+` : `RÈGLES DE MÉMOIRE PROACTIVE
+═══════════════════════════════
+Avant de répondre, consulte SYSTÉMATIQUEMENT les données pertinentes selon le sujet :
+- Nutrition → appelle get_daily_summary + get_recent_meals
+- Sport/séance → appelle get_health_context + get_recent_workout_sessions (pour respecter split, blessures, historique)
+- Bilan général → appelle get_daily_summary + get_recent_workout_sessions + get_body_composition_history
+- Génération séance → OBLIGATOIRE : get_health_context + get_recent_workout_sessions AVANT generate_workout
+
+Tu peux appeler plusieurs outils en parallèle. Ne réponds JAMAIS sans avoir consulté les données nécessaires.
+`}
+═══════════════════════════════
+COMPORTEMENT DU COACH
+═══════════════════════════════
+1. CONVICTIONS : Tu as un avis basé sur les données. Si l'utilisateur demande une séance inadaptée (ex: pec alors qu'il en a fait hier, ou full body alors qu'il préfère le split), tu le signales clairement avec ta recommandation alternative. Si l'utilisateur insiste, tu exécutes en précisant ton désaccord.
+
+2. COHÉRENCE : Toutes les recommandations (nutrition, entraînement, récupération) sont alignées avec l'objectif de l'utilisateur. Si l'objectif change, tout change.
+
+3. MÉMOIRE : Tu te souviens de tout ce qui a été sauvegardé (blessures, préférences, équipement, split, objectifs). Tu ne poses jamais deux fois la même question.
+
+4. CHRONOLOGIE : Quand tu présentes un historique de séances ou d'activités, TOUJOURS respecter l'ordre chronologique (de la plus ancienne à la plus récente). Utilise les dates/jours pour structurer clairement la timeline.
+
+5. CONFIRMATION AVANT ENREGISTREMENT :
+   - Analyse → présente un récap → demande confirmation → enregistre
+   - EXCEPTION : si l'utilisateur dit "ajoute", "enregistre", "note" → enregistre directement
+   - Quand l'utilisateur confirme (oui, ok, vas-y) → appelle l'outil IMMÉDIATEMENT
+   - Ne jamais écrire "c'est enregistré" sans avoir réellement appelé l'outil
+
+6. GESTION BDD :
+   - Pour modifier → get_recent_meals ou get_recent_workout_sessions d'abord pour l'ID, puis update
+   - Pour supprimer → toujours récupérer l'élément avant de supprimer, confirmer avec l'utilisateur
+   - Pour corriger une séance → get_recent_workout_sessions → get_workout_exercises → update_workout_exercise
+
+═══════════════════════════════
+FORMAT DES RÉPONSES
+═══════════════════════════════
+- Commence par un emoji + accroche courte
+- Paragraphes courts, lignes vides entre sections
+- Chiffres importants en **gras**
+- Listes à puces pour énumérer
+- Maximum 3 sections par réponse
+- Termine par une question ou une invitation à l'action
+
+TYPES DE REPAS :
+breakfast=petit-déj (~8h), morning_snack=collation matin (~10h30), lunch=déjeuner (~12h30), afternoon_snack=goûter (~16h), dinner=dîner (~19h30), dessert=dessert (~20h30)
+"goûter" = afternoon_snack (JAMAIS morning_snack)`;
+}
+
+// ─── MAIN HANDLER ────────────────────────────────────────────────────────────
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  try {
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY non configurée");
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      throw new Error("Supabase configuration missing");
-    }
 
-    // Parse body first (can only call req.json() once)
-    const { messages, imageUrl } = (await req.json()) as {
-      messages: ChatMessage[];
-      imageUrl?: string;
-    };
+    const { messages, imageUrl } = await req.json() as { messages: any[]; imageUrl?: string };
+    if (!messages || !Array.isArray(messages)) throw new Error("messages[] requis");
 
-    if (!messages || !Array.isArray(messages)) {
-      throw new Error("Messages array is required");
-    }
-
-    console.log("=== COACH-CHAT V2 DEPLOYED ===");
-    
-    // Authenticate the user via JWT
+    // Auth
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      console.error("Missing or invalid Authorization header");
-      return new Response(
-        JSON.stringify({ error: "Non autorisé" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Non autorisé" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { headers: { Authorization: authHeader } } });
     const token = authHeader.replace("Bearer ", "");
-    console.log("Token prefix:", token.substring(0, 20) + "...");
-    console.log("Token length:", token.length);
-
-    // Create client with user's auth header
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    // Use getClaims for JWT validation (recommended pattern)
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims?.sub) {
-      console.error("Auth claims error:", claimsError);
-      console.error("Claims data:", JSON.stringify(claimsData));
-      
-      // Fallback: try getUser
-      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-      if (authError || !user) {
-        console.error("Auth getUser error:", authError);
-        return new Response(
-          JSON.stringify({ error: "Authentification invalide" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      var userId = user.id;
-    } else {
-      var userId = claimsData.claims.sub as string;
-    }
-    
-    console.log("Authenticated userId:", userId);
-
-    // Get user profile for context
-    let userContext = "";
-    let healthContext = "";
-    let preparedWorkoutContext = "";
-    let trainingPreferencesContext = "";
-    let workoutHistoryContext = "";
-    // Declare these at outer scope so they're accessible after the if(userId) block
-    let savedSplitPreference: string | null = null;
-    let recentSessions: any[] = [];
-    
-    if (userId) {
-      // Fetch profile, health context, prepared workout, AND last 10 workout sessions in parallel
-      const [profileResult, healthContextResult, trainingPrefsResult, preparedWorkoutResult, recentSessionsResult] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("first_name, goal, weight_kg, target_weight_kg, height_cm, activity_level, current_body_fat_pct, target_body_fat_pct, dietary_preferences, allergies")
-          .eq("user_id", userId)
-          .maybeSingle(),
-        supabase
-          .from("user_context")
-          .select("key, value")
-          .eq("user_id", userId)
-          .like("key", "health_%"),
-        // Also fetch training preferences specifically for workout focus detection
-        supabase
-          .from("user_context")
-          .select("key, value")
-          .eq("user_id", userId)
-          .or("key.like.health_%,key.eq.training_split_preference"),
-        supabase
-          .from("user_context")
-          .select("value, updated_at")
-          .eq("user_id", userId)
-          .eq("key", "prepared_workout")
-          .maybeSingle(),
-        supabase
-          .from("workout_sessions")
-          .select("id, workout_name, started_at, completed_at, status, target_muscles, total_duration_seconds, calories_burned, notes")
-          .eq("user_id", userId)
-          .order("started_at", { ascending: false })
-          .limit(10),
-      ]);
-
-      const profile = profileResult.data;
-      const healthContexts = healthContextResult.data;
-      const allUserContexts = trainingPrefsResult.data || [];
-      const preparedWorkoutData = preparedWorkoutResult.data;
-      recentSessions = recentSessionsResult.data || [];
-
-      // Detect user's preferred split from saved context (for focus detection later)
-      for (const ctx of allUserContexts) {
-        try {
-          const val = ctx.value.toLowerCase();
-          if (val.includes("pas de full") || val.includes("no full") || val.includes("jamais full") || val.includes("haut/bas") || val.includes("haut et bas") || val.includes("split haut") || val.includes("upper/lower")) {
-            savedSplitPreference = "split"; // means: NEVER full_body, always upper or lower
-          } else if (val.includes("haut du corps") || val.includes("upper_body")) {
-            savedSplitPreference = "upper_body";
-          } else if (val.includes("bas du corps") || val.includes("lower_body")) {
-            savedSplitPreference = "lower_body";
-          }
-        } catch { /* ignore */ }
-      }
-      if (profile) {
-        const goalLabels: Record<string, string> = {
-          weight_loss: "perdre du poids",
-          fat_loss: "perdre de la masse graisseuse",
-          muscle_gain: "prendre du muscle",
-          maintain: "maintenir son poids",
-          recomposition: "recomposition corporelle (perdre du gras et gagner du muscle)",
-          wellness: "bien-être général",
-        };
-        const goalKey = profile.goal || "";
-        
-        // Build detailed goal context
-        let goalContext = goalLabels[goalKey] || "améliorer sa santé";
-        if (profile.current_body_fat_pct || profile.target_body_fat_pct) {
-          const parts: string[] = [];
-          if (profile.current_body_fat_pct) parts.push(`départ: ${profile.current_body_fat_pct}%`);
-          if (profile.target_body_fat_pct) parts.push(`objectif: ${profile.target_body_fat_pct}%`);
-          goalContext += ` (masse grasse: ${parts.join(" → ")})`;
-        }
-        
-        userContext = `
-L'utilisateur s'appelle ${profile.first_name || "l'utilisateur"}.
-Son objectif est de ${goalContext}.
-${profile.weight_kg ? `Poids actuel: ${profile.weight_kg}kg` : ""}
-${profile.target_weight_kg ? `Poids cible: ${profile.target_weight_kg}kg` : ""}
-${profile.height_cm ? `Taille: ${profile.height_cm}cm` : ""}
-${profile.current_body_fat_pct ? `Masse grasse de départ: ${profile.current_body_fat_pct}%` : ""}
-${profile.target_body_fat_pct ? `Masse grasse cible: ${profile.target_body_fat_pct}%` : ""}
-`;
-      }
-
-      // Parse health context
-      if (healthContexts && healthContexts.length > 0) {
-        const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
-        const parsedContexts = healthContexts
-          .map((c: { key: string; value: string }) => {
-            try {
-              const parsed = JSON.parse(c.value);
-              return {
-                key: c.key.replace(/^health_[^_]+_/, ""),
-                category: parsed.category,
-                description: parsed.description,
-                severity: parsed.severity,
-              };
-            } catch {
-              return null;
-            }
-          })
-          .filter(Boolean)
-          .sort((a: any, b: any) => (severityOrder[a.severity] || 3) - (severityOrder[b.severity] || 3));
-
-        if (parsedContexts.length > 0) {
-          const categoryLabels: Record<string, string> = {
-            injury: "🩹 Blessure",
-            allergy: "🚫 Allergie",
-            medical_condition: "🏥 Condition médicale",
-            physical_limitation: "⚠️ Limitation physique",
-            preference: "✅ Préférence",
-            lifestyle: "🏠 Mode de vie",
-            other: "📋 Autre",
-          };
-          
-          healthContext = `
-INFORMATIONS DE SANTÉ IMPORTANTES (à prendre en compte pour tous les conseils):
-${parsedContexts.map((c: any) => `- ${categoryLabels[c.category] || c.category}: ${c.description} [Importance: ${c.severity}]`).join("\n")}
-`;
-        }
-      }
-      // Parse prepared workout context
-      if (preparedWorkoutData?.value) {
-        try {
-          const pw = JSON.parse(preparedWorkoutData.value);
-          const muscles = pw.target_muscles?.join(", ") || "non spécifié";
-          const exerciseCount = pw.exercises?.length || 0;
-          const exerciseNames = pw.exercises?.slice(0, 8).map((e: any) => e.name).join(", ") || "";
-          preparedWorkoutContext = `
-SÉANCE D'ENTRAÎNEMENT ACTUELLEMENT PRÉPARÉE (visible dans l'aperçu de l'utilisateur):
-- Nom: ${pw.workout_name || "Sans nom"}
-- Durée estimée: ${pw.estimated_duration_min || "?"} min
-- Muscles ciblés: ${muscles}
-- ${exerciseCount} exercices: ${exerciseNames}
-${pw.coach_advice ? `- Conseil: ${pw.coach_advice}` : ""}
-`;
-        } catch {
-          // ignore parse errors
-        }
-      }
-
-      // ═══ AUTO-INJECT: Last 10 workout sessions with exercise details ═══
-      workoutHistoryContext = "";
-      if (recentSessions.length > 0) {
-        // Fetch exercise details for all sessions in one query
-        const sessionIds = recentSessions.map((s: any) => s.id);
-        const { data: allExerciseLogs } = await supabase
-          .from("workout_exercise_logs")
-          .select("session_id, exercise_name, planned_sets, planned_reps, planned_weight, actual_sets, actual_reps, actual_weight, skipped")
-          .eq("user_id", userId)
-          .in("session_id", sessionIds)
-          .order("exercise_order", { ascending: true });
-
-        const exercisesBySession: Record<string, any[]> = {};
-        (allExerciseLogs || []).forEach((e: any) => {
-          if (!exercisesBySession[e.session_id]) exercisesBySession[e.session_id] = [];
-          exercisesBySession[e.session_id].push(e);
-        });
-
-        const sessionLines = recentSessions.map((s: any) => {
-          const date = new Date(s.started_at);
-          const dateStr = new Intl.DateTimeFormat("fr-FR", {
-            timeZone: "Europe/Paris",
-            weekday: "short",
-            day: "numeric",
-            month: "short",
-          }).format(date);
-          const exercises = exercisesBySession[s.id] || [];
-          const exerciseList = exercises
-            .filter((e: any) => !e.skipped)
-            .map((e: any) => {
-              const weight = e.actual_weight || e.planned_weight || "";
-              return `${e.exercise_name} (${e.actual_sets || e.planned_sets}x${e.actual_reps || e.planned_reps}${weight ? " @ " + weight : ""})`;
-            })
-            .join(", ");
-          const muscles = s.target_muscles?.join(", ") || "";
-          const duration = s.total_duration_seconds ? Math.round(s.total_duration_seconds / 60) + "min" : "";
-          return `  ${dateStr} — ${s.workout_name}${muscles ? " [" + muscles + "]" : ""}${duration ? " (" + duration + ")" : ""}\n    Exercices: ${exerciseList || "non détaillés"}`;
-        }).join("\n");
-
-        workoutHistoryContext = `
-═══════════════════════════════════════════════
-HISTORIQUE DES 10 DERNIÈRES SÉANCES (DONNÉES RÉELLES - TOUJOURS EN TENIR COMPTE):
-═══════════════════════════════════════════════
-${sessionLines}
-
-⚠️ Tu DOIS utiliser cet historique pour :
-1. NE PAS reproposer les mêmes exercices que les 2-3 dernières séances
-2. Respecter le split/la rotation de l'utilisateur (si il alterne haut/bas, continue cette logique)
-3. Adapter la progression des charges (proposer légèrement plus lourd si les dernières séances étaient réussies)
-4. Varier les exercices pour stimuler la progression
-`;
-      }
-
-      // ═══ Extract training preferences from health context ═══
-      trainingPreferencesContext = "";
-      if (healthContexts && healthContexts.length > 0) {
-        const trainingPrefs = healthContexts
-          .filter((c: { key: string }) => c.key.includes("training") || c.key.includes("preference") || c.key.includes("split") || c.key.includes("programme"))
-          .map((c: { key: string; value: string }) => {
-            try {
-              const parsed = JSON.parse(c.value);
-              return parsed.description || c.value;
-            } catch {
-              return c.value;
-            }
-          });
-
-        if (trainingPrefs.length > 0) {
-          trainingPreferencesContext = `
-═══════════════════════════════════════════════
-PRÉFÉRENCES D'ENTRAÎNEMENT DE L'UTILISATEUR (STRICTEMENT OBLIGATOIRES):
-═══════════════════════════════════════════════
-${trainingPrefs.map((p: string) => `- ${p}`).join("\n")}
-
-🚫 Ces préférences sont NON-NÉGOCIABLES. Si l'utilisateur préfère le split haut/bas, NE JAMAIS proposer du full body.
-Tu peux suggérer de reconsidérer une préférence, mais TOUJOURS respecter le choix final de l'utilisateur.
-`;
-        }
-      }
+    const { data: claimsData } = await supabase.auth.getClaims(token);
+    let userId = claimsData?.claims?.sub as string;
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser(token);
+      if (!user) return new Response(JSON.stringify({ error: "Authentification invalide" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      userId = user.id;
     }
 
-    // Build current date/time context for the AI using Paris timezone
+    // ── Build context ──
     const today = getLocalDate();
-    // Get yesterday's date
-    const yesterdayDate = new Date();
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    const yesterday = getLocalDate(
-      `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, "0")}-${String(yesterdayDate.getDate()).padStart(2, "0")}`
-    );
-    
-    // Get current time in Paris
-    const currentTime = new Intl.DateTimeFormat("fr-FR", {
-      timeZone: "Europe/Paris",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(new Date());
-    
+    const yesterdayJs = new Date(); yesterdayJs.setDate(yesterdayJs.getDate() - 1);
+    const yesterday = `${yesterdayJs.getFullYear()}-${String(yesterdayJs.getMonth() + 1).padStart(2, "0")}-${String(yesterdayJs.getDate()).padStart(2, "0")}`;
+    const currentTime = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
+    const [yearS, monthS, dayS] = today.split("-");
+    const displayDate = new Date(parseInt(yearS), parseInt(monthS) - 1, parseInt(dayS));
     const dayNames = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
     const monthNames = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
-    
-    // Parse the date for display
-    const [yearStr, monthStr, dayStr] = today.split("-");
-    const displayDate = new Date(parseInt(yearStr), parseInt(monthStr) - 1, parseInt(dayStr));
-    const dayName = dayNames[displayDate.getDay()];
-    const dayOfMonth = displayDate.getDate();
-    const monthName = monthNames[displayDate.getMonth()];
-    const year = displayDate.getFullYear();
-    const formattedDate = `${dayName} ${dayOfMonth} ${monthName} ${year}`;
-
-    // Calculate Monday of current week (ISO: Monday=1)
-    const todayJs = new Date(parseInt(yearStr), parseInt(monthStr) - 1, parseInt(dayStr));
-    const dayOfWeek = todayJs.getDay(); // 0=Sun, 1=Mon...
-    const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    const mondayDate = new Date(todayJs);
-    mondayDate.setDate(todayJs.getDate() - diffToMonday);
+    const formattedDate = `${dayNames[displayDate.getDay()]} ${displayDate.getDate()} ${monthNames[displayDate.getMonth()]} ${displayDate.getFullYear()}`;
+    const dow = displayDate.getDay();
+    const diffMon = dow === 0 ? 6 : dow - 1;
+    const mondayDate = new Date(displayDate); mondayDate.setDate(displayDate.getDate() - diffMon);
+    const sundayDate = new Date(mondayDate); sundayDate.setDate(mondayDate.getDate() + 6);
     const mondayStr = `${mondayDate.getFullYear()}-${String(mondayDate.getMonth() + 1).padStart(2, "0")}-${String(mondayDate.getDate()).padStart(2, "0")}`;
-    const sundayDate = new Date(mondayDate);
-    sundayDate.setDate(mondayDate.getDate() + 6);
     const sundayStr = `${sundayDate.getFullYear()}-${String(sundayDate.getMonth() + 1).padStart(2, "0")}-${String(sundayDate.getDate()).padStart(2, "0")}`;
 
-    const systemPrompt = `Tu es un coach santé et fitness bienveillant et motivant. Tu parles français de manière naturelle et encourageante.
+    // Fetch user data in parallel — tout en une seule vague pour éviter les allers-retours outils au démarrage
+    const [profileRes, healthCtxRes, preparedWkRes, recentSessionsRes, chatCountRes, todayMetricsRes, todayMealsRes] = await Promise.all([
+      supabase.from("profiles").select("first_name, goal, weight_kg, target_weight_kg, height_cm, activity_level, current_body_fat_pct, target_body_fat_pct, target_calories, target_water_ml").eq("user_id", userId).maybeSingle(),
+      supabase.from("user_context").select("key, value").eq("user_id", userId).like("key", "health_%"),
+      supabase.from("user_context").select("value, updated_at").eq("user_id", userId).eq("key", "prepared_workout").maybeSingle(),
+      supabase.from("workout_sessions").select("id, workout_name, started_at, target_muscles, total_duration_seconds").eq("user_id", userId).order("started_at", { ascending: false }).limit(10),
+      supabase.from("chat_messages").select("id", { count: "exact", head: true }).eq("user_id", userId),
+      supabase.from("daily_metrics").select("water_ml, weight, calories_in, calories_burned").eq("user_id", userId).eq("date", today).maybeSingle(),
+      supabase.from("nutrition_logs").select("meal_type, food_name, calories, protein, carbs, fat, logged_at").eq("user_id", userId).gte("logged_at", `${today}T00:00:00`).lte("logged_at", `${today}T23:59:59`).order("logged_at", { ascending: true }),
+    ]);
 
-⏰ **DATE ET HEURE ACTUELLES (fuseau Paris):**
-- **Aujourd'hui:** ${formattedDate}
-- **Date d'aujourd'hui:** ${today}
-- **Date d'hier:** ${yesterday}
-- **Heure:** ${currentTime}
+    const profile = profileRes.data;
+    const healthContexts = healthCtxRes.data || [];
+    const recentSessions = recentSessionsRes.data || [];
+    const chatCount = chatCountRes.count || 0;
+    const isFirstSession = chatCount <= 1;
 
-📅 **DÉFINITION DE LA SEMAINE (CRITIQUE):**
-- Une semaine va TOUJOURS de **lundi à dimanche** (norme ISO/européenne).
-- **Cette semaine:** du ${mondayStr} (lundi) au ${sundayStr} (dimanche).
-- Pour compter les séances "cette semaine", ne compte QUE celles dont la date (started_at/performed_at) est >= ${mondayStr} ET <= ${sundayStr}.
-- Ne compte JAMAIS les séances du dimanche précédent ou du lundi suivant dans la semaine courante.
-- Quand tu analyses l'historique, filtre STRICTEMENT par ces dates. Ne fais pas d'approximation.
+    // Résumé du jour pré-chargé (évite un aller-retour outil pour chaque message)
+    const todayMeals = todayMealsRes.data || [];
+    const todayMetrics = todayMetricsRes.data;
+    const todayCalories = todayMeals.reduce((s: number, m: any) => s + (m.calories || 0), 0);
+    const todayProtein = todayMeals.reduce((s: number, m: any) => s + (m.protein || 0), 0);
+    const todayWater = todayMetrics?.water_ml || 0;
+    const targetCalories = profile?.target_calories || 2000;
+    const targetWater = profile?.target_water_ml || 2000;
+    const hasTodayData = todayMeals.length > 0 || todayWater > 0;
 
-TIMESTAMPS DES MESSAGES:
-- Chaque message utilisateur est préfixé par son timestamp [jour date heure] entre crochets. Utilise ces timestamps pour comprendre le contexte temporel de la conversation.
-- Quand l'utilisateur dit "ce matin", "tout à l'heure", "il y a 2h", réfère-toi au timestamp de son message pour calculer la bonne date/heure.
+    const todayContext = `═══════════════════════════════
+DONNÉES DU JOUR (${today} — pré-chargées)
+═══════════════════════════════
+${hasTodayData ? `- Calories consommées : ${todayCalories} / ${targetCalories} kcal
+- Protéines : ${todayProtein}g (objectif ~${Math.round((profile?.weight_kg || 70) * 2)}g)
+- Hydratation : ${todayWater}ml / ${targetWater}ml
+- Repas enregistrés : ${todayMeals.length} (${todayMeals.map((m: any) => m.food_name).join(", ") || "aucun"})` : `- Aucune donnée renseignée pour aujourd'hui.
+⚠️ RÈGLE IMPORTANTE : si calories=0, eau=0 ou repas=0, NE PAS conclure que l'utilisateur n'a rien mangé/bu. Il n'a simplement pas encore renseigné ses données. Dire plutôt : "N'hésite pas à me renseigner tes repas/ta consommation d'eau pour que je puisse t'accompagner plus précisément !" Même règle pour les séances non renseignées.`}
+`;
 
-GESTION DES DATES (CRITIQUE):
-- Quand l'utilisateur parle d'"hier", utilise la date: ${yesterday}
-- Quand l'utilisateur parle d'"aujourd'hui", utilise la date: ${today}
-- Pour log_water avec une date passée, spécifie le paramètre "date" (ex: {"amount_ml": 500, "date": "${yesterday}"})
-- Pour RETIRER de l'eau (erreur de saisie), utilise remove_water avec une quantité négative ou positive selon le contexte
-- TOUJOURS vérifier sur quelle date l'utilisateur veut que tu enregistres les données !
+    // Build userContext string
+    let userContext = "";
+    if (profile) {
+      const goalLabels: Record<string, string> = { weight_loss: "perte de poids", fat_loss: "perte de masse grasse", muscle_gain: "prise de muscle", maintain: "maintien", recomposition: "recomposition corporelle", wellness: "bien-être général" };
+      userContext = `═══════════════════════════════
+PROFIL UTILISATEUR
+═══════════════════════════════
+- Prénom : ${profile.first_name || "Non renseigné"}
+- Objectif : ${goalLabels[profile.goal || ""] || profile.goal || "Non renseigné"}
+- Poids actuel : ${profile.weight_kg || "?"}kg | Poids cible : ${profile.target_weight_kg || "?"}kg
+- Taille : ${profile.height_cm || "?"}cm
+${profile.current_body_fat_pct ? `- Masse grasse de départ : ${profile.current_body_fat_pct}%` : ""}
+${profile.target_body_fat_pct ? `- Masse grasse cible : ${profile.target_body_fat_pct}%` : ""}`;
+    }
 
-IMPORTANT: Quand l'utilisateur te demande des informations sur "aujourd'hui", "ce jour", "maintenant", utilise TOUJOURS la date ci-dessus (${today}). Les données sont stockées avec des timestamps, tu dois TOUJOURS utiliser l'outil get_daily_summary pour récupérer les données du jour en cours.
+    // Build healthContext string
+    let healthContext = "";
+    if (healthContexts.length > 0) {
+      const parsed = healthContexts.map((c: any) => {
+        try { const p = JSON.parse(c.value); return { key: c.key.replace(/^health_[^_]+_/, ""), category: p.category, description: p.description, severity: p.severity }; }
+        catch { return null; }
+      }).filter(Boolean);
+      if (parsed.length > 0) {
+        healthContext = `═══════════════════════════════
+CONTEXTE SANTÉ & PRÉFÉRENCES SAUVEGARDÉES
+═══════════════════════════════
+${parsed.map((c: any) => `- [${c.category}/${c.severity}] ${c.description}`).join("\n")}`;
+      }
+    }
 
-${userContext}
-${healthContext}
-${trainingPreferencesContext}
-${workoutHistoryContext}
-${preparedWorkoutContext}
+    // Build workoutHistoryContext
+    let workoutHistoryContext = "";
+    if (recentSessions.length > 0) {
+      const sessionIds = recentSessions.map((s: any) => s.id);
+      const { data: exLogs } = await supabase.from("workout_exercise_logs").select("session_id, exercise_name, actual_sets, actual_reps, actual_weight").eq("user_id", userId).in("session_id", sessionIds).order("exercise_order", { ascending: true });
+      const bySession: Record<string, any[]> = {};
+      (exLogs || []).forEach((e: any) => { if (!bySession[e.session_id]) bySession[e.session_id] = []; bySession[e.session_id].push(e); });
+      workoutHistoryContext = `═══════════════════════════════
+HISTORIQUE DES 10 DERNIÈRES SÉANCES
+═══════════════════════════════
+${recentSessions.map((s: any) => {
+  const d = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", weekday: "short", day: "numeric", month: "short" }).format(new Date(s.started_at));
+  const exs = (bySession[s.id] || []).map((e: any) => `${e.exercise_name}(${e.actual_sets || "?"}x${e.actual_reps || "?"}${e.actual_weight ? "@" + e.actual_weight : ""})`).join(", ");
+  return `- ${d} | ${s.workout_name} [${(s.target_muscles || []).join(", ")}] | ${exs || "détail non dispo"}`;
+}).join("\n")}`;
+    }
 
-SÉANCE PRÉPARÉE (CRITIQUE):
-- Si le contexte ci-dessus contient une "SÉANCE D'ENTRAÎNEMENT ACTUELLEMENT PRÉPARÉE", tu CONNAIS cette séance. Elle est affichée dans l'aperçu de l'utilisateur.
-- Quand l'utilisateur demande si la séance est adaptée, parle de cette séance par son nom, ses exercices et ses muscles ciblés.
-- Tu as TOUTES les informations nécessaires pour évaluer et commenter cette séance. Ne dis JAMAIS que tu ne peux pas voir l'aperçu.
-- Si aucune séance préparée n'est mentionnée ci-dessus, alors il n'y en a pas de planifiée.
+    // Build preparedWorkoutContext
+    let preparedWorkoutContext = "";
+    if (preparedWkRes.data?.value) {
+      try {
+        const pw = JSON.parse(preparedWkRes.data.value);
+        preparedWorkoutContext = `═══════════════════════════════
+SÉANCE ACTUELLEMENT PRÉPARÉE (visible dans l'aperçu)
+═══════════════════════════════
+- Nom : ${pw.workout_name} (~${pw.estimated_duration_min} min)
+- Muscles : ${(pw.target_muscles || []).join(", ")}
+- Exercices : ${(pw.exercises || []).slice(0, 8).map((e: any) => e.name).join(", ")}
+${pw.coach_advice ? `- Conseil : ${pw.coach_advice}` : ""}`;
+      } catch { /* ignore */ }
+    }
 
-STYLE DE RÉPONSE (ABSOLUMENT OBLIGATOIRE):
-Tu dois TOUJOURS formater tes réponses de manière aérée et agréable à lire :
+    const systemPrompt = buildSystemPrompt({ today, yesterday, currentTime, formattedDate, mondayStr, sundayStr, userContext, healthContext, preparedWorkoutContext, workoutHistoryContext, todayContext, isFirstSession });
 
-📌 **RÈGLES DE FORMATAGE:**
-1. **Commence** chaque réponse par un emoji + une phrase d'accroche courte
-2. **Laisse une ligne vide** entre chaque paragraphe/section
-3. Utilise des **listes à puces** (- élément) pour énumérer
-4. Mets en **gras** les chiffres importants et mots-clés
-5. Utilise des emojis thématiques : 💪 🏋️ 🥗 🎯 ✅ 💧 ⚡ 🔥 📊 🌟 ❤️ 🚀
-6. Maximum **3 sections courtes** par réponse
-7. Termine par un message motivant ou une question
-
-📝 **EXEMPLE DE RÉPONSE PARFAITE:**
-
-"🥗 Super choix pour le déjeuner !
-
-**✅ Enregistré:**
-- Salade César au poulet grillé
-- **~450 kcal** • 35g protéines • 20g glucides
-
-📊 **Ton bilan du jour:**
-- Calories : **1 200** / 2 000 kcal
-- Protéines : **85g** (objectif 120g)
-
-🔥 Tu avances bien ! Encore un snack protéiné cet après-midi ?"
-
-⚠️ NE JAMAIS écrire de longs blocs de texte sans espaces ni structure !
-
-Ton rôle:
-- Aider l'utilisateur à atteindre ses objectifs de santé
-- Enregistrer ses repas, son hydratation, son poids ET ses séances de sport via les outils disponibles
-- Enregistrer les mesures d'impédancemètre/balance connectée (composition corporelle complète)
-- MODIFIER les données existantes quand l'utilisateur te corrige ou te donne plus de précisions
-- Donner des conseils personnalisés et motivants
-
-RÈGLE ABSOLUE N°0 - CONSULTATION PROACTIVE DES DONNÉES (CRITIQUE):
-Tu DOIS systématiquement consulter les données pertinentes AVANT de répondre pour personnaliser tes réponses au maximum :
-
-🏋️ **SPORT / SÉANCES:**
-- Quand l'utilisateur parle de sport, séance, entraînement, ou demande une séance → appelle get_recent_workout_sessions ET get_health_context AVANT de répondre ou de générer
-- **Pour "cette semaine"** → utilise OBLIGATOIREMENT date_from="${mondayStr}" et date_to="${sundayStr}" dans get_recent_workout_sessions. NE FAIS PAS de calcul mental de dates, utilise ces paramètres.
-- **Pour "la semaine dernière"** → calcule le lundi et dimanche de la semaine précédente et utilise date_from/date_to.
-- Cela te permet de : éviter de proposer les mêmes exercices, adapter l'intensité selon la fatigue, respecter le split (haut/bas/push/pull), connaître les blessures
-- Quand tu génères une séance → consulte TOUJOURS les 3-5 dernières séances pour varier les exercices et respecter la progression
-
-🥗 **NUTRITION:**
-- Quand l'utilisateur parle de repas, alimentation, ou demande des conseils nutritionnels → appelle get_daily_summary ET get_recent_meals
-- Cela te permet de : connaître ce qui a déjà été mangé aujourd'hui, calculer les macros restantes, proposer des repas complémentaires
-
-📊 **BILAN / STATS:**
-- Quand l'utilisateur demande un bilan, son état, ses progrès → appelle get_daily_summary ET get_body_composition_history ET get_recent_workout_sessions
-- Cela te permet de : donner un bilan complet et chiffré, montrer la progression
-
-⚠️ Tu peux appeler PLUSIEURS outils en parallèle dans la même réponse. N'hésite JAMAIS à consulter les données — c'est GRATUIT et ça rend tes réponses 10x plus utiles.
-⚠️ NE JAMAIS donner des conseils génériques quand tu peux consulter les données réelles de l'utilisateur.
-
-TYPES DE REPAS EN FRANCE (TRÈS IMPORTANT):
-- **breakfast** = petit-déjeuner (~8h du matin)
-- **morning_snack** = collation du matin (~10h30, AVANT le déjeuner)
-- **lunch** = déjeuner (~12h30, repas du midi)
-- **afternoon_snack** = goûter (~16h, APRÈS le déjeuner, AVANT le dîner) - utilisé quand l'utilisateur dit "goûter", "en-cas de l'après-midi", "4h"
-- **dinner** = dîner (~19h30, repas du soir)
-- **dessert** = dessert (~20h30, après le dîner)
-
-⚠️ ATTENTION: "goûter" = afternoon_snack (PAS morning_snack). La collation du matin (morning_snack) est AVANT le déjeuner.
-
-RÈGLE ABSOLUE N°1 - INTERDICTION DE RÉPONDRE SANS AGIR (CRITIQUE):
-🚫 INTERDIT: Dire "je vais récupérer", "laisse-moi consulter", "je vais vérifier", "patiente", "un instant", "je lance la récupération", "je reviens vers toi" ou TOUTE phrase qui promet une action future.
-🚫 INTERDIT: Répondre avec du texte SANS appel d'outil quand une action est nécessaire.
-✅ OBLIGATOIRE: Si tu as besoin de données, appelle l'outil (get_daily_summary, get_recent_meals, get_recent_workout_sessions, etc.) DANS LA MÊME RÉPONSE. L'utilisateur ne verra ta réponse qu'APRÈS que les outils auront été exécutés.
-✅ OBLIGATOIRE: Chaque réponse doit être COMPLÈTE et FINALE. Pas de réponses intermédiaires. Pas de promesses. AGIS ou POSE UNE QUESTION.
-⚠️ Si tu dis "C'est enregistré !" sans avoir appelé l'outil correspondant, c'est un MENSONGE.
-⚠️ Quand l'utilisateur confirme (oui, ok, vas-y), appelle l'outil IMMÉDIATEMENT.
-
-RAPPEL TECHNIQUE: Quand tu appelles un outil, le système exécute l'outil et te renvoie le résultat. L'utilisateur ne voit RIEN entre-temps. Il ne voit que ta réponse FINALE après tous les appels d'outils. Donc tu n'as JAMAIS besoin de dire "patiente" — l'utilisateur attend déjà automatiquement.
-
-RÈGLES IMPORTANTES - CONFIRMATION AVANT ENREGISTREMENT:
-Quand l'utilisateur te donne une information pertinente (repas, eau, activité, poids, mesure corporelle), tu dois:
-1. **D'abord ANALYSER** l'information (estimer calories, macros, etc.)
-2. **Présenter un récapitulatif** de ce que tu vas enregistrer
-3. **DEMANDER CONFIRMATION** avec une phrase comme: "Je l'ajoute à tes données ?" ou "Tu veux que je l'enregistre ?"
-4. **Attendre la confirmation** de l'utilisateur (oui, ok, vas-y, enregistre, etc.) AVANT d'utiliser les outils d'enregistrement
-
-EXCEPTION - Pas besoin de confirmation quand:
-- L'utilisateur dit EXPLICITEMENT "ajoute", "enregistre", "note", "log" dans son message initial
-- L'utilisateur corrige une donnée existante (ex: "c'était 3 séries, pas 4")
-- L'utilisateur a déjà confirmé dans un message précédent
-
-⛔ RÈGLE CRITIQUE ANTI-HALLUCINATION - NE JAMAIS VIOLER:
-Quand l'utilisateur confirme un enregistrement (par "oui", "ok", "ça me va", "correct", "✅", etc.), tu DOIS:
-1. APPELER L'OUTIL (log_meal, log_water, log_activity, etc.) dans ta réponse. C'est OBLIGATOIRE.
-2. NE JAMAIS écrire "c'est enregistré", "c'est noté", "ajouté" ou tout mot impliquant un enregistrement SANS avoir EFFECTIVEMENT appelé l'outil correspondant.
-3. Si tu n'appelles pas l'outil, la donnée N'EST PAS enregistrée, même si tu dis le contraire.
-
-RAPPEL: Dire "enregistré" sans appeler l'outil = MENTIR à l'utilisateur. C'est le pire bug possible.
-
-Exemples:
-- "Ce matin j'ai bu un jus de clémentines" → Analyse + "Je l'ajoute à ton petit-déjeuner ?" (ATTENDRE confirmation)
-- "Ajoute un jus de clémentines à mon petit-déj" → Appeler log_meal directement (mot "ajoute" = confirmation implicite)
-- Utilisateur: "Oui" après ta question → Appeler l'outil MAINTENANT (log_meal, log_water, etc.) — NE PAS juste répondre "c'est fait" en texte !
-
-CONSULTATION DE LA SÉANCE PRÉPARÉE (TRÈS IMPORTANT):
-Quand l'utilisateur demande de "vérifier", "checker", "voir", "commenter", "évaluer" la séance dans son aperçu/preview, tu DOIS appeler get_prepared_workout.
-- Cet outil retourne la séance complète actuellement visible dans l'aperçu de l'app.
-- Tu peux ensuite commenter si elle est adaptée, proposer des modifications, etc.
-- NE JAMAIS dire que tu n'as pas accès à l'aperçu ou au preview. Tu AS l'outil get_prepared_workout pour ça.
-
-GÉNÉRATION DE SÉANCES D'ENTRAÎNEMENT (TRÈS IMPORTANT):
-Quand l'utilisateur demande une NOUVELLE séance, un entraînement, un programme, ou dit "propose-moi une séance", "prépare ma séance", "mets la séance en preview", "séance du jour", etc., tu DOIS TOUJOURS appeler l'outil generate_workout.
-- L'outil génère automatiquement un programme personnalisé et le sauvegarde pour que l'utilisateur le retrouve dans son aperçu de séance sur l'app.
-- Tu peux passer des paramètres optionnels: target_muscles, duration_min, difficulty, equipment.
-- Après l'appel, confirme que la séance est prête et visible dans l'aperçu.
-- NE JAMAIS écrire un programme textuellement sans appeler generate_workout. L'outil EST le moyen de créer un preview.
-
-AUTRES RÈGLES:
-1. Quand l'utilisateur CORRIGE ou PRÉCISE une entrée précédente → utilise d'abord get_recent_meals ou get_recent_activities pour trouver l'entrée, puis update_meal ou update_activity
-2. Si tu as un DOUTE sur si c'est un nouvel élément ou une correction → DEMANDE à l'utilisateur!
-3. Quand l'utilisateur veut supprimer quelque chose → utilise delete_meal ou delete_activity selon le type. IMPORTANT: tu DOIS appeler l'outil delete_activity avec l'ID exact, ne dis JAMAIS que tu as supprimé sans avoir réellement appelé l'outil!
-
-CORRECTIONS DE SÉANCES D'ENTRAÎNEMENT (TRÈS IMPORTANT):
-Quand l'utilisateur veut corriger des données d'une séance passée (séries, répétitions, poids utilisé):
-1) D'abord, utilise get_recent_workout_sessions avec le paramètre "date" si l'utilisateur mentionne "hier", "lundi", etc.
-2) Ensuite, utilise get_workout_exercises avec l'ID de la séance pour voir les exercices
-3) Enfin, utilise update_workout_exercise pour corriger les valeurs (actual_sets, actual_reps, actual_weight)
-
-Exemples de corrections de séances:
-- "Hier j'ai fait 3 séries au développé couché, pas 4" → get_recent_workout_sessions(date=hier) → get_workout_exercises → update_workout_exercise(actual_sets=3)
-- "Sur le squat de ma dernière séance, c'était 100kg, pas 80kg" → get_recent_workout_sessions → get_workout_exercises → update_workout_exercise(actual_weight="100kg")
-- "Retire le curl de la séance d'hier, je l'ai pas fait" → ... → delete_workout_exercise OU update_workout_exercise(skipped=true)
-
-CORRECTIONS DE TYPE/HEURE DE REPAS (TRÈS IMPORTANT):
-- Si l'utilisateur dit par ex. "c'était mon goûter de 17h30, pas une collation du matin" →
-  1) get_recent_meals (pour identifier l'ID)
-  2) update_meal avec meal_type = afternoon_snack ET estimated_time = "17:30" (et ajuste aussi food_name si nécessaire)
-
-DÉTECTION ET SAUVEGARDE DES INFORMATIONS DE SANTÉ ET PRÉFÉRENCES:
-Quand l'utilisateur mentionne une information de santé ou une PRÉFÉRENCE D'ENTRAÎNEMENT importante, tu DOIS l'enregistrer avec save_health_context:
-- **BLESSURES** (injury): hernies discales, entorses, fractures passées, douleurs chroniques
-- **ALLERGIES** (allergy): allergies alimentaires, intolérances (lactose, gluten, etc.)
-- **CONDITIONS MÉDICALES** (medical_condition): diabète, hypertension, asthme
-- **LIMITATIONS PHYSIQUES** (physical_limitation): fragilité du dos, genoux sensibles
-- **PRÉFÉRENCES ALIMENTAIRES** (preference): végétarien, sans porc, régime particulier
-- **PRÉFÉRENCES D'ENTRAÎNEMENT** (training_preference): séparer haut/bas du corps, pas de full body, préférence split, fréquence d'entraînement, jours préférés, etc.
-- **MODE DE VIE** (lifestyle): travail de nuit, beaucoup de déplacements
-
-⚠️ TRÈS IMPORTANT - PRÉFÉRENCES D'ENTRAÎNEMENT:
-Quand l'utilisateur exprime une préférence d'entraînement (ex: "je préfère séparer haut et bas du corps", "pas de full body", "je veux du split"), tu DOIS:
-1. La sauvegarder IMMÉDIATEMENT avec save_health_context(category="training_preference", key="description claire", value="détail", severity="high")
-2. L'appliquer à TOUTES les séances futures générées via generate_workout
-3. NE JAMAIS oublier cette préférence — elle est dans ton contexte santé, RELIS-LE avant chaque génération de séance
-
-Évalue la sévérité:
-- critical: contre-indication stricte
-- high: précautions importantes
-- medium: adapter les conseils
-- low: à noter
-
-IMPORTANT: Quand tu enregistres une info de santé, confirme à l'utilisateur que c'est noté.
-
-ANALYSE D'IMAGES:
-- Pour les **REPAS**: estime les calories et macros, puis utilise log_meal
-- Pour les **MESURES D'IMPÉDANCEMÈTRE**: lis TOUTES les valeurs et utilise log_body_composition
-- Pour les **PHOTOS DE CORPS**: encourage l'utilisateur, commente la progression
-
-MESURES D'IMPÉDANCEMÈTRE:
-- Compare avec les mesures précédentes (get_body_composition_history) pour montrer la progression
-- Encourage l'utilisateur en fonction de son objectif
-
-Quand il demande son bilan, utilise get_daily_summary puis commente les résultats de façon structurée.
-
-Après avoir utilisé un outil, confirme l'action de manière naturelle et encourage l'utilisateur ! 🎯`;
-
-    // Limit conversation history to prevent context overflow
+    // Prepare messages for Claude (filter system messages, handle images)
     const MAX_MESSAGES = 30;
-    const recentMessages = messages.length > MAX_MESSAGES 
-      ? messages.slice(-MAX_MESSAGES) 
-      : messages;
-    
-    console.log("Calling AI gateway with", recentMessages.length, "messages (original:", messages.length, ")", imageUrl ? "(with image)" : "");
+    const recentMessages = messages.slice(-MAX_MESSAGES).filter((m: any) => m.role === "user" || m.role === "assistant");
 
-    // Prepare messages - if there's an image, add it to the last user message
-    const preparedMessages = recentMessages.map((msg, index) => {
-      // If this is the last message and we have an image URL, make it multimodal
+    const claudeMessages = recentMessages.map((msg: any, index: number) => {
       if (imageUrl && index === recentMessages.length - 1 && msg.role === "user") {
-        return {
-          role: msg.role,
-          content: [
-            { type: "text", text: msg.content || "Analyse cette image" },
-            { type: "image_url", image_url: { url: imageUrl } },
-          ],
+        return { role: "user", content: [{ type: "image", source: { type: "url", url: imageUrl } }, { type: "text", text: msg.content || "Analyse cette image" }] };
+      }
+      return { role: msg.role, content: msg.content };
+    });
+
+    // ── Streaming SSE response with Claude API ──
+    const sseHeaders = { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" };
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        const sendSSE = (event: string, data: unknown) => {
+          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
         };
-      }
-      return msg;
-    });
 
-    // Detect if last user message is about workouts - inject a reminder with extracted params
-    const lastUserMsg = preparedMessages[preparedMessages.length - 1];
-    const lastContent = typeof lastUserMsg?.content === 'string' ? lastUserMsg.content.toLowerCase() : '';
-    const workoutKeywords = ['séance', 'seance', 'entraînement', 'entrainement', 'programme', 'workout', 'preview', 'musculation', 'lancer la séance', 'prépare'];
-    const isWorkoutRequest = workoutKeywords.some(k => lastContent.includes(k));
+        try {
+          const executedActions: any[] = [];
+          let conversationMessages: Array<{ role: string; content: unknown }> = [...claudeMessages];
+          const MAX_ITERATIONS = 5;
+          let iteration = 0;
+          let finalContent = "";
 
-    // Extract focus from message — then fallback to saved preferences (NEVER default to full_body if user prefers split)
-    let detectedFocus = "full_body";
-    let detectedIntensity = "moderate";
-    let focusExplicitlyMentioned = false;
+          while (iteration < MAX_ITERATIONS) {
+            iteration++;
+            const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+              method: "POST",
+              headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+              body: JSON.stringify({
+                model: "claude-haiku-4-5-20251001",
+                max_tokens: 2048,
+                stream: true,
+                system: systemPrompt,
+                tools,
+                messages: conversationMessages,
+              }),
+            });
 
-    if (lastContent.includes("haut du corps") || lastContent.includes("upper body") || lastContent.includes("upper_body")) {
-      detectedFocus = "upper_body"; focusExplicitlyMentioned = true;
-    } else if (lastContent.includes("bas du corps") || lastContent.includes("lower body") || lastContent.includes("lower_body") || lastContent.includes("jambes") || lastContent.includes("cuisses") || lastContent.includes("quadriceps") || lastContent.includes("fessiers") || lastContent.includes("ischio")) {
-      detectedFocus = "lower_body"; focusExplicitlyMentioned = true;
-    } else if (lastContent.includes("push") || lastContent.includes("poussée")) {
-      detectedFocus = "push"; focusExplicitlyMentioned = true;
-    } else if (lastContent.includes("pull") || lastContent.includes("tirage")) {
-      detectedFocus = "pull"; focusExplicitlyMentioned = true;
-    } else if (lastContent.includes("cardio")) {
-      detectedFocus = "cardio"; focusExplicitlyMentioned = true;
-    } else if (lastContent.includes("abdos") || lastContent.includes("core")) {
-      detectedFocus = "core"; focusExplicitlyMentioned = true;
-    } else if (lastContent.includes("pec") || lastContent.includes("épaule") || lastContent.includes("biceps") || lastContent.includes("triceps")) {
-      detectedFocus = "upper_body"; focusExplicitlyMentioned = true;
-    } else if (lastContent.includes("dos") && !lastContent.includes("mal au dos")) {
-      detectedFocus = "upper_body"; focusExplicitlyMentioned = true;
-    }
-
-    // If focus NOT explicitly mentioned in message, use saved split preference
-    // This prevents defaulting to full_body when user has expressed a preference
-    if (!focusExplicitlyMentioned && savedSplitPreference) {
-      if (savedSplitPreference === "split") {
-        // Alternate upper/lower based on last session
-        const lastSession = recentSessions?.[0];
-        const lastMuscles = (lastSession?.target_muscles || []).join(" ").toLowerCase();
-        const lastWasUpper = lastMuscles.includes("pec") || lastMuscles.includes("dos") || lastMuscles.includes("épaule") || lastMuscles.includes("bras") || lastMuscles.includes("biceps") || lastMuscles.includes("triceps") || lastMuscles.includes("upper") || lastMuscles.includes("haut");
-        const lastWasLower = lastMuscles.includes("jambe") || lastMuscles.includes("quad") || lastMuscles.includes("fessier") || lastMuscles.includes("ischio") || lastMuscles.includes("lower") || lastMuscles.includes("bas") || lastMuscles.includes("cuisse");
-        if (lastWasUpper) {
-          detectedFocus = "lower_body"; // alternate
-        } else if (lastWasLower) {
-          detectedFocus = "upper_body"; // alternate
-        } else {
-          detectedFocus = "upper_body"; // default to upper if unknown
-        }
-        console.log(`[Focus] Split preference detected. Last session muscles: "${lastMuscles}". Choosing: ${detectedFocus}`);
-      } else {
-        detectedFocus = savedSplitPreference;
-        console.log(`[Focus] Using saved preference: ${detectedFocus}`);
-      }
-    }
-
-    if (lastContent.includes("intense") || lastContent.includes("lourd") || lastContent.includes("costaud") || lastContent.includes("hardcore")) detectedIntensity = "intense";
-    else if (lastContent.includes("léger") || lastContent.includes("récup") || lastContent.includes("doux")) detectedIntensity = "light";
-
-    // Also check recent context for activity log reminder
-    const isActivityMention = lastContent.includes("j'ai fait") || lastContent.includes("j ai fait") || lastContent.includes("j'ai terminé") || lastContent.includes("j'ai fini") || lastContent.includes("séance terminée") || lastContent.includes("c'était ma séance") || lastContent.includes("ma séance de");
-
-    const finalMessages = [
-      { role: "system", content: systemPrompt },
-      ...preparedMessages,
-    ];
-
-    // If workout-related, inject a strong reminder right before the last message
-    if (isWorkoutRequest) {
-      const splitNote = savedSplitPreference === "split" 
-        ? `\n⚠️ L'utilisateur a une préférence STRICTE pour le split haut/bas. NE JAMAIS utiliser focus="full_body". Focus choisi automatiquement: "${detectedFocus}" (basé sur l'alternance haut/bas).`
-        : savedSplitPreference 
-          ? `\n⚠️ L'utilisateur préfère les séances "${savedSplitPreference}". RESPECTER cette préférence.`
-          : "";
-      
-      finalMessages.splice(finalMessages.length - 1, 0, {
-        role: "system",
-        content: `RAPPEL CRITIQUE: L'utilisateur demande une séance. Tu DOIS appeler generate_workout avec les paramètres:
-- focus: "${detectedFocus}"
-- intensity: "${detectedIntensity}"
-NE JAMAIS appeler generate_workout sans focus et intensity.
-NE JAMAIS écrire un programme en texte. L'outil sauvegarde automatiquement la séance dans l'app.${splitNote}`
-      });
-    }
-
-    // If user mentions having done a session, remind coach to log it
-    if (isActivityMention) {
-      finalMessages.splice(finalMessages.length - 1, 0, {
-        role: "system",
-        content: `RAPPEL CRITIQUE - ENREGISTREMENT SÉANCE: L'utilisateur semble mentionner qu'il a effectué une séance ou activité sportive.
-Si c'est une séance de salle/sport structurée, tu DOIS:
-1. Vérifier avec get_recent_workout_sessions si elle est déjà enregistrée (avec une date récente)
-2. Si elle n'est PAS enregistrée (status "completed"), utilise log_activity pour l'enregistrer
-3. Ne JAMAIS dire "c'est enregistré" sans avoir RÉELLEMENT appelé l'outil
-4. Si l'utilisateur confirme des informations (durée, exercices), appelle IMMÉDIATEMENT l'outil d'enregistrement`
-      });
-    }
-
-    // First API call - may include tool calls
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GEMINI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gemini-2.5-flash",
-        messages: finalMessages,
-        tools: userId ? tools : undefined,
-        tool_choice: userId ? "auto" : undefined,
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Trop de requêtes, réessaie dans un moment." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Crédits IA épuisés." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      const errorText = await response.text();
-      console.error("AI Gateway error:", response.status, errorText);
-      throw new Error(`AI Gateway error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    console.log("AI response received");
-    console.log("finish_reason:", data.choices[0].finish_reason);
-    console.log("has tool_calls:", !!(data.choices[0].message.tool_calls?.length));
-    if (data.choices[0].message.tool_calls?.length) {
-      console.log("tool_calls:", JSON.stringify(data.choices[0].message.tool_calls.map((tc: any) => tc.function.name)));
-    }
-
-    let assistantMessage = data.choices[0].message;
-    const executedActions: { name: string; result: { success: boolean; message: string } }[] = [];
-    let conversationHistory: any[] = [
-      { role: "system", content: systemPrompt },
-      ...messages,
-    ];
-    
-    // Maximum iterations to prevent infinite loops
-    const MAX_ITERATIONS = 5;
-    let iteration = 0;
-
-    // Loop to handle chained tool calls (e.g., get_recent_meals -> delete_meal)
-    while (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0 && userId && iteration < MAX_ITERATIONS) {
-      iteration++;
-      console.log(`Tool calls iteration ${iteration}:`, assistantMessage.tool_calls.length);
-
-      // Execute each tool call
-      const currentToolResults: any[] = [];
-      for (const toolCall of assistantMessage.tool_calls) {
-        const result = await executeToolCall(supabase, userId, toolCall);
-        executedActions.push({ name: toolCall.function.name, result });
-        currentToolResults.push({
-          role: "tool",
-          tool_call_id: toolCall.id,
-          content: JSON.stringify(result),
-        });
-      }
-
-      // Update conversation history with assistant message and tool results
-      conversationHistory.push(assistantMessage);
-      conversationHistory.push(...currentToolResults);
-      // CRITICAL: Re-inject date reminder so Gemini uses server date, not training data date
-      conversationHistory.push({
-        role: "system",
-        content: `RAPPEL CRITIQUE DE DATE: Nous sommes le ${today} (année ${today.slice(0,4)}). TOUJOURS utiliser ${today} comme date d'aujourd'hui. NE JAMAIS utiliser 2025 ou toute autre année. La date actuelle du serveur est ${today}.`,
-      });
-
-      console.log(`Calling AI for follow-up (iteration ${iteration})`);
-
-      // Call AI again with updated history
-      const followUpResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${GEMINI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gemini-2.5-flash",
-          messages: conversationHistory,
-          tools: tools,
-          tool_choice: "auto",
-        }),
-      });
-
-      if (!followUpResponse.ok) {
-        const errorText = await followUpResponse.text();
-        console.error("Follow-up AI error:", followUpResponse.status, errorText);
-        // Return partial response if follow-up fails
-        return new Response(
-          JSON.stringify({
-            content: executedActions.map((a) => a.result.message).join("\n"),
-            actions: executedActions,
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      const followUpData = await followUpResponse.json();
-      assistantMessage = followUpData.choices[0].message;
-    }
-
-    // Return final response (either after tool chain completed or no tool calls)
-    // Ensure finalContent is never empty - provide a meaningful fallback
-    let finalContent = assistantMessage.content;
-    if (!finalContent || finalContent.trim() === "") {
-      if (executedActions.length > 0) {
-        finalContent = executedActions.map((a) => a.result.message).join("\n\n");
-      } else {
-        finalContent = "✅ C'est fait ! Autre chose ?";
-      }
-    }
-
-    // Generate suggested replies via Gemini
-    let suggestedReplies: string[] = [];
-    try {
-      const suggestResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${GEMINI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gemini-2.5-flash-lite",
-          messages: [
-            {
-              role: "system",
-              content: `Tu génères des réponses suggérées pour un chat de coaching santé/fitness en français.
-Retourne UNIQUEMENT un tableau JSON de 2 à 4 réponses courtes (max 40 caractères chacune).
-
-RÈGLE CRITIQUE : Les suggestions doivent être des RÉPONSES DIRECTES à la question ou au message du coach.
-- Si le coach pose une question avec des options (ex: "haut du corps ou bas du corps ?"), les suggestions DOIVENT reprendre ces options comme réponses (ex: "Haut du corps 💪", "Bas du corps 🦵").
-- Si le coach demande une confirmation (oui/non), propose "Oui, go ! ✅" et "Non, plutôt..." comme options.
-- Si le coach donne un résumé ou un conseil sans question, propose des relances naturelles.
-- NE JAMAIS proposer des réactions passives comme "Super merci !", "Noté ✅", "J'ai hâte !" quand le coach attend une réponse concrète.
-
-Réponse format: ["réponse1", "réponse2", "réponse3"]`
-            },
-            {
-              role: "user",
-              content: `Message du coach:\n${finalContent.slice(0, 500)}\n\nGénère 2-4 réponses suggérées pertinentes.`
+            if (!claudeRes.ok) {
+              const errText = await claudeRes.text();
+              console.error("Claude API error:", claudeRes.status, errText);
+              if (claudeRes.status === 429) {
+                sendSSE("error", { message: "Trop de requêtes, réessaie dans un moment." });
+                sendSSE("done", {});
+                controller.close();
+                return;
+              }
+              throw new Error(`Claude API error: ${claudeRes.status}`);
             }
-          ],
-        }),
-      });
 
-      if (suggestResponse.ok) {
-        const suggestData = await suggestResponse.json();
-        const raw = suggestData.choices?.[0]?.message?.content || "";
-        // Extract JSON array from response
-        const match = raw.match(/\[[\s\S]*?\]/);
-        if (match) {
-          const parsed = JSON.parse(match[0]);
-          if (Array.isArray(parsed) && parsed.length >= 2) {
-            suggestedReplies = parsed.filter((s: any) => typeof s === "string" && s.length > 1 && s.length < 60).slice(0, 4);
+            // Parse Claude's SSE stream
+            const reader = claudeRes.body!.getReader();
+            const decoder = new TextDecoder();
+            let sseBuffer = "";
+            let iterationText = "";
+            const toolUseBlocks: Array<{ id: string; name: string; input: any }> = [];
+            let currentToolUse: { id: string; name: string } | null = null;
+            let currentToolJson = "";
+            let stopReason = "";
+
+            sendSSE("content_start", {});
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              sseBuffer += decoder.decode(value, { stream: true });
+              const chunks = sseBuffer.split("\n\n");
+              sseBuffer = chunks.pop() || "";
+
+              for (const chunk of chunks) {
+                const dataLine = chunk.split("\n").find((l: string) => l.startsWith("data: "));
+                if (!dataLine) continue;
+                const jsonStr = dataLine.slice(6).trim();
+                if (jsonStr === "[DONE]") continue;
+
+                try {
+                  const evt = JSON.parse(jsonStr);
+
+                  if (evt.type === "content_block_start" && evt.content_block?.type === "tool_use") {
+                    currentToolUse = { id: evt.content_block.id, name: evt.content_block.name };
+                    currentToolJson = "";
+                  }
+
+                  if (evt.type === "content_block_delta") {
+                    if (evt.delta?.type === "text_delta") {
+                      iterationText += evt.delta.text;
+                      sendSSE("content_delta", { text: evt.delta.text });
+                    } else if (evt.delta?.type === "input_json_delta") {
+                      currentToolJson += evt.delta.partial_json;
+                    }
+                  }
+
+                  if (evt.type === "content_block_stop" && currentToolUse) {
+                    let parsedInput = {};
+                    try { parsedInput = JSON.parse(currentToolJson); } catch { /* ignore */ }
+                    toolUseBlocks.push({ id: currentToolUse.id, name: currentToolUse.name, input: parsedInput });
+                    currentToolUse = null;
+                    currentToolJson = "";
+                  }
+
+                  if (evt.type === "message_delta") {
+                    stopReason = evt.delta?.stop_reason || "";
+                  }
+                } catch { /* skip malformed SSE events */ }
+              }
+            }
+
+            console.log(`Iteration ${iteration} - stop_reason: ${stopReason}, tools: ${toolUseBlocks.length}, text_len: ${iterationText.length}`);
+            if (iterationText) finalContent = iterationText;
+
+            // If done (no more tools), break
+            if (stopReason === "end_turn" || toolUseBlocks.length === 0) break;
+
+            // Build assistant content for conversation history
+            const assistantContent: any[] = [];
+            if (iterationText) assistantContent.push({ type: "text", text: iterationText });
+            for (const tu of toolUseBlocks) assistantContent.push({ type: "tool_use", id: tu.id, name: tu.name, input: tu.input });
+            conversationMessages.push({ role: "assistant", content: assistantContent });
+
+            // Execute tools
+            const toolResults: any[] = [];
+            for (const toolUse of toolUseBlocks) {
+              console.log(`Executing tool: ${toolUse.name}`);
+              const result = await executeToolCall(supabase, userId, toolUse.name, toolUse.input);
+              executedActions.push({ name: toolUse.name, result });
+              toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+            }
+
+            conversationMessages.push({ role: "user", content: toolResults });
           }
+
+          // Fallback if no text was generated
+          if (!finalContent?.trim()) {
+            const fallback = executedActions.length > 0 ? executedActions.map((a) => a.result.message).join("\n\n") : "✅ C'est fait !";
+            sendSSE("content_start", {});
+            sendSSE("content_delta", { text: fallback });
+            finalContent = fallback;
+          }
+
+          // Send executed actions
+          if (executedActions.length > 0) sendSSE("actions", executedActions);
+
+          // Generate suggested replies (runs AFTER main content is already visible to user)
+          try {
+            const lastExchanges = recentMessages.slice(-4).map((m: any) => `${m.role === "user" ? "Utilisateur" : "Coach"}: ${String(m.content).slice(0, 200)}`).join("\n");
+            const suggestRes = await fetch("https://api.anthropic.com/v1/messages", {
+              method: "POST",
+              headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+              body: JSON.stringify({
+                model: "claude-haiku-4-5-20251001",
+                max_tokens: 200,
+                system: `Tu génères des suggestions de réponses courtes pour un chat de coaching fitness en français.
+Règles STRICTES :
+- Retourne UNIQUEMENT un tableau JSON : ["suggestion1", "suggestion2", "suggestion3"]
+- 2 à 4 suggestions, max 35 caractères chacune
+- Si le coach pose une question avec des options → les suggestions SONT ces options
+- Si le coach demande confirmation → "Oui, go ! ✅" et une alternative
+- Si le coach donne un conseil/résumé → propose des relances naturelles et pertinentes
+- JAMAIS de "Merci 😊", "Super !", "Noté ✅" si le coach attend une réponse précise
+- Les suggestions doivent être des RÉPONSES DIRECTES et UTILES au dernier message du coach`,
+                messages: [{ role: "user", content: `Échanges récents:\n${lastExchanges}\n\nDernier message du coach:\n${finalContent.slice(0, 400)}\n\nGénère 2-4 suggestions de réponses.` }],
+              }),
+            });
+
+            if (suggestRes.ok) {
+              const suggestData = await suggestRes.json();
+              const raw = suggestData.content?.[0]?.text || "";
+              const match = raw.match(/\[[\s\S]*?\]/);
+              if (match) {
+                const parsed = JSON.parse(match[0]);
+                if (Array.isArray(parsed)) {
+                  const replies = parsed.filter((s: any) => typeof s === "string" && s.length > 1 && s.length <= 40).slice(0, 4);
+                  sendSSE("suggested_replies", replies);
+                }
+              }
+            }
+          } catch (e) { console.error("Suggestions error:", e); }
+
+          sendSSE("done", {});
+        } catch (error) {
+          console.error("Stream error:", error);
+          sendSSE("error", { message: error instanceof Error ? error.message : "Erreur inconnue" });
+          sendSSE("done", {});
+        } finally {
+          controller.close();
         }
       }
-    } catch (e) {
-      console.error("Suggest replies error:", e);
-    }
+    });
 
-    // Fallback: if no suggestions were generated, provide contextual defaults
-    if (suggestedReplies.length === 0) {
-      const lc = finalContent.toLowerCase();
-      if (lc.includes("repas") || lc.includes("calorie") || lc.includes("manger") || lc.includes("dessert") || lc.includes("déjeuner")) {
-        suggestedReplies = ["Mon bilan du jour 📊", "J'ai encore mangé autre chose", "Merci ! 😊"];
-      } else if (lc.includes("séance") || lc.includes("entraînement") || lc.includes("exercice") || lc.includes("musculation")) {
-        suggestedReplies = ["C'est noté, merci ! 💪", "Mon bilan du jour 📊", "Une autre séance ?"];
-      } else if (lc.includes("eau") || lc.includes("hydratation") || lc.includes("verre")) {
-        suggestedReplies = ["Encore un verre 💧", "Mon bilan du jour 📊", "Merci ! 😊"];
-      } else if (lc.includes("poids") || lc.includes("kg") || lc.includes("body") || lc.includes("graisse")) {
-        suggestedReplies = ["Mon bilan du jour 📊", "Des conseils ? 🤔", "Merci ! 😊"];
-      } else {
-        suggestedReplies = ["Mon bilan du jour 📊", "J'ai une question 🤔", "Merci ! 😊"];
-      }
-    }
+    return new Response(stream, { headers: sseHeaders });
 
-    return new Response(
-      JSON.stringify({
-        content: finalContent,
-        actions: executedActions,
-        suggestedReplies,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
   } catch (error) {
     console.error("Coach chat error:", error);
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : "Erreur inconnue",
-      }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Erreur inconnue" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });

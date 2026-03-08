@@ -1,3 +1,5 @@
+-- ⚠️ ONE-TIME DATA FIX — NE PAS REPRODUIRE
+-- Suppression de sessions dupliquées et nettoyage de la table activities. IDs hardcodés.
 -- Delete the 3 duplicate workout sessions from Feb 6
 DELETE FROM workout_sessions WHERE id IN (
   '00d451cc-5bfd-4f30-97f9-89b2036c93b8',
