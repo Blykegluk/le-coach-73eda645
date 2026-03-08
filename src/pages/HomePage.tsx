@@ -1,55 +1,33 @@
 import { useState } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useNutritionGoals } from '@/hooks/useNutritionGoals';
 import {
   useTodayMetrics,
-  useWeeklySessions,
-  useCurrentWeight,
   useTodayNutrition,
   useHealthStats,
-  usePreparedWorkout,
   useHomeRealtimeInvalidation,
 } from '@/hooks/queries/useHomeQueries';
-import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
-import GoalEditorModal from '@/components/profile/GoalEditorModal';
 import AppHeader from '@/components/layout/AppHeader';
 import StatHistorySheet from '@/components/home/StatHistorySheet';
 
 import HealthStatsCard from '@/components/home/HealthStatsCard';
-import SmartActionCard from '@/components/home/SmartActionCard';
 import CircularProgressRings from '@/components/home/CircularProgressRings';
-import WorkoutPreviewSheet from '@/components/home/WorkoutPreviewSheet';
-import { ActiveWorkoutSession } from '@/components/training/ActiveWorkoutSession';
-import type { Workout } from '@/components/training/NextWorkoutCard';
-
-interface OutletContextType {
-  onOpenCoach?: () => void;
-}
-
-const WORKOUT_STORAGE_KEY = 'prepared_workout';
+import NextWorkoutCard from '@/components/training/NextWorkoutCard';
+import EquipmentSection from '@/components/training/EquipmentSection';
 
 const HomePage = () => {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const { profile } = useProfile();
-  const outletContext = useOutletContext<OutletContextType>() || {};
 
-  // Local UI state only
-  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
-  const [isWorkoutPreviewOpen, setIsWorkoutPreviewOpen] = useState(false);
-  const [isSessionActive, setIsSessionActive] = useState(false);
-  const [isRefreshingWorkout, setIsRefreshingWorkout] = useState(false);
+  // Local UI state
   const [statHistoryKey, setStatHistoryKey] = useState<string | null>(null);
 
   // TanStack Query hooks — all data fetching
   const { data: metrics, isLoading: metricsLoading } = useTodayMetrics(user?.id);
-  const { data: weeklySessionsCompleted = 0 } = useWeeklySessions(user?.id);
   const { data: todayNutrition } = useTodayNutrition(user?.id);
   const { data: healthStats } = useHealthStats(user?.id);
-  const { data: preparedWorkout } = usePreparedWorkout(user?.id);
 
   // Realtime invalidation — subscribes once, invalidates queries on DB changes
   useHomeRealtimeInvalidation(user?.id);
@@ -63,13 +41,6 @@ const HomePage = () => {
   const waterConsumed = metrics?.waterMl || 0;
   const caloriesConsumed = todayNutrition?.calories ?? 0;
   const proteinConsumed = todayNutrition?.protein ?? 0;
-  const loggedMealTypes = todayNutrition?.loggedMealTypes ?? [];
-
-  const weeklySessionsTotal = profile?.activity_level === 'very_active' ? 6
-    : profile?.activity_level === 'active' ? 5
-    : profile?.activity_level === 'moderate' ? 4
-    : profile?.activity_level === 'light' ? 3
-    : 2;
 
   // Stat history sheet config
   const statHistoryConfig: Record<string, { title: string; unit: string; metricKey: string }> = {
@@ -85,64 +56,6 @@ const HomePage = () => {
   const handleStatClick = (key: string) => setStatHistoryKey(key);
   const handleRingClick = (ring: 'calories' | 'protein' | 'water') => setStatHistoryKey(ring);
 
-  const handleStartWorkout = () => {
-    if (preparedWorkout) {
-      setIsWorkoutPreviewOpen(false);
-      setIsSessionActive(true);
-    }
-  };
-
-  const handleOpenCoach = () => {
-    outletContext.onOpenCoach?.();
-  };
-
-  const handlePreviewWorkout = () => {
-    if (preparedWorkout) {
-      setIsWorkoutPreviewOpen(true);
-    }
-  };
-
-  const handleRefreshWorkout = async () => {
-    if (!user) return;
-    setIsRefreshingWorkout(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { data, error: fnError } = await supabase.functions.invoke('next-workout', {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-
-      if (fnError) throw fnError;
-      if (data?.error) throw new Error(data.error);
-
-      await supabase
-        .from('user_context')
-        .upsert({
-          user_id: user.id,
-          key: WORKOUT_STORAGE_KEY,
-          value: JSON.stringify(data),
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id,key' });
-    } catch (err) {
-      console.error("Error refreshing workout:", err);
-    } finally {
-      setIsRefreshingWorkout(false);
-    }
-  };
-
-  const handleSessionComplete = async () => {
-    setIsSessionActive(false);
-    if (user) {
-      await supabase
-        .from('user_context')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('key', WORKOUT_STORAGE_KEY);
-      await handleRefreshWorkout();
-    }
-  };
-
   if (metricsLoading) {
     return (
       <div className="safe-top px-4 pb-4 pt-2">
@@ -157,34 +70,15 @@ const HomePage = () => {
     );
   }
 
-  if (isSessionActive && preparedWorkout) {
-    return (
-      <div className="safe-top px-4 pb-24 md:pb-4 pt-2">
-        <ActiveWorkoutSession
-          workout={preparedWorkout}
-          onClose={() => setIsSessionActive(false)}
-          onComplete={handleSessionComplete}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="safe-top px-4 pb-24 md:pb-4 pt-2">
       {/* Header */}
       <AppHeader title="The Perfect Coach" />
 
-      {/* Smart Action Card - Hero Section */}
-      <SmartActionCard
-        preparedWorkout={preparedWorkout ? {
-          name: preparedWorkout.workout_name,
-          targetMuscles: preparedWorkout.target_muscles,
-        } : null}
-        loggedMealTypes={loggedMealTypes}
-        onStartWorkout={handleStartWorkout}
-        onOpenCoach={handleOpenCoach}
-        onPreviewWorkout={handlePreviewWorkout}
-      />
+      {/* Next Workout Card — full featured (load, preview, launch, refresh) */}
+      <div className="mb-4">
+        <NextWorkoutCard />
+      </div>
 
       {/* Circular Progress Rings */}
       <CircularProgressRings
@@ -196,7 +90,6 @@ const HomePage = () => {
         waterGoal={waterGoal}
         onRingClick={handleRingClick}
       />
-
 
       {/* Health Stats Section */}
       <HealthStatsCard
@@ -214,23 +107,8 @@ const HomePage = () => {
         onStatClick={handleStatClick}
       />
 
-      {/* Goal Editor Modal */}
-      <GoalEditorModal
-        isOpen={isGoalModalOpen}
-        onClose={() => setIsGoalModalOpen(false)}
-        currentGoal={profile?.goal}
-        currentTargetWeight={profile?.target_weight_kg}
-      />
-
-      {/* Workout Preview Sheet */}
-      <WorkoutPreviewSheet
-        isOpen={isWorkoutPreviewOpen}
-        onClose={() => setIsWorkoutPreviewOpen(false)}
-        workout={preparedWorkout ?? null}
-        onStartWorkout={handleStartWorkout}
-        onRefresh={handleRefreshWorkout}
-        isRefreshing={isRefreshingWorkout}
-      />
+      {/* Equipment Section */}
+      <EquipmentSection />
 
       {/* Stat History Sheet */}
       {statHistoryKey && statHistoryConfig[statHistoryKey] && (
