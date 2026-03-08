@@ -15,7 +15,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import GoalEditorModal from '@/components/profile/GoalEditorModal';
-import DailyTipsCard from '@/components/home/DailyTipsCard';
+
 import HealthStatsCard from '@/components/home/HealthStatsCard';
 import SmartActionCard from '@/components/home/SmartActionCard';
 import CircularProgressRings from '@/components/home/CircularProgressRings';
@@ -57,7 +57,6 @@ const HomePage = () => {
   const proteinGoal = nutritionGoals.protein;
   const waterGoal = profile?.target_water_ml ?? Math.round(nutritionGoals.hydrationLiters * 1000);
 
-  const firstName = profile?.first_name || user?.email?.split('@')[0] || 'Athlète';
   const waterConsumed = metrics?.waterMl || 0;
   const caloriesConsumed = todayNutrition?.calories ?? 0;
   const proteinConsumed = todayNutrition?.protein ?? 0;
@@ -156,10 +155,10 @@ const HomePage = () => {
   return (
     <div className="safe-top px-4 pb-24 md:pb-4 pt-2">
       {/* Header */}
-      <div className="mb-4">
-        <span className="text-sm text-muted-foreground">Bonjour 👋</span>
-        <h1 className="text-2xl font-bold text-foreground">
-          {firstName}, <span className="text-gradient-primary">prêt à transpirer ?</span>
+      <div className="mb-4 text-center">
+        <h1 className="text-2xl font-bold tracking-tight">
+          <span className="text-gradient-primary">The Perfect</span>{' '}
+          <span className="text-foreground">Coach</span>
         </h1>
       </div>
 
@@ -185,10 +184,6 @@ const HomePage = () => {
         waterGoal={waterGoal}
       />
 
-      {/* Daily Tips */}
-      <div className="mb-4">
-        <DailyTipsCard />
-      </div>
 
       {/* Health Stats Section */}
       <HealthStatsCard
