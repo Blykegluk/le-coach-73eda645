@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Scale } from 'lucide-react';
+import { Scale, Plus } from 'lucide-react';
 import { useWeightHistory } from '@/hooks/queries/useProgressQueries';
 import { useProfile } from '@/hooks/useProfile';
 import ProgressChart from '@/components/progress/ProgressChart';
+import QuickAddWeight from '@/components/progress/QuickAddWeight';
 
 interface WeightProgressSectionProps {
   userId: string | undefined;
@@ -10,6 +11,7 @@ interface WeightProgressSectionProps {
 
 const WeightProgressSection = ({ userId }: WeightProgressSectionProps) => {
   const [period, setPeriod] = useState<30 | 90>(90);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const { data: weightData, isLoading } = useWeightHistory(userId, period);
   const { profile } = useProfile();
 
@@ -33,6 +35,12 @@ const WeightProgressSection = ({ userId }: WeightProgressSectionProps) => {
         <div className="flex items-center gap-2">
           <Scale className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-bold text-foreground">Poids</h2>
+          <button
+            onClick={() => setShowQuickAdd(true)}
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Period toggle */}
@@ -124,6 +132,13 @@ const WeightProgressSection = ({ userId }: WeightProgressSectionProps) => {
           </div>
         </div>
       )}
+
+      <QuickAddWeight
+        isOpen={showQuickAdd}
+        onClose={() => setShowQuickAdd(false)}
+        userId={userId}
+        lastKnownWeight={currentWeight}
+      />
     </div>
   );
 };

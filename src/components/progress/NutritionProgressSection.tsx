@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { Utensils } from 'lucide-react';
+import { Utensils, Plus } from 'lucide-react';
 import { useNutritionHistory } from '@/hooks/queries/useProgressQueries';
 import { useProfile } from '@/hooks/useProfile';
 import ProgressChart from '@/components/progress/ProgressChart';
 
 interface NutritionProgressSectionProps {
   userId: string | undefined;
+  onOpenCoach?: () => void;
 }
 
-const NutritionProgressSection = ({ userId }: NutritionProgressSectionProps) => {
+const NutritionProgressSection = ({ userId, onOpenCoach }: NutritionProgressSectionProps) => {
   const [period, setPeriod] = useState<7 | 30>(30);
   const { data: nutritionData, isLoading } = useNutritionHistory(userId, period);
   const { profile } = useProfile();
@@ -33,6 +34,15 @@ const NutritionProgressSection = ({ userId }: NutritionProgressSectionProps) => 
         <div className="flex items-center gap-2">
           <Utensils className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-bold text-foreground">Nutrition</h2>
+          {onOpenCoach && (
+            <button
+              onClick={onOpenCoach}
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+              aria-label="Ajouter un repas"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         {/* Period toggle */}

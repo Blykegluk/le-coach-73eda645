@@ -1,4 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { useOutletContext } from 'react-router-dom';
 import { usePerformanceStats } from '@/hooks/queries/usePerformanceQueries';
 import { useProgressRealtimeInvalidation } from '@/hooks/queries/useProgressQueries';
 import { useUserWeight } from '@/hooks/queries/useTrainingQueries';
@@ -12,6 +13,7 @@ import WeeklyCarousel from '@/components/training/WeeklyCarousel';
 
 const ProgressPage = () => {
   const { user } = useAuth();
+  const { onOpenCoach } = useOutletContext<{ onOpenCoach: () => void }>();
   const userId = user?.id;
   const { data: stats, isLoading: statsLoading } = usePerformanceStats(userId);
   const { data: userWeight } = useUserWeight(userId);
@@ -31,7 +33,7 @@ const ProgressPage = () => {
 
       <ExerciseProgressionSection userId={userId} />
 
-      <NutritionProgressSection userId={userId} />
+      <NutritionProgressSection userId={userId} onOpenCoach={onOpenCoach} />
 
       <BodyCompositionSection userId={userId} />
     </div>

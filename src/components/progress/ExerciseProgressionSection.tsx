@@ -1,5 +1,7 @@
 import { Dumbbell, TrendingUp, TrendingDown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useExerciseProgression } from '@/hooks/queries/useProgressQueries';
+import { Button } from '@/components/ui/button';
 import ProgressChart from '@/components/progress/ProgressChart';
 
 interface ExerciseProgressionSectionProps {
@@ -11,6 +13,7 @@ function capitalize(str: string): string {
 }
 
 const ExerciseProgressionSection = ({ userId }: ExerciseProgressionSectionProps) => {
+  const navigate = useNavigate();
   const { data: exercises, isLoading } = useExerciseProgression(userId);
 
   return (
@@ -40,9 +43,17 @@ const ExerciseProgressionSection = ({ userId }: ExerciseProgressionSectionProps)
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
             <Dumbbell className="h-6 w-6 text-muted-foreground" />
           </div>
-          <p className="text-sm text-muted-foreground">
-            Commence tes seances structurees pour suivre ta progression musculaire
+          <p className="text-sm text-muted-foreground mb-4">
+            Commence tes séances structurées pour suivre ta progression musculaire
           </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/')}
+          >
+            <Dumbbell className="h-4 w-4 mr-1" />
+            Lancer une séance
+          </Button>
         </div>
       )}
 
