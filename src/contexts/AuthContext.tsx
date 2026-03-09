@@ -20,9 +20,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        // Always update session (needed for fresh access token)
         setSession(session);
-        setUser(session?.user ?? null);
-        healthProvider.setUserId(session?.user?.id ?? null);
+        // Only update user on actual auth changes, NOT token refreshes.
+        // TOKEN_REFRESHED fires during getAccessToken() in coach chat —
+        // a new user reference triggers useProfile re-fetch → OnboardingGate
+        // briefly shows spinner → AppLayout unmounts → coach drawer closes.
+        if (event !== 'TOKEN_REFRESHED') {
+          setUser(session?.user ?? null);
+          healthProvider.setUserId(session?.user?.id ?? null);
+        }
       }
     );
 

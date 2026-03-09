@@ -126,18 +126,23 @@ export function useCoachChat(onNavigateAway?: () => void) {
   }, [messages, isLoadingHistory, scrollToBottom]);
 
   /**
-   * Get a valid user access token. Tries refreshSession first, falls back to getSession.
-   * Returns null if no valid session exists.
+   * Get a valid user access token.
+   * Uses getSession() first (no side-effects). Only calls refreshSession()
+   * as a fallback — refreshSession triggers TOKEN_REFRESHED which can
+   * cause cascading re-renders through AuthContext → useProfile → OnboardingGate.
    */
   const getAccessToken = async (): Promise<string | null> => {
-    // Try refresh first to ensure fresh token
-    const { data: { session }, error } = await supabase.auth.refreshSession();
-    if (!error && session?.access_token) {
+    // Try existing session first (avoids TOKEN_REFRESHED event)
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
       return session.access_token;
     }
-    // Fallback to existing session
-    const { data: fallback } = await supabase.auth.getSession();
-    return fallback.session?.access_token || null;
+    // No session found — try refreshing as last resort
+    const { data: refreshed, error } = await supabase.auth.refreshSession();
+    if (!error && refreshed.session?.access_token) {
+      return refreshed.session.access_token;
+    }
+    return null;
   };
 
   const handleSend = async (text?: string, imageUrl?: string) => {
