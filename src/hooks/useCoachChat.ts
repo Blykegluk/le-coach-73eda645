@@ -99,13 +99,17 @@ export function useCoachChat(onNavigateAway?: () => void) {
     };
     getUser();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      const uid = session?.user?.id || null;
-      setUserId(uid);
-      if (uid) {
-        loadChatHistory(uid);
-      } else {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Only react to actual sign-in/sign-out.
+      // TOKEN_REFRESHED fires during handleSend (getAccessToken → refreshSession)
+      // and must NOT reload history — it would overwrite the streaming response.
+      if (event === 'SIGNED_OUT') {
+        setUserId(null);
         setMessages([WELCOME_MESSAGE]);
+      } else if (event === 'SIGNED_IN') {
+        const uid = session?.user?.id || null;
+        setUserId(uid);
+        if (uid) loadChatHistory(uid);
       }
     });
 
