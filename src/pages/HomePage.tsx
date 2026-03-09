@@ -75,11 +75,6 @@ const HomePage = () => {
       {/* Header */}
       <AppHeader title="The Perfect Coach" />
 
-      {/* Next Workout Card — full featured (load, preview, launch, refresh) */}
-      <div className="mb-4">
-        <NextWorkoutCard />
-      </div>
-
       {/* Circular Progress Rings */}
       <CircularProgressRings
         caloriesConsumed={caloriesConsumed}
@@ -106,6 +101,11 @@ const HomePage = () => {
         targetSleepHours={profile?.target_sleep_hours ?? 8}
         onStatClick={handleStatClick}
       />
+
+      {/* Next Workout Card */}
+      <div className="mb-4">
+        <NextWorkoutCard />
+      </div>
 
       {/* Equipment Section */}
       <EquipmentSection />
