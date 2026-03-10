@@ -655,6 +655,14 @@ async function executeToolCall(
           notes: toolInput.notes || null,
         });
         if (error) throw error;
+        // Also write to activities so Progress page / StatsGrid can see it
+        const { error: actErr } = await supabase.from("activities").insert({
+          user_id: userId, activity_type: toolInput.activity_type,
+          duration_min: toolInput.duration_min, calories_burned: caloriesBurned,
+          distance_km: toolInput.distance_km || null, notes: toolInput.notes || null,
+          performed_at: performedAt,
+        });
+        if (actErr) console.error("activities sync failed:", actErr.message);
         const { data: currentMetrics } = await supabase.from("daily_metrics").select("calories_burned").eq("user_id", userId).eq("date", actDate).maybeSingle();
         const { error: metricsErr } = await supabase.from("daily_metrics").upsert({ user_id: userId, date: actDate, calories_burned: (currentMetrics?.calories_burned || 0) + caloriesBurned }, { onConflict: "user_id,date" });
         if (metricsErr) console.error("daily_metrics sync failed:", metricsErr.message);
@@ -842,20 +850,20 @@ Retourne UNIQUEMENT ce JSON:
       }
 
       case "get_recent_workout_sessions": {
-        let query = supabase.from("workout_sessions").select("id, workout_name, started_at, completed_at, status, target_muscles, total_duration_seconds, notes").eq("user_id", userId).eq("status", "completed").order("started_at", { ascending: false }).limit(toolInput.limit || 20);
+        let query = supabase.from("workout_sessions").select("id, workout_name, started_at, completed_at, status, target_muscles, total_duration_seconds, calories_burned, notes").eq("user_id", userId).eq("status", "completed").order("started_at", { ascending: false }).limit(toolInput.limit || 20);
         if (toolInput.date) { const d = getLocalDate(toolInput.date); query = query.gte("started_at", `${d}T00:00:00`).lt("started_at", `${d}T23:59:59`); }
         if (toolInput.date_from) { const d = getLocalDate(toolInput.date_from); query = query.gte("started_at", `${d}T00:00:00`); }
         if (toolInput.date_to) { const d = getLocalDate(toolInput.date_to); query = query.lte("started_at", `${d}T23:59:59`); }
         const { data: sessions, error } = await query;
         if (error) throw error;
-        let actQuery = supabase.from("activities").select("id, activity_type, performed_at, duration_min, calories_burned, notes").eq("user_id", userId).order("performed_at", { ascending: false }).limit(toolInput.limit || 20);
-        if (toolInput.date_from) { const d = getLocalDate(toolInput.date_from); actQuery = actQuery.gte("performed_at", `${d}T00:00:00`); }
-        if (toolInput.date_to) { const d = getLocalDate(toolInput.date_to); actQuery = actQuery.lte("performed_at", `${d}T23:59:59`); }
-        const { data: activities } = await actQuery;
-        const allSessions = [
-          ...(sessions || []).map((s: any) => ({ id: s.id, source: "workout_session", workout_name: s.workout_name, started_at: s.started_at, target_muscles: s.target_muscles, duration_min: s.total_duration_seconds ? Math.round(s.total_duration_seconds / 60) : null, notes: s.notes, time_ago: getTimeAgo(s.started_at) })),
-          ...(activities || []).map((a: any) => ({ id: a.id, source: "activity", workout_name: a.activity_type, started_at: a.performed_at, duration_min: a.duration_min, calories_burned: a.calories_burned, notes: a.notes, time_ago: getTimeAgo(a.performed_at) })),
-        ].sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()).slice(0, toolInput.limit || 20);
+        // No need to merge with activities table — log_activity now writes to both,
+        // and the backfill migration ensures older entries exist in both tables too.
+        const allSessions = (sessions || []).map((s: any) => ({
+          id: s.id, source: "workout_session", workout_name: s.workout_name,
+          started_at: s.started_at, target_muscles: s.target_muscles,
+          duration_min: s.total_duration_seconds ? Math.round(s.total_duration_seconds / 60) : null,
+          calories_burned: s.calories_burned, notes: s.notes, time_ago: getTimeAgo(s.started_at),
+        }));
         return { success: true, message: `${allSessions.length} séance(s) trouvée(s)`, data: allSessions };
       }
 
