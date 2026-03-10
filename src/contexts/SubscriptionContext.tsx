@@ -37,6 +37,10 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const tokenRef = useRef(session?.access_token);
   tokenRef.current = session?.access_token;
 
+  // Track whether the initial check has completed so periodic refreshes
+  // don't flash the loading spinner (which unmounts the entire Outlet).
+  const initialCheckDone = useRef(false);
+
   const checkSubscription = useCallback(async () => {
     const token = tokenRef.current;
     if (!token) {
@@ -44,7 +48,11 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    setState(prev => ({ ...prev, isLoading: true, timedOut: false }));
+    // Only show the loading spinner on the very first check.
+    // Periodic refreshes update state silently to avoid unmounting the app.
+    if (!initialCheckDone.current) {
+      setState(prev => ({ ...prev, isLoading: true, timedOut: false }));
+    }
 
     try {
       const { data, error } = await supabase.functions.invoke('check-subscription', {
@@ -57,6 +65,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       const isInTrial = data?.is_in_trial ?? false;
       const trialDaysRemaining = data?.trial_days_remaining ?? 0;
 
+      initialCheckDone.current = true;
       setState({
         isLoading: false,
         subscribed,
@@ -68,6 +77,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       });
     } catch (err) {
       console.error('Error checking subscription:', err);
+      initialCheckDone.current = true;
       // On error, be permissive (allow access)
       setState(prev => ({ ...prev, isLoading: false, hasAccess: true, timedOut: false }));
     }
@@ -91,6 +101,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
       return () => clearTimeout(safetyTimeout);
     } else {
+      initialCheckDone.current = false;
       setState({
         isLoading: false,
         subscribed: false,
