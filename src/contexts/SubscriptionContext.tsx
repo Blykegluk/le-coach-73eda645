@@ -71,6 +71,20 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (user) {
       checkSubscription();
+
+      // Safety net: if the edge function hangs, stop the loading spinner
+      // after 10s and allow access (fail-open).
+      const safetyTimeout = setTimeout(() => {
+        setState(prev => {
+          if (prev.isLoading) {
+            console.warn('Subscription check timed out — allowing access');
+            return { ...prev, isLoading: false, hasAccess: true };
+          }
+          return prev;
+        });
+      }, 10_000);
+
+      return () => clearTimeout(safetyTimeout);
     } else {
       setState({
         isLoading: false,

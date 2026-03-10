@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfWeek, endOfWeek } from 'date-fns';
 
@@ -94,4 +95,29 @@ export function usePerformanceStats(userId: string | undefined) {
     enabled: !!userId,
     staleTime: 60_000,
   });
+}
+
+/** Invalidate performance stats when the activities table changes */
+export function usePerformanceRealtimeInvalidation(userId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel('performance_activities_rt')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'activities',
+        filter: `user_id=eq.${userId}`,
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: performanceKeys.all });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, queryClient]);
 }

@@ -21,7 +21,7 @@ interface NutritionDay {
   meals: number;
 }
 
-interface BodyCompositionEntry {
+export interface BodyCompositionEntry {
   date: string;
   weight_kg: number | null;
   body_fat_pct: number | null;
@@ -29,6 +29,16 @@ interface BodyCompositionEntry {
   water_pct: number | null;
   bmi: number | null;
   visceral_fat_index: number | null;
+  lean_mass_kg: number | null;
+  bone_mass_kg: number | null;
+  bmr_kcal: number | null;
+  body_age: number | null;
+  protein_pct: number | null;
+  protein_kg: number | null;
+  subcutaneous_fat_pct: number | null;
+  fat_mass_kg: number | null;
+  skeletal_muscle_pct: number | null;
+  standard_weight_kg: number | null;
 }
 
 interface WeightEntry {
@@ -216,7 +226,7 @@ export function useBodyCompositionHistory(userId: string | undefined) {
     queryFn: async (): Promise<BodyCompositionEntry[]> => {
       const { data, error } = await supabase
         .from('body_composition')
-        .select('measured_at, weight_kg, body_fat_pct, muscle_mass_kg, water_pct, bmi, visceral_fat_index')
+        .select('measured_at, weight_kg, body_fat_pct, muscle_mass_kg, water_pct, bmi, visceral_fat_index, lean_mass_kg, bone_mass_kg, bmr_kcal, body_age, protein_pct, protein_kg, subcutaneous_fat_pct, fat_mass_kg, skeletal_muscle_pct, standard_weight_kg')
         .eq('user_id', userId!)
         .order('measured_at', { ascending: true })
         .limit(100);
@@ -224,7 +234,7 @@ export function useBodyCompositionHistory(userId: string | undefined) {
       if (error) throw error;
       if (!data) return [];
 
-      return data.map(row => ({
+      return data.map((row: any) => ({
         date: new Date(row.measured_at).toISOString().split('T')[0],
         weight_kg: row.weight_kg ?? null,
         body_fat_pct: row.body_fat_pct ?? null,
@@ -232,6 +242,16 @@ export function useBodyCompositionHistory(userId: string | undefined) {
         water_pct: row.water_pct ?? null,
         bmi: row.bmi ?? null,
         visceral_fat_index: row.visceral_fat_index ?? null,
+        lean_mass_kg: row.lean_mass_kg ?? null,
+        bone_mass_kg: row.bone_mass_kg ?? null,
+        bmr_kcal: row.bmr_kcal ?? null,
+        body_age: row.body_age ?? null,
+        protein_pct: row.protein_pct ?? null,
+        protein_kg: row.protein_kg ?? null,
+        subcutaneous_fat_pct: row.subcutaneous_fat_pct ?? null,
+        fat_mass_kg: row.fat_mass_kg ?? null,
+        skeletal_muscle_pct: row.skeletal_muscle_pct ?? null,
+        standard_weight_kg: row.standard_weight_kg ?? null,
       }));
     },
     enabled: !!userId,

@@ -19,12 +19,26 @@ interface MetricConfig {
 }
 
 const ALL_METRICS: MetricConfig[] = [
+  // Core metrics
   { key: 'weight_kg', label: 'Poids', unit: ' kg', color: '#6366f1', lowerIsBetter: true },
   { key: 'body_fat_pct', label: 'Masse grasse', unit: '%', color: '#ef4444', lowerIsBetter: true },
+  { key: 'fat_mass_kg', label: 'Masse grasse (kg)', unit: ' kg', color: '#f87171', lowerIsBetter: true },
   { key: 'muscle_mass_kg', label: 'Masse musculaire', unit: ' kg', color: '#22c55e', lowerIsBetter: false },
+  { key: 'skeletal_muscle_pct', label: 'Muscles squelettiques', unit: '%', color: '#4ade80', lowerIsBetter: false },
+  { key: 'lean_mass_kg', label: 'Masse maigre', unit: ' kg', color: '#10b981', lowerIsBetter: false },
+  // Water & protein
   { key: 'water_pct', label: 'Hydratation', unit: '%', color: '#3b82f6', lowerIsBetter: false },
-  { key: 'bmi', label: 'IMC', unit: '', color: '#f59e0b', lowerIsBetter: true },
+  { key: 'protein_pct', label: 'Protéines', unit: '%', color: '#8b5cf6', lowerIsBetter: false },
+  { key: 'protein_kg', label: 'Protéines (kg)', unit: ' kg', color: '#a78bfa', lowerIsBetter: false },
+  // Bone & visceral
+  { key: 'bone_mass_kg', label: 'Masse osseuse', unit: ' kg', color: '#94a3b8', lowerIsBetter: false },
   { key: 'visceral_fat_index', label: 'Graisse viscérale', unit: '', color: '#ef4444', lowerIsBetter: true },
+  { key: 'subcutaneous_fat_pct', label: 'Graisse sous-cutanée', unit: '%', color: '#fb923c', lowerIsBetter: true },
+  // Indices & derived
+  { key: 'bmi', label: 'IMC', unit: '', color: '#f59e0b', lowerIsBetter: true },
+  { key: 'bmr_kcal', label: 'Métabolisme basal', unit: ' kcal', color: '#06b6d4', lowerIsBetter: false },
+  { key: 'body_age', label: 'Âge corporel', unit: ' ans', color: '#ec4899', lowerIsBetter: true },
+  { key: 'standard_weight_kg', label: 'Poids idéal', unit: ' kg', color: '#64748b', lowerIsBetter: false },
 ];
 
 interface MetricRowProps {

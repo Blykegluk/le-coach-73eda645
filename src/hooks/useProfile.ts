@@ -32,7 +32,13 @@ export function useProfile() {
   useEffect(() => {
     if (!user) {
       setProfile(null);
-      setIsComplete(false);
+      // Only reset isComplete on actual sign-out (fetchedForRef was already
+      // set to a user id).  On initial mount user is null before auth resolves
+      // — we must NOT clear the sessionStorage-based value or OnboardingGate
+      // will briefly redirect to /onboarding.
+      if (fetchedForRef.current !== null) {
+        setIsComplete(false);
+      }
       setIsFetching(false);
       fetchedForRef.current = null;
       return;
@@ -47,22 +53,29 @@ export function useProfile() {
     setIsFetching(true);
 
     const fetchProfile = async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
 
-      if (cancelled) return;
+        if (cancelled) return;
 
-      if (error) {
-        console.error('Error fetching profile:', error);
-        setProfile(null);
-        setIsComplete(false);
-      } else {
-        const profileData = data as unknown as Profile;
-        setProfile(profileData);
-        setIsComplete(isProfileComplete(profileData));
+        if (error) {
+          console.error('Error fetching profile:', error);
+          setProfile(null);
+          setIsComplete(false);
+        } else {
+          const profileData = data as unknown as Profile;
+          setProfile(profileData);
+          setIsComplete(isProfileComplete(profileData));
+        }
+      } catch (err) {
+        // Network-level error — don't reset isComplete so the app doesn't
+        // flash onboarding.  The user can retry by refreshing.
+        if (cancelled) return;
+        console.error('Network error fetching profile:', err);
       }
 
       fetchedForRef.current = user.id;

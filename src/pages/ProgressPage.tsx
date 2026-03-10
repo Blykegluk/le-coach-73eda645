@@ -1,6 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useOutletContext } from 'react-router-dom';
-import { usePerformanceStats } from '@/hooks/queries/usePerformanceQueries';
+import { usePerformanceStats, usePerformanceRealtimeInvalidation } from '@/hooks/queries/usePerformanceQueries';
 import { useProgressRealtimeInvalidation } from '@/hooks/queries/useProgressQueries';
 import { useUserWeight } from '@/hooks/queries/useTrainingQueries';
 import AppHeader from '@/components/layout/AppHeader';
@@ -20,6 +20,7 @@ const ProgressPage = () => {
 
   // Subscribe to realtime invalidation
   useProgressRealtimeInvalidation(userId);
+  usePerformanceRealtimeInvalidation(userId);
 
   return (
     <div className="safe-top px-4 pb-24 pt-2">
