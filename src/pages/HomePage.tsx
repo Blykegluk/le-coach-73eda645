@@ -73,7 +73,7 @@ const HomePage = () => {
   return (
     <div className="safe-top px-4 pb-24 md:pb-4 pt-2">
       {/* Header */}
-      <AppHeader title="The Perfect Coach" />
+      <AppHeader title="The Perfect Coach" logo />
 
       {/* Circular Progress Rings */}
       <CircularProgressRings

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Plus, Camera, Mic, Loader2, X, ArrowDown, Dumbbell } from 'lucide-react';
+import { Send, Plus, Camera, Mic, Loader2, X, ArrowDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import ImageCapture from '@/components/chat/ImageCapture';
 import VoiceRecorder from '@/components/chat/VoiceRecorder';
@@ -77,11 +77,9 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
         {/* Header */}
         <div className="flex-shrink-0 border-b border-border/50 px-4 pb-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-primary-foreground shadow-glow-sm">
-              <Dumbbell className="h-5 w-5" />
-            </div>
+            <img src="/logo.png" alt="Coach" className="h-10 w-10 rounded-full object-cover" />
             <div className="flex-1">
-              <h2 className="text-lg font-semibold leading-none">Coach IA</h2>
+              <h2 className="text-lg font-semibold leading-none">Perfect Coach</h2>
               <p className="text-sm text-muted-foreground">{isLoading ? "Réfléchit..." : "En ligne"}</p>
             </div>
             <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/50 hover:bg-muted">
@@ -106,9 +104,7 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
                   <div key={msg.id || index}>
                     <div className={`flex gap-2 ${isCoach ? 'justify-start' : 'justify-end'}`}>
                       {isCoach && (
-                        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-primary-foreground">
-                          <Dumbbell className="h-3.5 w-3.5" />
-                        </div>
+                        <img src="/logo.png" alt="Coach" className="h-7 w-7 flex-shrink-0 rounded-full object-cover" />
                       )}
                       <div className={`flex max-w-[80%] flex-col ${isCoach ? 'items-start' : 'items-end'}`}>
                         {msg.imageUrl && (
