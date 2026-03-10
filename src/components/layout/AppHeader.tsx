@@ -18,7 +18,7 @@ const AppHeader = ({ title, subtitle, logo }: AppHeaderProps) => {
     <div className="flex items-center justify-between mb-4">
       <div>
         {logo ? (
-          <img src="/logo.png" alt="The Perfect Coach" className="h-10" />
+          <img src="/logo.png" alt="The Perfect Coach" className="h-14" />
         ) : (
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             {title}
