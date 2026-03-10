@@ -77,7 +77,7 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
         {/* Header */}
         <div className="flex-shrink-0 border-b border-border/50 px-4 pb-3">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Coach" className="h-10 w-10 rounded-full object-cover" />
+            <img src="/logo.png" alt="Coach" className="h-12 w-12 rounded-full object-cover" />
             <div className="flex-1">
               <h2 className="text-lg font-semibold leading-none">Perfect Coach</h2>
               <p className="text-sm text-muted-foreground">{isLoading ? "Réfléchit..." : "En ligne"}</p>
@@ -104,7 +104,7 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
                   <div key={msg.id || index}>
                     <div className={`flex gap-2 ${isCoach ? 'justify-start' : 'justify-end'}`}>
                       {isCoach && (
-                        <img src="/logo.png" alt="Coach" className="h-7 w-7 flex-shrink-0 rounded-full object-cover" />
+                        <img src="/logo.png" alt="Coach" className="h-8 w-8 flex-shrink-0 rounded-full object-cover" />
                       )}
                       <div className={`flex max-w-[80%] flex-col ${isCoach ? 'items-start' : 'items-end'}`}>
                         {msg.imageUrl && (
@@ -137,7 +137,7 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
               })}
               {isLoading && (
                 <div className="flex gap-2 justify-start">
-                   <img src="/logo.png" alt="Coach" className="h-7 w-7 flex-shrink-0 rounded-full object-cover" />
+                   <img src="/logo.png" alt="Coach" className="h-8 w-8 flex-shrink-0 rounded-full object-cover" />
                   <div className="rounded-2xl rounded-tl-md bg-muted/50 px-3 py-2">
                     <div className="flex gap-1">
                       <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />

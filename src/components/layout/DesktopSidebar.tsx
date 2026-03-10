@@ -25,7 +25,7 @@ const DesktopSidebar = ({ onOpenCoach }: DesktopSidebarProps) => {
       {/* Logo + Profile avatar */}
       <div className="flex items-center justify-between p-6 border-b border-border/50">
         <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="The Perfect Coach" className="h-10 w-10 rounded-xl object-cover" />
+          <img src="/logo.png" alt="The Perfect Coach" className="h-12 w-12 rounded-xl object-cover" />
           <span className="text-lg font-bold text-foreground">Perfect Coach</span>
         </div>
         <button
