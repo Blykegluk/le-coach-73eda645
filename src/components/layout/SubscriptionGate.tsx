@@ -1,5 +1,5 @@
 import { Navigate, Outlet } from 'react-router-dom';
-import { Loader2, Lock, CreditCard, Sparkles } from 'lucide-react';
+import { Loader2, Lock, CreditCard, Sparkles, RefreshCw, WifiOff } from 'lucide-react';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { Button } from '@/components/ui/button';
 
@@ -7,12 +7,33 @@ import { Button } from '@/components/ui/button';
  * Blocks access to the app if the user's trial has expired and they have no active subscription.
  */
 export default function SubscriptionGate() {
-  const { isLoading, hasAccess, isInTrial, trialDaysRemaining, startCheckout, checkSubscription } = useSubscription();
+  const { isLoading, hasAccess, timedOut, isInTrial, trialDaysRemaining, startCheckout, checkSubscription } = useSubscription();
 
   if (isLoading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Subscription check timed out — show retry UI (fail-closed)
+  if (timedOut) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-background p-6">
+        <div className="max-w-sm w-full text-center space-y-4">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+            <WifiOff className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <h2 className="text-lg font-semibold text-foreground">Connexion lente</h2>
+          <p className="text-sm text-muted-foreground">
+            Impossible de vérifier ton abonnement. Vérifie ta connexion internet et réessaie.
+          </p>
+          <Button onClick={checkSubscription} className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Réessayer
+          </Button>
+        </div>
       </div>
     );
   }

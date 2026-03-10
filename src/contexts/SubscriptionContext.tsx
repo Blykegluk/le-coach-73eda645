@@ -9,6 +9,7 @@ interface SubscriptionState {
   trialDaysRemaining: number;
   subscriptionEnd: string | null;
   hasAccess: boolean; // true if subscribed OR in trial
+  timedOut: boolean;  // true if the check timed out (show retry UI)
 }
 
 interface SubscriptionContextType extends SubscriptionState {
@@ -28,6 +29,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     trialDaysRemaining: 14,
     subscriptionEnd: null,
     hasAccess: true,
+    timedOut: false,
   });
 
   // Use a ref for the access token so checkSubscription doesn't recreate
@@ -41,6 +43,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       setState(prev => ({ ...prev, isLoading: false }));
       return;
     }
+
+    setState(prev => ({ ...prev, isLoading: true, timedOut: false }));
 
     try {
       const { data, error } = await supabase.functions.invoke('check-subscription', {
@@ -60,11 +64,12 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         trialDaysRemaining,
         subscriptionEnd: data?.subscription_end ?? null,
         hasAccess: subscribed || isInTrial,
+        timedOut: false,
       });
     } catch (err) {
       console.error('Error checking subscription:', err);
       // On error, be permissive (allow access)
-      setState(prev => ({ ...prev, isLoading: false, hasAccess: true }));
+      setState(prev => ({ ...prev, isLoading: false, hasAccess: true, timedOut: false }));
     }
   }, []); // stable — reads token from ref
 
@@ -72,13 +77,13 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     if (user) {
       checkSubscription();
 
-      // Safety net: if the edge function hangs, stop the loading spinner
-      // after 10s and allow access (fail-open).
+      // Safety net: if the edge function hangs, stop the spinner after 10s
+      // but DON'T grant access — show a retry UI instead (fail-closed).
       const safetyTimeout = setTimeout(() => {
         setState(prev => {
           if (prev.isLoading) {
-            console.warn('Subscription check timed out — allowing access');
-            return { ...prev, isLoading: false, hasAccess: true };
+            console.warn('Subscription check timed out');
+            return { ...prev, isLoading: false, timedOut: true };
           }
           return prev;
         });
@@ -93,6 +98,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         trialDaysRemaining: 0,
         subscriptionEnd: null,
         hasAccess: false,
+        timedOut: false,
       });
     }
   }, [user, checkSubscription]);
