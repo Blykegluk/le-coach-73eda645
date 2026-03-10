@@ -5,9 +5,10 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 interface AppHeaderProps {
   title: string;
   subtitle?: string;
+  logo?: boolean;
 }
 
-const AppHeader = ({ title, subtitle }: AppHeaderProps) => {
+const AppHeader = ({ title, subtitle, logo }: AppHeaderProps) => {
   const navigate = useNavigate();
   const { profile } = useProfile();
 
@@ -16,9 +17,13 @@ const AppHeader = ({ title, subtitle }: AppHeaderProps) => {
   return (
     <div className="flex items-center justify-between mb-4">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          {title}
-        </h1>
+        {logo ? (
+          <img src="/logo.png" alt="The Perfect Coach" className="h-10" />
+        ) : (
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            {title}
+          </h1>
+        )}
         {subtitle && (
           <p className="text-sm text-muted-foreground">{subtitle}</p>
         )}
