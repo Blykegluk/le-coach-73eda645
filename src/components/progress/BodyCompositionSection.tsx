@@ -9,14 +9,35 @@ interface BodyCompositionSectionProps {
   userId: string | undefined;
 }
 
+interface MetricConfig {
+  key: string;
+  label: string;
+  unit: string;
+  color: string;
+  /** true = lower is better (green on decrease), false = higher is better */
+  lowerIsBetter: boolean;
+}
+
+const ALL_METRICS: MetricConfig[] = [
+  { key: 'weight_kg', label: 'Poids', unit: ' kg', color: '#6366f1', lowerIsBetter: true },
+  { key: 'body_fat_pct', label: 'Masse grasse', unit: '%', color: '#ef4444', lowerIsBetter: true },
+  { key: 'muscle_mass_kg', label: 'Masse musculaire', unit: ' kg', color: '#22c55e', lowerIsBetter: false },
+  { key: 'water_pct', label: 'Hydratation', unit: '%', color: '#3b82f6', lowerIsBetter: false },
+  { key: 'bmi', label: 'IMC', unit: '', color: '#f59e0b', lowerIsBetter: true },
+  { key: 'visceral_fat_index', label: 'Graisse viscérale', unit: '', color: '#ef4444', lowerIsBetter: true },
+];
+
 interface MetricRowProps {
   label: string;
   unit: string;
   lastValue: number | null;
   firstValue: number | null;
+  lowerIsBetter: boolean;
+  isSelected: boolean;
+  onClick: () => void;
 }
 
-const MetricRow = ({ label, unit, lastValue, firstValue }: MetricRowProps) => {
+const MetricRow = ({ label, unit, lastValue, firstValue, lowerIsBetter, isSelected, onClick }: MetricRowProps) => {
   if (lastValue == null) return null;
 
   const change =
@@ -24,8 +45,16 @@ const MetricRow = ({ label, unit, lastValue, firstValue }: MetricRowProps) => {
       ? Math.round((lastValue - firstValue) * 10) / 10
       : null;
 
+  const isPositiveChange = change != null && change > 0;
+  const isGood = change != null && change !== 0 && (lowerIsBetter ? change < 0 : change > 0);
+
   return (
-    <div className="flex items-center justify-between py-2">
+    <div
+      className={`flex items-center justify-between py-2.5 px-2 -mx-2 rounded-lg cursor-pointer transition-colors ${
+        isSelected ? 'bg-primary/10' : 'hover:bg-muted/50'
+      }`}
+      onClick={onClick}
+    >
       <span className="text-sm text-muted-foreground">{label}</span>
       <div className="flex items-center gap-2">
         <span className="text-sm font-semibold text-foreground">
@@ -35,15 +64,15 @@ const MetricRow = ({ label, unit, lastValue, firstValue }: MetricRowProps) => {
         {change != null && change !== 0 && (
           <span
             className={`flex items-center gap-0.5 text-xs ${
-              change > 0 ? 'text-amber-400' : 'text-green-400'
+              isGood ? 'text-green-400' : 'text-amber-400'
             }`}
           >
-            {change > 0 ? (
+            {isPositiveChange ? (
               <TrendingUp className="h-3 w-3" />
             ) : (
               <TrendingDown className="h-3 w-3" />
             )}
-            {change > 0 ? '+' : ''}
+            {isPositiveChange ? '+' : ''}
             {change}
             {unit}
           </span>
@@ -56,6 +85,7 @@ const MetricRow = ({ label, unit, lastValue, firstValue }: MetricRowProps) => {
 const BodyCompositionSection = ({ userId }: BodyCompositionSectionProps) => {
   const { data: bodyData, isLoading } = useBodyCompositionHistory(userId);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
   if (isLoading) return null;
 
@@ -63,25 +93,28 @@ const BodyCompositionSection = ({ userId }: BodyCompositionSectionProps) => {
   const first = hasData ? bodyData[0] : null;
   const last = hasData ? bodyData[bodyData.length - 1] : null;
 
-  // Determine which metric to chart (prefer body_fat_pct, fallback to muscle_mass_kg)
-  const chartMetric = hasData && bodyData.some(d => d.body_fat_pct != null)
-    ? 'body_fat_pct'
-    : hasData && bodyData.some(d => d.muscle_mass_kg != null)
-      ? 'muscle_mass_kg'
-      : null;
-
-  const chartData = chartMetric && hasData
-    ? bodyData
-        .filter(d => d[chartMetric] != null)
-        .map(d => ({
-          date: d.date,
-          value: d[chartMetric] as number,
-        }))
+  // Determine which metrics have data (check across all entries, not just last)
+  const availableMetrics = hasData
+    ? ALL_METRICS.filter(m =>
+        bodyData.some(d => (d as any)[m.key] != null)
+      )
     : [];
 
-  const chartLabel = chartMetric === 'body_fat_pct' ? 'Masse grasse' : 'Masse musculaire';
-  const chartUnit = chartMetric === 'body_fat_pct' ? '%' : 'kg';
-  const chartColor = chartMetric === 'body_fat_pct' ? '#ef4444' : '#22c55e';
+  // Auto-select first metric with chart data if none selected
+  const activeMetric = selectedMetric && availableMetrics.some(m => m.key === selectedMetric)
+    ? availableMetrics.find(m => m.key === selectedMetric)!
+    : availableMetrics.find(m =>
+        hasData && bodyData.filter(d => (d as any)[m.key] != null).length >= 2
+      ) || availableMetrics[0] || null;
+
+  const chartData = activeMetric && hasData
+    ? bodyData
+        .filter(d => (d as any)[activeMetric.key] != null)
+        .map(d => ({
+          date: d.date,
+          value: (d as any)[activeMetric.key] as number,
+        }))
+    : [];
 
   return (
     <div className="mb-6">
@@ -121,37 +154,36 @@ const BodyCompositionSection = ({ userId }: BodyCompositionSectionProps) => {
       {/* Data state */}
       {hasData && first && last && (
         <div className="rounded-xl border border-border bg-card p-4">
-          {/* Metric rows */}
+          {/* Last measurement date */}
+          <p className="text-xs text-muted-foreground mb-2">
+            Dernière mesure : {new Date(last.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
+
+          {/* Dynamic metric rows — only show metrics that have data */}
           <div className="divide-y divide-border">
-            <MetricRow
-              label="Masse grasse"
-              unit="%"
-              lastValue={last.body_fat_pct}
-              firstValue={first.body_fat_pct}
-            />
-            <MetricRow
-              label="Masse musculaire"
-              unit=" kg"
-              lastValue={last.muscle_mass_kg}
-              firstValue={first.muscle_mass_kg}
-            />
-            <MetricRow
-              label="Hydratation"
-              unit="%"
-              lastValue={last.water_pct}
-              firstValue={first.water_pct}
-            />
+            {availableMetrics.map(metric => (
+              <MetricRow
+                key={metric.key}
+                label={metric.label}
+                unit={metric.unit}
+                lastValue={(last as any)[metric.key]}
+                firstValue={(first as any)[metric.key]}
+                lowerIsBetter={metric.lowerIsBetter}
+                isSelected={activeMetric?.key === metric.key}
+                onClick={() => setSelectedMetric(metric.key)}
+              />
+            ))}
           </div>
 
-          {/* Chart for primary metric */}
-          {chartData.length >= 2 && (
+          {/* Chart for selected metric */}
+          {activeMetric && chartData.length >= 2 && (
             <div className="mt-4 pt-3 border-t border-border">
-              <p className="text-xs text-muted-foreground mb-2">{chartLabel}</p>
+              <p className="text-xs text-muted-foreground mb-2">{activeMetric.label}</p>
               <ProgressChart
                 data={chartData}
-                label={chartLabel}
-                unit={chartUnit}
-                color={chartColor}
+                label={activeMetric.label}
+                unit={activeMetric.unit.trim()}
+                color={activeMetric.color}
                 height={120}
               />
             </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, Dumbbell, Clock, Flame, ChevronDown } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, subWeeks, isWithinInterval } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -56,10 +56,10 @@ const estimateCalories = (activity: Activity, weightKg: number = 70): number => 
   if (activity.calories_burned !== null && activity.calories_burned > 0) {
     return activity.calories_burned;
   }
-  
+
   const activityLower = activity.activity_type.toLowerCase();
   let met = 4;
-  
+
   if (activityLower.includes("course") || activityLower.includes("running") || activityLower.includes("jogging")) {
     met = 8;
   } else if (activityLower.includes("musculation") || activityLower.includes("muscu") || activityLower.includes("poids")) {
@@ -75,7 +75,7 @@ const estimateCalories = (activity: Activity, weightKg: number = 70): number => 
   } else if (activityLower.includes("marche") || activityLower.includes("walk")) {
     met = 3.5;
   }
-  
+
   return Math.round(met * weightKg * (activity.duration_min / 60));
 };
 
@@ -95,6 +95,29 @@ const WeeklyCarousel = ({ userWeight = 70 }: WeeklyCarouselProps) => {
   const [exerciseLogs, setExerciseLogs] = useState<Map<string, ExerciseLog[]>>(new Map());
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
   const [loadingSession, setLoadingSession] = useState<string | null>(null);
+
+  // Touch swipe support
+  const touchStartX = useRef<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
+
+    const threshold = 50;
+    if (deltaX < -threshold && currentIndex < weeks.length - 1) {
+      // Swipe left → older week
+      setCurrentIndex(prev => prev + 1);
+    } else if (deltaX > threshold && currentIndex > 0) {
+      // Swipe right → newer week
+      setCurrentIndex(prev => prev - 1);
+    }
+  }, [currentIndex, weeks.length]);
 
   useEffect(() => {
     const fetchAllActivities = async () => {
@@ -135,8 +158,8 @@ const WeeklyCarousel = ({ userWeight = 70 }: WeeklyCarouselProps) => {
       for (let i = 0; i < 8; i++) {
         const weekStart = startOfWeek(subWeeks(now, i), { weekStartsOn: 1 });
         const weekEnd = endOfWeek(subWeeks(now, i), { weekStartsOn: 1 });
-        
-        const weekActivities = data.filter(a => 
+
+        const weekActivities = data.filter(a =>
           isWithinInterval(new Date(a.performed_at), { start: weekStart, end: weekEnd })
         );
 
@@ -168,52 +191,35 @@ const WeeklyCarousel = ({ userWeight = 70 }: WeeklyCarouselProps) => {
       }
 
       setWeeks(weeksData);
+      // Always start at index 0 = current week
+      setCurrentIndex(0);
     };
 
     fetchAllActivities();
   }, [user, userWeight]);
 
-  // Find next week with data when navigating backwards
-  const findNextWeekWithData = (startIdx: number, direction: 'prev' | 'next'): number => {
-    if (direction === 'prev') {
-      for (let i = startIdx + 1; i < weeks.length; i++) {
-        if (weeks[i].sessions > 0) return i;
-      }
-    } else {
-      for (let i = startIdx - 1; i >= 0; i--) {
-        if (weeks[i].sessions > 0) return i;
-      }
-    }
-    return -1;
-  };
-
-  const canNavigatePrev = findNextWeekWithData(currentIndex, 'prev') !== -1;
-  const canNavigateNext = findNextWeekWithData(currentIndex, 'next') !== -1;
+  // Navigate to any week (not just ones with data)
+  const canNavigatePrev = currentIndex < weeks.length - 1;
+  const canNavigateNext = currentIndex > 0;
 
   const navigatePrev = () => {
-    const nextIdx = findNextWeekWithData(currentIndex, 'prev');
-    if (nextIdx !== -1) {
-      setCurrentIndex(nextIdx);
-    }
+    if (canNavigatePrev) setCurrentIndex(prev => prev + 1);
   };
 
   const navigateNext = () => {
-    const nextIdx = findNextWeekWithData(currentIndex, 'next');
-    if (nextIdx !== -1) {
-      setCurrentIndex(nextIdx);
-    }
+    if (canNavigateNext) setCurrentIndex(prev => prev - 1);
   };
 
   const loadExerciseLogs = async (sessionId: string) => {
     if (exerciseLogs.has(sessionId)) return;
-    
+
     setLoadingSession(sessionId);
     const { data } = await supabase
       .from('workout_exercise_logs')
       .select('*')
       .eq('session_id', sessionId)
       .order('exercise_order', { ascending: true });
-    
+
     if (data) {
       setExerciseLogs(prev => new Map(prev).set(sessionId, data as ExerciseLog[]));
     }
@@ -223,11 +229,11 @@ const WeeklyCarousel = ({ userWeight = 70 }: WeeklyCarouselProps) => {
   const toggleSession = async (activity: Activity) => {
     const dateKey = format(new Date(activity.performed_at), 'yyyy-MM-dd');
     const session = workoutSessions.get(dateKey);
-    
+
     if (!session) return;
-    
+
     const isExpanded = expandedSessions.has(session.id);
-    
+
     if (isExpanded) {
       setExpandedSessions(prev => {
         const next = new Set(prev);
@@ -242,27 +248,18 @@ const WeeklyCarousel = ({ userWeight = 70 }: WeeklyCarouselProps) => {
 
   const currentWeek = weeks[currentIndex];
 
-  // Show carousel even if current week has no data, as long as there's any week with data
-  const hasAnyData = weeks.some(w => w.sessions > 0);
-  
-  if (!hasAnyData) {
-    return null;
-  }
-
-  // If current week has no data, find first week with data
-  if (currentWeek && currentWeek.sessions === 0) {
-    const firstWithData = weeks.findIndex(w => w.sessions > 0);
-    if (firstWithData !== -1 && firstWithData !== currentIndex) {
-      setCurrentIndex(firstWithData);
-      return null;
-    }
-  }
-
+  // Hide entire carousel only if no weeks loaded yet
+  if (weeks.length === 0) return null;
   if (!currentWeek) return null;
 
   return (
     <>
-      <div className="mb-6 card-premium p-4">
+      <div
+        ref={containerRef}
+        className="mb-6 card-premium p-4"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         {/* Navigation header */}
         <div className="flex items-center justify-between mb-3">
           <button
@@ -272,7 +269,7 @@ const WeeklyCarousel = ({ userWeight = 70 }: WeeklyCarouselProps) => {
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
-          
+
           <div className="flex items-center gap-2">
             <div className="relative">
               <Calendar className="h-4 w-4 text-primary" />
@@ -280,7 +277,7 @@ const WeeklyCarousel = ({ userWeight = 70 }: WeeklyCarouselProps) => {
             </div>
             <span className="text-sm font-medium text-foreground">{currentWeek.label}</span>
           </div>
-          
+
           <button
             onClick={navigateNext}
             disabled={!canNavigateNext}
@@ -290,29 +287,40 @@ const WeeklyCarousel = ({ userWeight = 70 }: WeeklyCarouselProps) => {
           </button>
         </div>
 
-        {/* Stats grid - clickable */}
-        <div 
-          onClick={() => setDetailSheet({ isOpen: true, week: currentWeek })}
-          className="grid grid-cols-3 gap-4 text-center cursor-pointer hover:bg-primary/5 rounded-xl p-2 -m-2 transition-colors"
-        >
-          <div>
-            <p className="text-2xl font-bold text-gradient-primary">{currentWeek.sessions}</p>
-            <p className="text-xs text-muted-foreground">séances</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-foreground">{currentWeek.totalMinutes}</p>
-            <p className="text-xs text-muted-foreground">minutes</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-foreground">{currentWeek.totalCalories}</p>
-            <p className="text-xs text-muted-foreground">kcal brûlées</p>
-          </div>
-        </div>
+        {currentWeek.sessions > 0 ? (
+          <>
+            {/* Stats grid - clickable */}
+            <div
+              onClick={() => setDetailSheet({ isOpen: true, week: currentWeek })}
+              className="grid grid-cols-3 gap-4 text-center cursor-pointer hover:bg-primary/5 rounded-xl p-2 -m-2 transition-colors"
+            >
+              <div>
+                <p className="text-2xl font-bold text-gradient-primary">{currentWeek.sessions}</p>
+                <p className="text-xs text-muted-foreground">séances</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{currentWeek.totalMinutes}</p>
+                <p className="text-xs text-muted-foreground">minutes</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{currentWeek.totalCalories}</p>
+                <p className="text-xs text-muted-foreground">kcal brûlées</p>
+              </div>
+            </div>
 
-        {/* Hint */}
-        <p className="text-xs text-muted-foreground/70 text-center mt-3">
-          ← → Naviguer entre les semaines • Tap pour détails
-        </p>
+            {/* Hint */}
+            <p className="text-xs text-muted-foreground/70 text-center mt-3">
+              Swipe ou ← → pour naviguer • Tap pour détails
+            </p>
+          </>
+        ) : (
+          <div className="py-4 text-center">
+            <p className="text-sm text-muted-foreground">Aucune séance cette semaine</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">
+              Swipe ou ← → pour voir les autres semaines
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Week Detail Sheet */}
@@ -329,7 +337,7 @@ const WeeklyCarousel = ({ userWeight = 70 }: WeeklyCarouselProps) => {
               {detailSheet.week?.label}
             </SheetTitle>
           </SheetHeader>
-          
+
           <ScrollArea className="h-[calc(80vh-100px)]">
             {detailSheet.week && detailSheet.week.activities.length > 0 ? (
               <div className="space-y-3 pr-4">
@@ -360,7 +368,7 @@ const WeeklyCarousel = ({ userWeight = 70 }: WeeklyCarouselProps) => {
                   const isExpanded = session ? expandedSessions.has(session.id) : false;
                   const logs = session ? exerciseLogs.get(session.id) || [] : [];
                   const isLoading = loadingSession === session?.id;
-                  
+
                   return (
                     <Collapsible
                       key={activity.id}
@@ -402,7 +410,7 @@ const WeeklyCarousel = ({ userWeight = 70 }: WeeklyCarouselProps) => {
                             </div>
                           </div>
                         </CollapsibleTrigger>
-                        
+
                         <CollapsibleContent>
                           {isLoading ? (
                             <div className="mt-4 pt-4 border-t border-border flex justify-center">
@@ -414,8 +422,8 @@ const WeeklyCarousel = ({ userWeight = 70 }: WeeklyCarouselProps) => {
                                 Détails des exercices
                               </p>
                               {logs.map((log) => (
-                                <div 
-                                  key={log.id} 
+                                <div
+                                  key={log.id}
                                   className={`flex items-center justify-between py-2 px-3 rounded-lg ${log.skipped ? 'bg-muted/50 opacity-60' : 'bg-muted/30'}`}
                                 >
                                   <div className="flex-1 min-w-0">

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -30,15 +30,21 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     hasAccess: true,
   });
 
+  // Use a ref for the access token so checkSubscription doesn't recreate
+  // on every TOKEN_REFRESHED event (which updates session.access_token).
+  const tokenRef = useRef(session?.access_token);
+  tokenRef.current = session?.access_token;
+
   const checkSubscription = useCallback(async () => {
-    if (!session?.access_token) {
+    const token = tokenRef.current;
+    if (!token) {
       setState(prev => ({ ...prev, isLoading: false }));
       return;
     }
 
     try {
       const { data, error } = await supabase.functions.invoke('check-subscription', {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (error) throw error;
@@ -60,7 +66,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       // On error, be permissive (allow access)
       setState(prev => ({ ...prev, isLoading: false, hasAccess: true }));
     }
-  }, [session?.access_token]);
+  }, []); // stable — reads token from ref
 
   useEffect(() => {
     if (user) {
@@ -85,10 +91,11 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   }, [user, checkSubscription]);
 
   const startCheckout = async () => {
-    if (!session?.access_token) return;
+    const token = tokenRef.current;
+    if (!token) return;
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (error) throw error;
       if (data?.url) {
@@ -100,10 +107,11 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   };
 
   const openCustomerPortal = async () => {
-    if (!session?.access_token) return;
+    const token = tokenRef.current;
+    if (!token) return;
     try {
       const { data, error } = await supabase.functions.invoke('customer-portal', {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (error) throw error;
       if (data?.url) {

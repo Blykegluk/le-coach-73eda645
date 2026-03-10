@@ -36,11 +36,11 @@ const HomePage = () => {
   const nutritionGoals = useNutritionGoals(profile);
   const caloriesGoal = nutritionGoals.calories;
   const proteinGoal = nutritionGoals.protein;
-  const waterGoal = profile?.target_water_ml ?? Math.round(nutritionGoals.hydrationLiters * 1000);
+  const carbsGoal = nutritionGoals.carbs;
 
-  const waterConsumed = metrics?.waterMl || 0;
   const caloriesConsumed = todayNutrition?.calories ?? 0;
   const proteinConsumed = todayNutrition?.protein ?? 0;
+  const carbsConsumed = todayNutrition?.carbs ?? 0;
 
   // Stat history sheet config
   const statHistoryConfig: Record<string, { title: string; unit: string; metricKey: string }> = {
@@ -50,11 +50,11 @@ const HomePage = () => {
     activeMinutes: { title: 'Minutes actives', unit: 'min', metricKey: 'active_minutes' },
     calories: { title: 'Calories', unit: 'kcal', metricKey: 'calories' },
     protein: { title: 'Protéines', unit: 'g', metricKey: 'protein' },
-    water: { title: 'Eau', unit: 'ml', metricKey: 'water_ml' },
+    carbs: { title: 'Glucides', unit: 'g', metricKey: 'carbs' },
   };
 
   const handleStatClick = (key: string) => setStatHistoryKey(key);
-  const handleRingClick = (ring: 'calories' | 'protein' | 'water') => setStatHistoryKey(ring);
+  const handleRingClick = (ring: 'calories' | 'protein' | 'carbs') => setStatHistoryKey(ring);
 
   if (metricsLoading) {
     return (
@@ -81,8 +81,8 @@ const HomePage = () => {
         caloriesGoal={caloriesGoal}
         proteinConsumed={proteinConsumed}
         proteinGoal={proteinGoal}
-        waterConsumed={waterConsumed}
-        waterGoal={waterGoal}
+        carbsConsumed={carbsConsumed}
+        carbsGoal={carbsGoal}
         onRingClick={handleRingClick}
       />
 

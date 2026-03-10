@@ -955,11 +955,13 @@ COMPORTEMENT DU COACH
 
 4. CHRONOLOGIE : Quand tu présentes un historique de séances ou d'activités, TOUJOURS respecter l'ordre chronologique (de la plus ancienne à la plus récente). Utilise les dates/jours pour structurer clairement la timeline.
 
-5. CONFIRMATION AVANT ENREGISTREMENT :
-   - Analyse → présente un récap → demande confirmation → enregistre
-   - EXCEPTION : si l'utilisateur dit "ajoute", "enregistre", "note" → enregistre directement
-   - Quand l'utilisateur confirme (oui, ok, vas-y) → appelle l'outil IMMÉDIATEMENT
-   - Ne jamais écrire "c'est enregistré" sans avoir réellement appelé l'outil
+5. ENREGISTREMENT DES DONNÉES — RÈGLE ABSOLUE :
+   ⚠️ Tu ne peux JAMAIS confirmer un enregistrement en texte sans avoir appelé l'outil correspondant dans CE tour.
+   - Si tu dois enregistrer quelque chose → appelle l'outil DANS TA RÉPONSE (tool_use), puis confirme APRÈS le résultat.
+   - INTERDIT de répondre "c'est noté/enregistré/sauvegardé" sans un tool_use dans le même message.
+   - Si tu n'es pas sûr → demande confirmation SANS prétendre avoir enregistré.
+   - Quand l'utilisateur dit "ajoute", "enregistre", "note", "oui", "ok", "vas-y" → appelle l'outil IMMÉDIATEMENT, ne génère JAMAIS juste du texte.
+   - Flux normal : Analyse → récap → demande confirmation → L'UTILISATEUR confirme → tool_use → texte de confirmation
 
 6. GESTION BDD :
    - Pour modifier → get_recent_meals ou get_recent_workout_sessions d'abord pour l'ID, puis update
@@ -1133,12 +1135,30 @@ ${pw.coach_advice ? `- Conseil : ${pw.coach_advice}` : ""}`;
     const MAX_MESSAGES = 30;
     const recentMessages = messages.slice(-MAX_MESSAGES).filter((m: any) => m.role === "user" || m.role === "assistant");
 
-    const claudeMessages = recentMessages.map((msg: any, index: number) => {
-      if (imageUrl && index === recentMessages.length - 1 && msg.role === "user") {
-        return { role: "user", content: [{ type: "image", source: { type: "url", url: imageUrl } }, { type: "text", text: msg.content || "Analyse cette image" }] };
+    // Build Claude messages, injecting tool_use/tool_result pairs from saved history.
+    // For assistant messages with tool_calls, we reconstruct the agentic loop:
+    //   assistant: [tool_use blocks]  →  user: [tool_result blocks]  →  assistant: "final text"
+    // This gives Claude examples of its own prior tool usage, reinforcing the tool-calling pattern.
+    const claudeMessages: Array<{ role: string; content: any }> = [];
+    for (let i = 0; i < recentMessages.length; i++) {
+      const msg = recentMessages[i];
+      const isLastUserMsg = imageUrl && i === recentMessages.length - 1 && msg.role === "user";
+      const hasToolHistory = msg.role === "assistant" && msg.tool_calls && Array.isArray(msg.tool_calls) && msg.tool_calls.length >= 2;
+
+      if (hasToolHistory) {
+        // Inject tool interactions BEFORE the final assistant text.
+        // tool_calls = [{ role: "assistant", content: [tool_use...] }, { role: "user", content: [tool_result...] }, ...]
+        for (const tc of msg.tool_calls) {
+          claudeMessages.push({ role: tc.role, content: tc.content });
+        }
+        // Then push the final assistant text (what was actually shown to the user)
+        claudeMessages.push({ role: "assistant", content: msg.content });
+      } else if (isLastUserMsg) {
+        claudeMessages.push({ role: "user", content: [{ type: "image", source: { type: "url", url: imageUrl } }, { type: "text", text: msg.content || "Analyse cette image" }] });
+      } else {
+        claudeMessages.push({ role: msg.role, content: msg.content });
       }
-      return { role: msg.role, content: msg.content };
-    });
+    }
 
     // ── Streaming SSE response with Claude API ──
     const sseHeaders = { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" };
@@ -1152,6 +1172,7 @@ ${pw.coach_advice ? `- Conseil : ${pw.coach_advice}` : ""}`;
 
         try {
           const executedActions: any[] = [];
+          const toolHistory: Array<{ role: string; content: any }> = []; // Track tool_use/tool_result pairs for conversation persistence
           let conversationMessages: Array<{ role: string; content: unknown }> = [...claudeMessages];
           const MAX_ITERATIONS = 5;
           let iteration = 0;
@@ -1163,7 +1184,7 @@ ${pw.coach_advice ? `- Conseil : ${pw.coach_advice}` : ""}`;
               method: "POST",
               headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
               body: JSON.stringify({
-                model: "claude-haiku-4-5-20251001",
+                model: "claude-sonnet-4-6",
                 max_tokens: 2048,
                 stream: true,
                 system: systemPrompt,
@@ -1264,6 +1285,12 @@ ${pw.coach_advice ? `- Conseil : ${pw.coach_advice}` : ""}`;
             }
 
             conversationMessages.push({ role: "user", content: toolResults });
+
+            // Track tool interactions for conversation persistence
+            toolHistory.push(
+              { role: "assistant", content: toolUseBlocks.map(tu => ({ type: "tool_use", id: tu.id, name: tu.name, input: tu.input })) },
+              { role: "user", content: toolResults },
+            );
           }
 
           // Fallback if no text was generated
@@ -1276,6 +1303,9 @@ ${pw.coach_advice ? `- Conseil : ${pw.coach_advice}` : ""}`;
 
           // Send executed actions
           if (executedActions.length > 0) sendSSE("actions", executedActions);
+
+          // Send tool history for conversation persistence
+          if (toolHistory.length > 0) sendSSE("tool_history", toolHistory);
 
           // Generate suggested replies (runs AFTER main content is already visible to user)
           try {

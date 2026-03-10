@@ -97,6 +97,7 @@ export function useCurrentWeight(userId: string | undefined) {
 interface TodayNutrition {
   calories: number;
   protein: number;
+  carbs: number;
   loggedMealTypes: string[];
 }
 
@@ -108,17 +109,18 @@ export function useTodayNutrition(userId: string | undefined) {
 
       const { data, error } = await supabase
         .from('nutrition_logs')
-        .select('calories, protein, meal_type')
+        .select('calories, protein, carbs, meal_type')
         .eq('user_id', userId!)
         .gte('logged_at', `${today}T00:00:00`)
         .lte('logged_at', `${today}T23:59:59`);
 
       if (error) throw error;
-      if (!data) return { calories: 0, protein: 0, loggedMealTypes: [] };
+      if (!data) return { calories: 0, protein: 0, carbs: 0, loggedMealTypes: [] };
 
       return {
         calories: Math.round(data.reduce((sum, log) => sum + (log.calories || 0), 0)),
         protein: Math.round(data.reduce((sum, log) => sum + (log.protein || 0), 0)),
+        carbs: Math.round(data.reduce((sum, log) => sum + (log.carbs || 0), 0)),
         loggedMealTypes: data.map(log => log.meal_type),
       };
     },

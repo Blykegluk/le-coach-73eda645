@@ -30,14 +30,14 @@ const JournalPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
   const [showActions, setShowActions] = useState(false);
-  const [daySummary, setDaySummary] = useState({ calories: 0, protein: 0, waterMl: 0 });
+  const [daySummary, setDaySummary] = useState({ calories: 0, protein: 0, carbs: 0, waterMl: 0 });
   const navigate = useNavigate();
   const { onOpenCoach } = useOutletContext<{ onOpenCoach: () => void }>();
   const { profile } = useProfile();
   const nutritionGoals = useNutritionGoals(profile);
   const caloriesGoal = nutritionGoals.calories;
   const proteinGoal = nutritionGoals.protein;
-  const waterGoal = profile?.target_water_ml ?? Math.round(nutritionGoals.hydrationLiters * 1000);
+  const carbsGoal = nutritionGoals.carbs;
 
   const loadEntries = useCallback(async () => {
     setIsLoading(true);
@@ -80,7 +80,7 @@ const JournalPage = () => {
 
       const { data: meals } = await supabase
         .from('nutrition_logs')
-        .select('id, food_name, meal_type, calories, protein, logged_at')
+        .select('id, food_name, meal_type, calories, protein, carbs, logged_at')
         .eq('user_id', user.id)
         .gte('logged_at', startOfDayDate.toISOString())
         .lt('logged_at', endOfDayDate.toISOString())
@@ -88,6 +88,7 @@ const JournalPage = () => {
 
       let totalCalories = 0;
       let totalProtein = 0;
+      let totalCarbs = 0;
 
       if (meals) {
         meals.forEach(m => {
@@ -99,6 +100,7 @@ const JournalPage = () => {
           };
           totalCalories += m.calories || 0;
           totalProtein += m.protein || 0;
+          totalCarbs += m.carbs || 0;
           allEntries.push({
             id: `meal-${m.id}`,
             type: 'meal',
@@ -133,7 +135,7 @@ const JournalPage = () => {
 
       allEntries.sort((a, b) => a.time.getTime() - b.time.getTime());
       setEntries(allEntries);
-      setDaySummary({ calories: Math.round(totalCalories), protein: Math.round(totalProtein), waterMl });
+      setDaySummary({ calories: Math.round(totalCalories), protein: Math.round(totalProtein), carbs: Math.round(totalCarbs), waterMl });
     } catch (error) {
       console.error('Error loading journal entries:', error);
     } finally {
@@ -304,8 +306,8 @@ const JournalPage = () => {
             caloriesGoal={caloriesGoal}
             proteinConsumed={daySummary.protein}
             proteinGoal={proteinGoal}
-            waterConsumed={daySummary.waterMl}
-            waterGoal={waterGoal}
+            carbsConsumed={daySummary.carbs}
+            carbsGoal={carbsGoal}
           />
         </div>
       )}

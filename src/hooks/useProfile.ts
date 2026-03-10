@@ -4,13 +4,30 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { Profile } from '@/types/profile';
 import { isProfileComplete } from '@/types/profile';
 
+const PROFILE_COMPLETE_KEY = 'profile_complete';
+
 export function useProfile() {
   const { user, isLoading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isFetching, setIsFetching] = useState(false);
-  const [isComplete, setIsComplete] = useState(false);
+  // Initialise isComplete from sessionStorage to prevent flash redirects
+  // when the component remounts during token refreshes.
+  const [isComplete, setIsComplete] = useState(() => {
+    try { return sessionStorage.getItem(PROFILE_COMPLETE_KEY) === '1'; } catch { return false; }
+  });
   // Track which user ID the current profile belongs to
   const fetchedForRef = useRef<string | null>(null);
+
+  // Sync isComplete → sessionStorage
+  useEffect(() => {
+    try {
+      if (isComplete) {
+        sessionStorage.setItem(PROFILE_COMPLETE_KEY, '1');
+      } else if (!user) {
+        sessionStorage.removeItem(PROFILE_COMPLETE_KEY);
+      }
+    } catch { /* SSR / private browsing */ }
+  }, [isComplete, user]);
 
   useEffect(() => {
     if (!user) {

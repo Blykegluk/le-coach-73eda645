@@ -1,4 +1,4 @@
-import { Flame, Beef, Droplets } from 'lucide-react';
+import { Flame, Beef, Wheat } from 'lucide-react';
 
 interface ProgressRingProps {
   value: number;
@@ -84,9 +84,9 @@ interface CircularProgressRingsProps {
   caloriesGoal: number;
   proteinConsumed: number;
   proteinGoal: number;
-  waterConsumed: number;
-  waterGoal: number;
-  onRingClick?: (ring: 'calories' | 'protein' | 'water') => void;
+  carbsConsumed: number;
+  carbsGoal: number;
+  onRingClick?: (ring: 'calories' | 'protein' | 'carbs') => void;
 }
 
 const CircularProgressRings = ({
@@ -94,14 +94,10 @@ const CircularProgressRings = ({
   caloriesGoal,
   proteinConsumed,
   proteinGoal,
-  waterConsumed,
-  waterGoal,
+  carbsConsumed,
+  carbsGoal,
   onRingClick,
 }: CircularProgressRingsProps) => {
-  // Convert water to liters for display
-  const waterLiters = (waterConsumed / 1000).toFixed(1);
-  const waterGoalLiters = (waterGoal / 1000).toFixed(1);
-  
   return (
     <div className="card-premium p-4 mb-4">
       <div className="flex items-center justify-around">
@@ -137,19 +133,19 @@ const CircularProgressRings = ({
           />
         </button>
 
-        {/* Water Ring */}
+        {/* Carbs Ring */}
         <button
-          onClick={() => onRingClick?.('water')}
+          onClick={() => onRingClick?.('carbs')}
           className="transition-transform active:scale-95 focus:outline-none"
         >
           <ProgressRing
-            value={parseFloat(waterLiters)}
-            max={parseFloat(waterGoalLiters)}
+            value={carbsConsumed}
+            max={carbsGoal}
             color="hsl(var(--water))"
             bgColor="hsl(var(--water-light))"
-            icon={<Droplets className="h-5 w-5" />}
-            label="Eau"
-            unit="L"
+            icon={<Wheat className="h-5 w-5" />}
+            label="Glucides"
+            unit="g"
           />
         </button>
       </div>

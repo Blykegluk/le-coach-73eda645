@@ -135,6 +135,7 @@ export type Database = {
           id: string
           image_url: string | null
           role: string
+          tool_calls: any[] | null
           user_id: string
         }
         Insert: {
@@ -143,6 +144,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           role: string
+          tool_calls?: any[] | null
           user_id: string
         }
         Update: {
@@ -151,6 +153,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           role?: string
+          tool_calls?: any[] | null
           user_id?: string
         }
         Relationships: []

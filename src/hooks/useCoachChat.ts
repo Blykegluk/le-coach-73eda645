@@ -9,6 +9,7 @@ export type Message = {
   content: string;
   imageUrl?: string;
   suggestedReplies?: string[];
+  tool_calls?: any[]; // tool_use/tool_result pairs from the agentic loop
 };
 
 const WELCOME_MESSAGE: Message = {
@@ -24,7 +25,7 @@ export function useCoachChat(onNavigateAway?: () => void) {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
-  
+
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -44,7 +45,7 @@ export function useCoachChat(onNavigateAway?: () => void) {
     try {
       const { data, error } = await supabase
         .from('chat_messages')
-        .select('id, role, content, image_url, created_at')
+        .select('id, role, content, image_url, tool_calls, created_at')
         .eq('user_id', uid)
         .order('created_at', { ascending: true });
 
@@ -56,6 +57,7 @@ export function useCoachChat(onNavigateAway?: () => void) {
           role: msg.role as "user" | "assistant",
           content: msg.content,
           imageUrl: msg.image_url || undefined,
+          tool_calls: msg.tool_calls || undefined,
         })));
       } else {
         setMessages([WELCOME_MESSAGE]);
@@ -77,6 +79,7 @@ export function useCoachChat(onNavigateAway?: () => void) {
           role: message.role,
           content: message.content,
           image_url: message.imageUrl || null,
+          tool_calls: message.tool_calls || null,
         })
         .select('id')
         .single();
@@ -182,9 +185,11 @@ export function useCoachChat(onNavigateAway?: () => void) {
       };
 
       const now = new Date();
-      const messagesWithTimestamps = [...messages, { role: userMsg.role, content: userMsg.content }].map(m => ({
+      // Include tool_calls in messages sent to the backend
+      const messagesWithTimestamps = [...messages, { role: userMsg.role, content: userMsg.content, tool_calls: undefined as any[] | undefined }].map(m => ({
         role: m.role,
         content: m.content,
+        ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
       }));
       // Tag the last user message with current timestamp
       const lastIdx = messagesWithTimestamps.length - 1;
@@ -217,6 +222,7 @@ export function useCoachChat(onNavigateAway?: () => void) {
       let sseBuffer = "";
       let accumulatedContent = "";
       let assistantAdded = false;
+      let pendingToolHistory: any[] | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -270,6 +276,13 @@ export function useCoachChat(onNavigateAway?: () => void) {
               }
               break;
 
+            case "tool_history":
+              // Store tool interactions to save with the assistant message
+              if (Array.isArray(eventData)) {
+                pendingToolHistory = eventData;
+              }
+              break;
+
             case "suggested_replies":
               if (Array.isArray(eventData)) {
                 setMessages(prev => {
@@ -289,9 +302,14 @@ export function useCoachChat(onNavigateAway?: () => void) {
         }
       }
 
-      // Save the complete assistant message
+      // Save the complete assistant message (with tool_calls if any)
       if (accumulatedContent) {
-        await saveMessage(userId, { role: "assistant", content: accumulatedContent });
+        const assistantMsg: Message = {
+          role: "assistant",
+          content: accumulatedContent,
+          tool_calls: pendingToolHistory || undefined,
+        };
+        await saveMessage(userId, assistantMsg);
       }
 
     } catch (error) {

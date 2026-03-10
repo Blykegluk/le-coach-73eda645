@@ -37,11 +37,11 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated");
     logStep("User authenticated", { email: user.email });
 
-    // Check if user is a tester (bypass subscription)
+    // Check if user is a tester (bypass subscription) — case-insensitive
     const { data: testerData } = await supabaseClient
       .from('testers')
       .select('id')
-      .eq('email', user.email)
+      .eq('email', user.email!.toLowerCase())
       .maybeSingle();
 
     if (testerData) {
