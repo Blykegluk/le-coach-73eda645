@@ -137,9 +137,7 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
               })}
               {isLoading && (
                 <div className="flex gap-2 justify-start">
-                   <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-primary-foreground">
-                     <Dumbbell className="h-3.5 w-3.5" />
-                   </div>
+                   <img src="/logo.png" alt="Coach" className="h-7 w-7 flex-shrink-0 rounded-full object-cover" />
                   <div className="rounded-2xl rounded-tl-md bg-muted/50 px-3 py-2">
                     <div className="flex gap-1">
                       <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
