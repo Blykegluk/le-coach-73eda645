@@ -1,7 +1,7 @@
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
@@ -12,8 +12,7 @@ import SubscriptionGate from "@/components/layout/SubscriptionGate";
 import AppLayout from "@/components/layout/AppLayout";
 import HomePage from "@/pages/HomePage";
 import JournalPage from "@/pages/JournalPage";
-import TrainingPage from "@/pages/TrainingPage";
-import PerformancePage from "@/pages/PerformancePage";
+// TrainingPage & PerformancePage are replaced by ProgressPage
 import ProfilePage from "@/pages/ProfilePage";
 import AuthPage from "@/pages/AuthPage";
 import OnboardingPage from "@/pages/OnboardingPage";
@@ -55,8 +54,9 @@ const App = () => (
                           <Route path="/" element={<HomePage />} />
                           <Route path="/progress" element={<ProgressPage />} />
                           <Route path="/journal" element={<JournalPage />} />
-                          <Route path="/training" element={<TrainingPage />} />
-                          <Route path="/performance" element={<PerformancePage />} />
+                          {/* Legacy routes → redirect to /progress */}
+                          <Route path="/training" element={<Navigate to="/progress" replace />} />
+                          <Route path="/performance" element={<Navigate to="/progress" replace />} />
                           <Route path="/profile" element={<ProfilePage />} />
                         </Route>
                       </Route>

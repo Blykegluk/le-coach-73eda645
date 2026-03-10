@@ -2,11 +2,22 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfWeek, endOfWeek } from 'date-fns';
 
-interface PerformanceStats {
+export interface WeekActivity {
+  activity_type: string;
+  duration_min: number;
+  calories_burned: number | null;
+  performed_at: string;
+}
+
+export interface PerformanceStats {
   totalSessions: number;
   totalTimeMin: number;
   totalCalories: number;
   currentStreak: number;
+  /** All streak dates (descending), for the detail sheet */
+  streakDates: string[];
+  /** This week's activities, for the detail sheets */
+  weekActivities: WeekActivity[];
 }
 
 export const performanceKeys = {
@@ -24,7 +35,7 @@ export function usePerformanceStats(userId: string | undefined) {
 
       const { data: activities, error } = await supabase
         .from('activities')
-        .select('duration_min, calories_burned, performed_at')
+        .select('activity_type, duration_min, calories_burned, performed_at')
         .eq('user_id', userId!)
         .gte('performed_at', weekStart.toISOString())
         .lte('performed_at', weekEnd.toISOString())
@@ -32,7 +43,7 @@ export function usePerformanceStats(userId: string | undefined) {
 
       if (error) throw error;
       if (!activities || activities.length === 0) {
-        return { totalSessions: 0, totalTimeMin: 0, totalCalories: 0, currentStreak: 0 };
+        return { totalSessions: 0, totalTimeMin: 0, totalCalories: 0, currentStreak: 0, streakDates: [], weekActivities: [] };
       }
 
       const totalSessions = activities.length;
@@ -40,7 +51,6 @@ export function usePerformanceStats(userId: string | undefined) {
       const totalCalories = activities.reduce((sum, a) => sum + (a.calories_burned || 0), 0);
 
       // Calculate streak (consecutive days with activities, looking at all-time data)
-      // We need all activities for streak calc, not just this week
       const { data: allActivities } = await supabase
         .from('activities')
         .select('performed_at')
@@ -49,6 +59,7 @@ export function usePerformanceStats(userId: string | undefined) {
         .limit(200);
 
       let streak = 0;
+      const streakDates: string[] = [];
       if (allActivities && allActivities.length > 0) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -64,13 +75,21 @@ export function usePerformanceStats(userId: string | undefined) {
 
           if (activityDate.toISOString().split('T')[0] === expectedDate.toISOString().split('T')[0]) {
             streak++;
+            streakDates.push(activityDates[i]);
           } else {
             break;
           }
         }
       }
 
-      return { totalSessions, totalTimeMin, totalCalories, currentStreak: streak };
+      return {
+        totalSessions,
+        totalTimeMin,
+        totalCalories,
+        currentStreak: streak,
+        streakDates,
+        weekActivities: activities as WeekActivity[],
+      };
     },
     enabled: !!userId,
     staleTime: 60_000,
