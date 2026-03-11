@@ -442,6 +442,7 @@ const tools = [
       properties: { exercise_id: { type: "string" } },
       required: ["exercise_id"],
     },
+    cache_control: { type: "ephemeral" },
   },
 ];
 
@@ -1190,12 +1191,23 @@ ${pw.coach_advice ? `- Conseil : ${pw.coach_advice}` : ""}`;
             iteration++;
             const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
               method: "POST",
-              headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+              headers: {
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
+                "anthropic-beta": "prompt-caching-2024-07-31",
+                "content-type": "application/json",
+              },
               body: JSON.stringify({
                 model: "claude-sonnet-4-6",
                 max_tokens: 2048,
                 stream: true,
-                system: systemPrompt,
+                system: [
+                  {
+                    type: "text",
+                    text: systemPrompt,
+                    cache_control: { type: "ephemeral" },
+                  },
+                ],
                 tools,
                 messages: conversationMessages,
               }),

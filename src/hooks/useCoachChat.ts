@@ -92,27 +92,34 @@ export function useCoachChat(onNavigateAway?: () => void) {
     }
   }, []);
 
+  // Prevent double-loading history (getUser + onAuthStateChange can race)
+  const historyLoadedRef = useRef(false);
+
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.id) {
-        setUserId(user.id);
-        loadChatHistory(user.id);
-      }
+    historyLoadedRef.current = false;
+
+    const loadOnce = (uid: string) => {
+      if (historyLoadedRef.current) return;
+      historyLoadedRef.current = true;
+      setUserId(uid);
+      loadChatHistory(uid);
     };
-    getUser();
+
+    // Try loading immediately from stored session
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.id) loadOnce(user.id);
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // Only react to actual sign-in/sign-out.
       // TOKEN_REFRESHED fires during handleSend (getAccessToken → refreshSession)
       // and must NOT reload history — it would overwrite the streaming response.
       if (event === 'SIGNED_OUT') {
+        historyLoadedRef.current = false;
         setUserId(null);
         setMessages([WELCOME_MESSAGE]);
-      } else if (event === 'SIGNED_IN') {
+      } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         const uid = session?.user?.id || null;
-        setUserId(uid);
-        if (uid) loadChatHistory(uid);
+        if (uid) loadOnce(uid);
       }
     });
 
