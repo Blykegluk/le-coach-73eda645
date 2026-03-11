@@ -41,6 +41,7 @@ export function useCoachChat(onNavigateAway?: () => void) {
   }, []);
 
   const loadChatHistory = useCallback(async (uid: string) => {
+    console.log('[CoachChat] loadChatHistory called for uid:', uid);
     setIsLoadingHistory(true);
     try {
       const { data, error } = await supabase
@@ -50,6 +51,8 @@ export function useCoachChat(onNavigateAway?: () => void) {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
+
+      console.log('[CoachChat] Loaded', data?.length ?? 0, 'messages from DB');
 
       if (data && data.length > 0) {
         setMessages(data.map(msg => ({
@@ -63,7 +66,7 @@ export function useCoachChat(onNavigateAway?: () => void) {
         setMessages([WELCOME_MESSAGE]);
       }
     } catch (error) {
-      console.error('Error loading chat history:', error);
+      console.error('[CoachChat] Error loading chat history:', error);
       setMessages([WELCOME_MESSAGE]);
     } finally {
       setIsLoadingHistory(false);
@@ -98,7 +101,8 @@ export function useCoachChat(onNavigateAway?: () => void) {
   useEffect(() => {
     historyLoadedRef.current = false;
 
-    const loadOnce = (uid: string) => {
+    const loadOnce = (uid: string, source: string) => {
+      console.log(`[CoachChat] loadOnce called from ${source}, uid:`, uid, 'alreadyLoaded:', historyLoadedRef.current);
       if (historyLoadedRef.current) return;
       historyLoadedRef.current = true;
       setUserId(uid);
@@ -107,10 +111,12 @@ export function useCoachChat(onNavigateAway?: () => void) {
 
     // Try loading immediately from stored session
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user?.id) loadOnce(user.id);
+      console.log('[CoachChat] getUser result:', user?.id ?? 'null');
+      if (user?.id) loadOnce(user.id, 'getUser');
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[CoachChat] onAuthStateChange event:', event, 'uid:', session?.user?.id ?? 'null');
       // TOKEN_REFRESHED fires during handleSend (getAccessToken → refreshSession)
       // and must NOT reload history — it would overwrite the streaming response.
       if (event === 'SIGNED_OUT') {
@@ -119,7 +125,7 @@ export function useCoachChat(onNavigateAway?: () => void) {
         setMessages([WELCOME_MESSAGE]);
       } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         const uid = session?.user?.id || null;
-        if (uid) loadOnce(uid);
+        if (uid) loadOnce(uid, `onAuthStateChange:${event}`);
       }
     });
 
