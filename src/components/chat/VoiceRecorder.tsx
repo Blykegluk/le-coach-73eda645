@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Mic, Square, X } from 'lucide-react';
+import { Mic, Square, X, Check, AlertCircle } from 'lucide-react';
 
 interface VoiceRecorderProps {
   isOpen: boolean;
@@ -11,7 +11,7 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [transcript, setTranscript] = useState('');
-  const [status, setStatus] = useState<'idle' | 'recording' | 'processing'>('idle');
+  const [status, setStatus] = useState<'idle' | 'recording' | 'processing' | 'sent' | 'error'>('idle');
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -45,6 +45,18 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
     };
   }, []);
 
+  // Reset state when opened
+  useEffect(() => {
+    if (isOpen) {
+      setStatus('idle');
+      setTranscript('');
+      setRecordingTime(0);
+      sentRef.current = false;
+      finalTranscriptRef.current = '';
+      interimTranscriptRef.current = '';
+    }
+  }, [isOpen]);
+
   const stopMediaTracks = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       try { mediaRecorderRef.current.stop(); } catch {}
@@ -59,25 +71,30 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
     if (sentRef.current) return;
     sentRef.current = true;
 
-    // Use final transcript, fall back to interim, fall back to displayed transcript
+    // Use final transcript, fall back to interim
     let text = finalTranscriptRef.current.trim();
     if (!text) text = interimTranscriptRef.current.trim();
-    
+
     console.log('[VoiceRecorder] doSend called, text:', JSON.stringify(text));
 
     stopMediaTracks();
 
     if (text) {
       onTranscriptionRef.current(text);
+      // Show "sent" confirmation briefly, then auto-close
+      setStatus('sent');
+      setTimeout(() => {
+        onCloseRef.current();
+      }, 600);
+    } else {
+      // No text detected — show error, let user retry or close
+      setStatus('error');
+      setIsRecording(false);
+      setRecordingTime(0);
     }
 
-    setIsRecording(false);
-    setStatus('idle');
-    setTranscript('');
-    setRecordingTime(0);
     finalTranscriptRef.current = '';
     interimTranscriptRef.current = '';
-    onCloseRef.current();
   }, [stopMediaTracks]);
 
   const startRecording = useCallback(async () => {
@@ -119,12 +136,10 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
           finalTranscriptRef.current = final;
           interimTranscriptRef.current = interim;
           setTranscript(final + interim);
-          console.log('[VoiceRecorder] onresult - final:', JSON.stringify(final), 'interim:', JSON.stringify(interim));
         };
 
         recognition.onerror = (event: { error: string }) => {
           console.error('[VoiceRecorder] recognition error:', event.error);
-          // On error, if we have any text, send it
           if (event.error === 'no-speech' || event.error === 'aborted') {
             return; // non-fatal
           }
@@ -145,12 +160,12 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
       }, 1000);
     } catch (error) {
       console.error('[VoiceRecorder] Microphone access error:', error);
-      setStatus('idle');
+      setStatus('error');
     }
   }, [hasSpeechRecognition, doSend]);
 
   const stopAndSend = useCallback(() => {
-    console.log('[VoiceRecorder] stopAndSend called, final:', JSON.stringify(finalTranscriptRef.current), 'interim:', JSON.stringify(interimTranscriptRef.current));
+    console.log('[VoiceRecorder] stopAndSend called');
     setIsRecording(false);
     setStatus('processing');
 
@@ -162,7 +177,7 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
     if (recognitionRef.current) {
       try { recognitionRef.current.stop(); } catch {}
       // recognition.onend will call doSend
-      // Safety fallback
+      // Safety fallback if onend doesn't fire
       setTimeout(() => doSend(), 2000);
     } else {
       doSend();
@@ -188,6 +203,14 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
     sentRef.current = false;
     onClose();
   }, [stopMediaTracks, onClose]);
+
+  const handleRetry = useCallback(() => {
+    setStatus('idle');
+    setTranscript('');
+    sentRef.current = false;
+    finalTranscriptRef.current = '';
+    interimTranscriptRef.current = '';
+  }, []);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -223,7 +246,29 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
           )}
 
           {status === 'processing' && (
-            <span className="text-sm text-muted-foreground">Envoi en cours…</span>
+            <div className="flex items-center gap-2">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <span className="text-sm text-muted-foreground">Traitement en cours…</span>
+            </div>
+          )}
+
+          {status === 'sent' && (
+            <div className="flex items-center gap-2 text-primary">
+              <Check className="h-5 w-5" />
+              <span className="text-sm font-medium">Message envoyé !</span>
+            </div>
+          )}
+
+          {status === 'error' && (
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <AlertCircle className="h-5 w-5" />
+                <span className="text-sm">Aucune parole détectée</span>
+              </div>
+              <p className="text-xs text-muted-foreground text-center">
+                Parle clairement près du micro et réessaie
+              </p>
+            </div>
           )}
 
           {/* Waveform */}
@@ -244,7 +289,7 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
           )}
 
           {/* Live transcript */}
-          {transcript && (
+          {transcript && status !== 'error' && (
             <div className="w-full rounded-xl bg-muted/50 p-3 max-h-24 overflow-y-auto">
               <p className="text-sm text-foreground leading-relaxed">{transcript}</p>
             </div>
@@ -261,7 +306,7 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
         </div>
 
         {/* Main button */}
-        <div className="flex justify-center">
+        <div className="flex justify-center gap-4">
           {status === 'idle' && (
             <button
               onClick={startRecording}
@@ -278,6 +323,15 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
               className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500 text-white shadow-lg transition-transform active:scale-95"
             >
               <Square className="h-6 w-6 fill-current" />
+            </button>
+          )}
+
+          {status === 'error' && (
+            <button
+              onClick={handleRetry}
+              className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95"
+            >
+              <Mic className="h-7 w-7" />
             </button>
           )}
         </div>
