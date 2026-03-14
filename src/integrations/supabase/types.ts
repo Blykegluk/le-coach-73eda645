@@ -218,6 +218,42 @@ export type Database = {
         }
         Relationships: []
       }
+      favorite_meals: {
+        Row: {
+          id: string
+          user_id: string
+          food_name: string
+          calories: number
+          protein: number
+          carbs: number
+          fat: number
+          meal_type: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          food_name: string
+          calories?: number
+          protein?: number
+          carbs?: number
+          fat?: number
+          meal_type?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          food_name?: string
+          calories?: number
+          protein?: number
+          carbs?: number
+          fat?: number
+          meal_type?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       nutrition_logs: {
         Row: {
           ai_analysis_json: Json | null
@@ -281,8 +317,11 @@ export type Database = {
           onboarding_complete: boolean | null
           target_body_fat_pct: number | null
           target_calories: number | null
+          target_carbs: number | null
+          target_fat: number | null
           target_lean_mass_kg: number | null
           target_muscle_mass_kg: number | null
+          target_protein: number | null
           target_sleep_hours: number | null
           target_steps: number | null
           target_visceral_fat_index: number | null
@@ -310,8 +349,11 @@ export type Database = {
           onboarding_complete?: boolean | null
           target_body_fat_pct?: number | null
           target_calories?: number | null
+          target_carbs?: number | null
+          target_fat?: number | null
           target_lean_mass_kg?: number | null
           target_muscle_mass_kg?: number | null
+          target_protein?: number | null
           target_sleep_hours?: number | null
           target_steps?: number | null
           target_visceral_fat_index?: number | null
@@ -339,8 +381,11 @@ export type Database = {
           onboarding_complete?: boolean | null
           target_body_fat_pct?: number | null
           target_calories?: number | null
+          target_carbs?: number | null
+          target_fat?: number | null
           target_lean_mass_kg?: number | null
           target_muscle_mass_kg?: number | null
+          target_protein?: number | null
           target_sleep_hours?: number | null
           target_steps?: number | null
           target_visceral_fat_index?: number | null

@@ -14,6 +14,9 @@ export interface Profile {
   target_weight_kg: number | null;
   weekly_goal_kg: number | null;
   target_calories: number | null;
+  target_protein: number | null;
+  target_carbs: number | null;
+  target_fat: number | null;
   target_steps: number | null;
   target_water_ml: number | null;
   target_sleep_hours: number | null;

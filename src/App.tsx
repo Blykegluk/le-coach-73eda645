@@ -17,6 +17,7 @@ import ProfilePage from "@/pages/ProfilePage";
 import AuthPage from "@/pages/AuthPage";
 import OnboardingPage from "@/pages/OnboardingPage";
 import ProgressPage from "@/pages/ProgressPage";
+import NutritionPage from "@/pages/NutritionPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -54,6 +55,7 @@ const App = () => (
                           <Route path="/" element={<HomePage />} />
                           <Route path="/progress" element={<ProgressPage />} />
                           <Route path="/journal" element={<JournalPage />} />
+                          <Route path="/nutrition" element={<NutritionPage />} />
                           {/* Legacy routes → redirect to /progress */}
                           <Route path="/training" element={<Navigate to="/progress" replace />} />
                           <Route path="/performance" element={<Navigate to="/progress" replace />} />

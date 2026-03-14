@@ -17,6 +17,9 @@ export default function ObjectivesModal({ isOpen, onClose }: ObjectivesModalProp
 
   const [targetWeight, setTargetWeight] = useState(profile?.target_weight_kg?.toString() || '');
   const [targetCalories, setTargetCalories] = useState(profile?.target_calories?.toString() || '');
+  const [targetProtein, setTargetProtein] = useState(profile?.target_protein?.toString() || '');
+  const [targetCarbs, setTargetCarbs] = useState(profile?.target_carbs?.toString() || '');
+  const [targetFat, setTargetFat] = useState(profile?.target_fat?.toString() || '');
   const [targetSteps, setTargetSteps] = useState(profile?.target_steps?.toString() || '');
   const [targetWater, setTargetWater] = useState(profile?.target_water_ml?.toString() || '');
   const [targetSleep, setTargetSleep] = useState(profile?.target_sleep_hours?.toString() || '');
@@ -30,6 +33,9 @@ export default function ObjectivesModal({ isOpen, onClose }: ObjectivesModalProp
       const { error } = await updateProfile({
         target_weight_kg: targetWeight ? Number(targetWeight) : null,
         target_calories: targetCalories ? Number(targetCalories) : null,
+        target_protein: targetProtein ? Number(targetProtein) : null,
+        target_carbs: targetCarbs ? Number(targetCarbs) : null,
+        target_fat: targetFat ? Number(targetFat) : null,
         target_steps: targetSteps ? Number(targetSteps) : null,
         target_water_ml: targetWater ? Number(targetWater) : null,
         target_sleep_hours: targetSleep ? Number(targetSleep) : null,
@@ -49,7 +55,10 @@ export default function ObjectivesModal({ isOpen, onClose }: ObjectivesModalProp
   const fields = [
     { label: 'Poids cible (kg)', value: targetWeight, set: setTargetWeight, placeholder: '70', icon: '⚖️' },
     { label: 'Objectif hebdo (kg/sem)', value: weeklyGoal, set: setWeeklyGoal, placeholder: '-0.5', icon: '📉' },
-    { label: 'Calories quotidiennes', value: targetCalories, set: setTargetCalories, placeholder: '2000', icon: '🔥' },
+    { label: 'Calories quotidiennes', value: targetCalories, set: setTargetCalories, placeholder: 'Auto', icon: '🔥' },
+    { label: 'Protéines (g/jour)', value: targetProtein, set: setTargetProtein, placeholder: 'Auto', icon: '🥩' },
+    { label: 'Glucides (g/jour)', value: targetCarbs, set: setTargetCarbs, placeholder: 'Auto', icon: '🍞' },
+    { label: 'Lipides (g/jour)', value: targetFat, set: setTargetFat, placeholder: 'Auto', icon: '🥑' },
     { label: 'Pas quotidiens', value: targetSteps, set: setTargetSteps, placeholder: '10000', icon: '👟' },
     { label: 'Eau (ml/jour)', value: targetWater, set: setTargetWater, placeholder: '2000', icon: '💧' },
     { label: 'Sommeil (heures)', value: targetSleep, set: setTargetSleep, placeholder: '8', icon: '😴' },

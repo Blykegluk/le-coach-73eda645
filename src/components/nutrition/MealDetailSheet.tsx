@@ -6,8 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Flame, Beef, Wheat, Droplet, Pencil, Trash2 } from 'lucide-react';
+import { Flame, Beef, Wheat, Droplet, Pencil, Trash2, Star } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAddFavoriteMeal } from '@/hooks/queries/useFavoriteMeals';
 
 interface NutritionLog {
   id: string;
@@ -60,7 +62,8 @@ function getDatePart(iso: string): string {
 }
 
 const MealDetailSheet = ({ isOpen, onClose, mealName, logs, onChanged }: MealDetailSheetProps) => {
-  
+  const { user } = useAuth();
+  const addFavorite = useAddFavoriteMeal(user?.id);
   const [editing, setEditing] = useState<NutritionLog | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState({
@@ -192,6 +195,23 @@ const MealDetailSheet = ({ isOpen, onClose, mealName, logs, onChanged }: MealDet
                 <div className="flex items-start justify-between gap-2">
                   <p className="font-medium text-foreground mb-2">{log.food_name}</p>
                   <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9"
+                      onClick={() => addFavorite.mutate({
+                        food_name: log.food_name,
+                        calories: log.calories || 0,
+                        protein: log.protein || 0,
+                        carbs: log.carbs || 0,
+                        fat: log.fat || 0,
+                        meal_type: log.meal_type || null,
+                      })}
+                      aria-label="Ajouter aux favoris"
+                    >
+                      <Star className="h-4 w-4" />
+                    </Button>
                     <Button
                       type="button"
                       variant="ghost"

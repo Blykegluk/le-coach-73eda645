@@ -7,6 +7,10 @@ interface Profile {
   gender?: string | null;
   activity_level?: string | null;
   goal?: string | null;
+  target_calories?: number | null;
+  target_protein?: number | null;
+  target_carbs?: number | null;
+  target_fat?: number | null;
 }
 
 export interface NutritionGoals {
@@ -18,7 +22,8 @@ export interface NutritionGoals {
 }
 
 /**
- * Calculate daily nutrition goals based on profile using Harris-Benedict formula
+ * Calculate daily nutrition goals using Mifflin-St Jeor formula
+ * Supports profile overrides for calories and macros
  */
 export function calculateNutritionGoals(profile: Profile | null): NutritionGoals {
   const defaults: NutritionGoals = {
@@ -33,16 +38,16 @@ export function calculateNutritionGoals(profile: Profile | null): NutritionGoals
 
   const weight = profile.weight_kg;
   const height = profile.height_cm;
-  const age = profile.birth_date 
+  const age = profile.birth_date
     ? Math.floor((Date.now() - new Date(profile.birth_date).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
     : 30;
-  
-  // BMR calculation (Mifflin-St Jeor)
+
+  // Mifflin-St Jeor BMR
   let bmr: number;
   if (profile.gender === 'male') {
-    bmr = 88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age);
+    bmr = (10 * weight) + (6.25 * height) - (5 * age) - 5;
   } else {
-    bmr = 447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age);
+    bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161;
   }
 
   // Activity multiplier
@@ -55,7 +60,7 @@ export function calculateNutritionGoals(profile: Profile | null): NutritionGoals
     athlete: 1.9,
   };
   const multiplier = activityMultipliers[profile.activity_level || 'moderate'] || 1.55;
-  
+
   let tdee = Math.round(bmr * multiplier);
 
   // Adjust for goal
@@ -65,18 +70,17 @@ export function calculateNutritionGoals(profile: Profile | null): NutritionGoals
     tdee = Math.round(tdee * 1.1); // 10% surplus
   }
 
-  // Macro split (protein: 2g/kg, rest balanced)
-  const proteinGoal = Math.round(weight * 2);
-  const proteinCals = proteinGoal * 4;
-  const fatGoal = Math.round((tdee * 0.25) / 9);
-  const fatCals = fatGoal * 9;
-  const carbGoal = Math.round((tdee - proteinCals - fatCals) / 4);
+  // Use overrides if set, otherwise auto-calculate
+  const calories = profile.target_calories || tdee;
+  const autoProtein = Math.round(weight * 2);
+  const autoFat = Math.round((calories * 0.25) / 9);
+  const autoCarbs = Math.round((calories - autoProtein * 4 - autoFat * 9) / 4);
 
   return {
-    calories: tdee,
-    protein: proteinGoal,
-    carbs: carbGoal,
-    fat: fatGoal,
+    calories,
+    protein: profile.target_protein || autoProtein,
+    carbs: profile.target_carbs || Math.max(autoCarbs, 0),
+    fat: profile.target_fat || autoFat,
     hydrationLiters: Math.round(weight * 0.033 * 10) / 10,
   };
 }

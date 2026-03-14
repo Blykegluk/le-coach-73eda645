@@ -194,7 +194,7 @@ const JournalPage = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => onOpenCoach?.()}
+                onClick={() => navigate('/nutrition')}
                 className="gap-2"
               >
                 <UtensilsCrossed className="h-4 w-4" />

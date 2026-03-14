@@ -1,7 +1,9 @@
 import { useState, useRef, useCallback } from 'react';
-import { Camera, X, Send, RotateCcw, Image as ImageIcon, Loader2, MessageSquare } from 'lucide-react';
+import { Camera, X, Send, RotateCcw, Image as ImageIcon, Loader2, MessageSquare, Star, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import FavoriteMealsList from './FavoriteMealsList';
+import FoodSearchSheet from './FoodSearchSheet';
 
 interface AddMealModalProps {
   isOpen: boolean;
@@ -20,7 +22,8 @@ export default function AddMealModal({
   mealType,
   mealName 
 }: AddMealModalProps) {
-  const [mode, setMode] = useState<'choose' | 'camera' | 'text'>('choose');
+  const [mode, setMode] = useState<'choose' | 'camera' | 'text' | 'favorites'>('choose');
+  const [foodSearchOpen, setFoodSearchOpen] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [textInput, setTextInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -88,6 +91,7 @@ export default function AddMealModal({
     setCapturedImage(null);
     setTextInput('');
     setMode('choose');
+    setFoodSearchOpen(false);
     onClose();
   };
 
@@ -227,6 +231,30 @@ export default function AddMealModal({
                   <p className="text-sm text-muted-foreground">L'IA estimera les macros</p>
                 </div>
               </button>
+              <button
+                onClick={() => setMode('favorites')}
+                className="flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-muted transition-colors"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10">
+                  <Star className="h-5 w-5 text-amber-500" />
+                </div>
+                <div className="text-left">
+                  <p className="font-medium text-foreground">Mes favoris</p>
+                  <p className="text-sm text-muted-foreground">Tes repas enregistrés</p>
+                </div>
+              </button>
+              <button
+                onClick={() => setFoodSearchOpen(true)}
+                className="flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-muted transition-colors"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/10">
+                  <Search className="h-5 w-5 text-green-500" />
+                </div>
+                <div className="text-left">
+                  <p className="font-medium text-foreground">Rechercher un aliment</p>
+                  <p className="text-sm text-muted-foreground">Base Open Food Facts</p>
+                </div>
+              </button>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -336,11 +364,38 @@ export default function AddMealModal({
               </button>
             </div>
           )}
+
+          {/* Favorites mode */}
+          {mode === 'favorites' && userId && (
+            <div className="flex flex-col gap-4">
+              <button
+                onClick={() => setMode('choose')}
+                className="self-start text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                ← Retour
+              </button>
+              <FavoriteMealsList
+                userId={userId}
+                mealType={mealType}
+                onClose={handleClose}
+              />
+            </div>
+          )}
         </div>
 
         {/* Hidden canvas for capture */}
         <canvas ref={canvasRef} className="hidden" />
       </div>
+
+      {/* Food Search Sheet */}
+      {userId && (
+        <FoodSearchSheet
+          isOpen={foodSearchOpen}
+          onClose={() => { setFoodSearchOpen(false); handleClose(); }}
+          userId={userId}
+          mealType={mealType}
+        />
+      )}
     </div>
   );
 }
