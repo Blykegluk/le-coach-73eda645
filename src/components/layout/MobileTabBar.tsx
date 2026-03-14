@@ -1,5 +1,6 @@
 import { Home, TrendingUp, CalendarDays, MessageCircle } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 
 const tabs = [
   { id: 'today', path: '/', label: "Aujourd'hui", icon: Home },
@@ -30,7 +31,7 @@ const MobileTabBar = ({ onOpenCoach }: MobileTabBarProps) => {
             <button
               key={tab.id}
               onClick={() => navigate(tab.path)}
-              className={`relative flex flex-col items-center gap-1 rounded-lg px-3 py-2 transition-all duration-200 ${
+              className={`relative flex flex-col items-center gap-1 rounded-lg px-3 py-2 transition-colors duration-200 ${
                 isActive
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'
@@ -39,14 +40,22 @@ const MobileTabBar = ({ onOpenCoach }: MobileTabBarProps) => {
               <div className="relative">
                 <Icon className={`h-5 w-5 ${isActive ? 'stroke-[2.5]' : ''}`} />
                 {isActive && (
-                  <div className="absolute -inset-1 rounded-full bg-primary/20 blur-sm -z-10" />
+                  <motion.div
+                    layoutId="tab-glow"
+                    className="absolute -inset-1 rounded-full bg-primary/20 blur-sm -z-10"
+                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                  />
                 )}
               </div>
               <span className={`text-[10px] font-medium ${isActive ? 'font-semibold' : ''}`}>
                 {tab.label}
               </span>
               {isActive && (
-                <div className="absolute -bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-primary shadow-glow-sm" />
+                <motion.div
+                  layoutId="tab-indicator"
+                  className="absolute -bottom-1 h-1 w-1 rounded-full bg-primary shadow-glow-sm"
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                />
               )}
             </button>
           );
@@ -58,11 +67,14 @@ const MobileTabBar = ({ onOpenCoach }: MobileTabBarProps) => {
         onClick={onOpenCoach}
         className="relative flex flex-col items-center gap-0.5 -mt-5 mr-2 transition-all duration-200"
       >
-        <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary via-primary to-primary-glow shadow-glow-lg hover:scale-105 transition-all">
+        <motion.div
+          whileTap={{ scale: 0.92 }}
+          className="relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary via-primary to-primary-glow shadow-glow-lg hover:scale-105 transition-all"
+        >
           <div className="absolute inset-0 rounded-full bg-gradient-to-t from-transparent to-white/20" />
           <div className="absolute -inset-1 rounded-full bg-primary/30 animate-glow-pulse -z-10" />
           <MessageCircle className="h-7 w-7 text-primary-foreground stroke-2" />
-        </div>
+        </motion.div>
         <span className="text-xs font-semibold mt-0.5 text-primary">
           Coach
         </span>

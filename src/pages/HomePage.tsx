@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useNutritionGoals } from '@/hooks/useNutritionGoals';
@@ -16,6 +17,21 @@ import HealthStatsCard from '@/components/home/HealthStatsCard';
 import CircularProgressRings from '@/components/home/CircularProgressRings';
 import NextWorkoutCard from '@/components/training/NextWorkoutCard';
 import EquipmentSection from '@/components/training/EquipmentSection';
+
+const stagger = {
+  animate: {
+    transition: { staggerChildren: 0.08 },
+  },
+};
+
+const fadeUp = {
+  initial: { opacity: 0, y: 16 },
+  animate: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, ease: [0.25, 0.1, 0.25, 1] },
+  },
+};
 
 const HomePage = () => {
   const { user } = useAuth();
@@ -71,44 +87,57 @@ const HomePage = () => {
   }
 
   return (
-    <div className="safe-top px-4 pb-24 md:pb-4 pt-2">
+    <motion.div
+      className="safe-top px-4 pb-24 md:pb-4 pt-2"
+      variants={stagger}
+      initial="initial"
+      animate="animate"
+    >
       {/* Header */}
-      <AppHeader title="The Perfect Coach" logo />
+      <motion.div variants={fadeUp}>
+        <AppHeader title="The Perfect Coach" logo />
+      </motion.div>
 
       {/* Circular Progress Rings */}
-      <CircularProgressRings
-        caloriesConsumed={caloriesConsumed}
-        caloriesGoal={caloriesGoal}
-        proteinConsumed={proteinConsumed}
-        proteinGoal={proteinGoal}
-        carbsConsumed={carbsConsumed}
-        carbsGoal={carbsGoal}
-        onRingClick={handleRingClick}
-      />
+      <motion.div variants={fadeUp}>
+        <CircularProgressRings
+          caloriesConsumed={caloriesConsumed}
+          caloriesGoal={caloriesGoal}
+          proteinConsumed={proteinConsumed}
+          proteinGoal={proteinGoal}
+          carbsConsumed={carbsConsumed}
+          carbsGoal={carbsGoal}
+          onRingClick={handleRingClick}
+        />
+      </motion.div>
 
       {/* Health Stats Section */}
-      <HealthStatsCard
-        stats={healthStats ?? {
-          sleepHours: null,
-          steps: null,
-          heartRateAvg: null,
-          heartRateResting: null,
-          activeMinutes: null,
-          floorsClimbed: null,
-        }}
-        isLoading={false}
-        targetSteps={profile?.target_steps ?? 10000}
-        targetSleepHours={profile?.target_sleep_hours ?? 8}
-        onStatClick={handleStatClick}
-      />
+      <motion.div variants={fadeUp}>
+        <HealthStatsCard
+          stats={healthStats ?? {
+            sleepHours: null,
+            steps: null,
+            heartRateAvg: null,
+            heartRateResting: null,
+            activeMinutes: null,
+            floorsClimbed: null,
+          }}
+          isLoading={false}
+          targetSteps={profile?.target_steps ?? 10000}
+          targetSleepHours={profile?.target_sleep_hours ?? 8}
+          onStatClick={handleStatClick}
+        />
+      </motion.div>
 
       {/* Next Workout Card */}
-      <div className="mb-4">
+      <motion.div variants={fadeUp} className="mb-4">
         <NextWorkoutCard />
-      </div>
+      </motion.div>
 
       {/* Equipment Section */}
-      <EquipmentSection />
+      <motion.div variants={fadeUp}>
+        <EquipmentSection />
+      </motion.div>
 
       {/* Stat History Sheet */}
       {statHistoryKey && statHistoryConfig[statHistoryKey] && (
@@ -121,7 +150,7 @@ const HomePage = () => {
           userId={user?.id}
         />
       )}
-    </div>
+    </motion.div>
   );
 };
 

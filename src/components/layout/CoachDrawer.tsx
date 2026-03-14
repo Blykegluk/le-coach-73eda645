@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Plus, Camera, Mic, Loader2, X, ArrowDown } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import ImageCapture from '@/components/chat/ImageCapture';
 import VoiceRecorder from '@/components/chat/VoiceRecorder';
@@ -55,20 +56,30 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
     return () => timers.forEach(clearTimeout);
   }, [isOpen, messages, isLoadingHistory, scrollToEnd]);
 
-  if (!isOpen) return (
-    <>
-      <ImageCapture isOpen={showImageCapture} onClose={() => setShowImageCapture(false)} onImageCaptured={handleImageCaptured} userId={userId} />
-      <VoiceRecorder isOpen={showVoiceRecorder} onClose={() => setShowVoiceRecorder(false)} onTranscription={handleVoiceTranscription} />
-    </>
-  );
-
   return (
     <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-50 bg-black/60" onClick={onClose} />
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-50 bg-black/60"
+              onClick={onClose}
+            />
 
-      {/* Panel */}
-      <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col bg-background rounded-t-2xl border-t border-border/50" style={{ height: '85vh' }}>
+            {/* Panel */}
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="fixed inset-x-0 bottom-0 z-50 flex flex-col bg-background rounded-t-2xl border-t border-border/50"
+              style={{ height: '85vh' }}
+            >
         {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
           <div className="h-1.5 w-12 rounded-full bg-muted" />
@@ -202,7 +213,7 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
             </button>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Action menu overlay */}
       {showActions && (
@@ -227,6 +238,9 @@ const CoachDrawer = ({ isOpen, onClose }: CoachDrawerProps) => {
           </div>
         </div>
       )}
+          </>
+        )}
+      </AnimatePresence>
 
       <ImageCapture isOpen={showImageCapture} onClose={() => setShowImageCapture(false)} onImageCaptured={handleImageCaptured} userId={userId} />
       <VoiceRecorder isOpen={showVoiceRecorder} onClose={() => setShowVoiceRecorder(false)} onTranscription={handleVoiceTranscription} />

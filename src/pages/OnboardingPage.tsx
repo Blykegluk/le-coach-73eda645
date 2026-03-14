@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, ChevronLeft, User, Scale, Target, Loader2 } from 'lucide-react';
+import { ChevronRight, ChevronLeft, User, Scale, Target, Loader2, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
@@ -33,14 +34,46 @@ const GENDERS = [
   { value: 'other', label: 'Autre' },
 ];
 
+const stepVariants = {
+  enter: (direction: number) => ({
+    x: direction > 0 ? 80 : -80,
+    opacity: 0,
+  }),
+  center: {
+    x: 0,
+    opacity: 1,
+    transition: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+  },
+  exit: (direction: number) => ({
+    x: direction > 0 ? -80 : 80,
+    opacity: 0,
+    transition: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] },
+  }),
+};
+
+const welcomeVariants = {
+  initial: { opacity: 0, scale: 0.9 },
+  animate: {
+    opacity: 1,
+    scale: 1,
+    transition: { duration: 0.5, ease: [0.25, 0.1, 0.25, 1] },
+  },
+  exit: {
+    opacity: 0,
+    scale: 1.05,
+    transition: { duration: 0.3 },
+  },
+};
+
 export default function OnboardingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0); // 0 = welcome, 1-3 = form steps
+  const [direction, setDirection] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  const [formData, setFormData] = useState<Partial<OnboardingData> & { 
+
+  const [formData, setFormData] = useState<Partial<OnboardingData> & {
     custom_goal_label?: string;
     current_body_fat_pct?: number;
     target_body_fat_pct?: number;
@@ -103,19 +136,26 @@ export default function OnboardingPage() {
   };
 
   const handleNext = () => {
+    if (step === 0) {
+      setDirection(1);
+      setStep(1);
+      return;
+    }
     if (!validateStep()) return;
+    setDirection(1);
     setStep(prev => Math.min(prev + 1, 3));
   };
 
   const handleBack = () => {
-    setStep(prev => Math.max(prev - 1, 1));
+    setDirection(-1);
+    setStep(prev => Math.max(prev - 1, 0));
     setError(null);
   };
 
   const handleSubmit = async () => {
     if (!validateStep()) return;
     if (!user) return;
-    
+
     setIsSubmitting(true);
     setError(null);
 
@@ -135,20 +175,17 @@ export default function OnboardingPage() {
         onboarding_complete: true,
       };
 
-      // Upsert guarantees the row exists (update if present, insert otherwise)
       const { error: upsertError } = await supabase
         .from('profiles')
         .upsert(profilePayload, { onConflict: 'user_id' });
 
       if (upsertError) {
         console.error('Error upserting profile:', upsertError);
-        // Show more detail in dev mode
         const detail = upsertError.message || upsertError.code || 'Unknown error';
         setError(`Erreur lors de la sauvegarde: ${detail}`);
         return;
       }
 
-      // Also set initial weight in daily_metrics
       const today = new Date().toISOString().split('T')[0];
       const { error: metricsError } = await supabase
         .from('daily_metrics')
@@ -162,7 +199,6 @@ export default function OnboardingPage() {
         );
 
       if (metricsError) {
-        // Non-blocking, but log it so we can debug if needed
         console.error('Error upserting daily_metrics:', metricsError);
       }
 
@@ -175,18 +211,91 @@ export default function OnboardingPage() {
   const renderStepIndicator = () => (
     <div className="mb-8 flex items-center justify-center gap-2">
       {[1, 2, 3].map(s => (
-        <div
+        <motion.div
           key={s}
-          className={`h-2 w-8 rounded-full transition-all ${
-            s === step
-              ? 'bg-primary'
+          className="h-2 rounded-full"
+          animate={{
+            width: s === step ? 32 : 16,
+            backgroundColor: s === step
+              ? 'hsl(var(--primary))'
               : s < step
-              ? 'bg-primary/40'
-              : 'bg-muted'
-          }`}
+              ? 'hsl(var(--primary) / 0.4)'
+              : 'hsl(var(--muted))',
+          }}
+          transition={{ duration: 0.3, ease: 'easeInOut' }}
         />
       ))}
     </div>
+  );
+
+  const renderWelcome = () => (
+    <motion.div
+      variants={welcomeVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="flex flex-col items-center justify-center text-center py-12"
+    >
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 15 }}
+        className="mb-8"
+      >
+        <div className="relative">
+          <img src="/logo.png" alt="The Perfect Coach" className="h-24 mx-auto" />
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5, duration: 0.5 }}
+            className="absolute -inset-4 rounded-3xl bg-primary/10 blur-xl -z-10"
+          />
+        </div>
+      </motion.div>
+
+      <motion.h1
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.5 }}
+        className="text-3xl font-bold text-foreground mb-3"
+      >
+        Bienvenue !
+      </motion.h1>
+
+      <motion.p
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4, duration: 0.5 }}
+        className="text-muted-foreground text-lg mb-8 max-w-xs"
+      >
+        Ton coach IA personnel pour le sport et la nutrition. Configurons ton profil en 1 minute.
+      </motion.p>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6, duration: 0.5 }}
+        className="space-y-3 w-full max-w-xs text-left"
+      >
+        {[
+          { icon: '🏋️', text: 'Séances personnalisées' },
+          { icon: '🥗', text: 'Suivi nutritionnel intelligent' },
+          { icon: '📈', text: 'Progression en temps réel' },
+          { icon: '🤖', text: 'Coach IA disponible 24/7' },
+        ].map((item, i) => (
+          <motion.div
+            key={item.text}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.7 + i * 0.1, duration: 0.3 }}
+            className="flex items-center gap-3 rounded-xl bg-card/50 border border-border/30 p-3"
+          >
+            <span className="text-xl">{item.icon}</span>
+            <span className="text-sm font-medium text-foreground">{item.text}</span>
+          </motion.div>
+        ))}
+      </motion.div>
+    </motion.div>
   );
 
   const renderStep1 = () => (
@@ -384,21 +493,54 @@ export default function OnboardingPage() {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background px-4 py-8 safe-top safe-bottom overflow-y-auto">
       <div className="mx-auto w-full max-w-md flex-1">
-        {renderStepIndicator()}
+        {step > 0 && renderStepIndicator()}
 
-        <Card className="border-none bg-transparent shadow-none">
-          <CardContent className="p-0">
-            {step === 1 && renderStep1()}
-            {step === 2 && renderStep2()}
-            {step === 3 && renderStep3()}
-          </CardContent>
-        </Card>
+        <AnimatePresence mode="wait" custom={direction}>
+          {step === 0 ? (
+            <motion.div key="welcome">
+              {renderWelcome()}
+            </motion.div>
+          ) : (
+            <motion.div
+              key={step}
+              custom={direction}
+              variants={stepVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+            >
+              <Card className="border-none bg-transparent shadow-none">
+                <CardContent className="p-0">
+                  {step === 1 && renderStep1()}
+                  {step === 2 && renderStep2()}
+                  {step === 3 && renderStep3()}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {error && (
-          <p className="mt-4 text-center text-sm text-destructive">{error}</p>
-        )}
+        {/* Error message */}
+        <AnimatePresence>
+          {error && (
+            <motion.p
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="mt-4 text-center text-sm text-destructive"
+            >
+              {error}
+            </motion.p>
+          )}
+        </AnimatePresence>
 
-        <div className="mt-8 flex gap-3">
+        {/* Navigation buttons */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: step === 0 ? 1 : 0.2, duration: 0.3 }}
+          className="mt-8 flex gap-3"
+        >
           {step > 1 && (
             <button
               onClick={handleBack}
@@ -417,6 +559,11 @@ export default function OnboardingPage() {
           >
             {isSubmitting ? (
               <Loader2 className="h-5 w-5 animate-spin" />
+            ) : step === 0 ? (
+              <>
+                <Sparkles className="h-5 w-5" />
+                C'est parti !
+              </>
             ) : step === 3 ? (
               'Commencer 🚀'
             ) : (
@@ -426,7 +573,7 @@ export default function OnboardingPage() {
               </>
             )}
           </button>
-        </div>
+        </motion.div>
       </div>
     </div>
   );
