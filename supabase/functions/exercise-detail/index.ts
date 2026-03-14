@@ -13,10 +13,22 @@ const corsHeaders = {
  */
 async function generatePositionsImage(exerciseName: string, apiKey: string): Promise<string | null> {
   try {
-    const prompt = `Generate a single wide illustration showing TWO positions of the exercise "${exerciseName}" side by side:
-- LEFT side: the starting position
-- RIGHT side: the ending/contracted position
-Same person, same angle, same style throughout. The style should be like a professional fitness anatomy textbook (Strength Training Anatomy by Frederic Delavier): realistic human body proportions, visible muscle definition and shading, semi-transparent skin showing underlying engaged muscles. 3/4 or side view, plain white background. An arrow or visual flow from left to right showing the movement progression. No text, no labels. Clean, high-quality, detailed anatomical drawing. Wide landscape format.`;
+    const prompt = `Create a single wide landscape illustration of the exercise "${exerciseName}" showing exactly TWO key positions of the movement placed side by side (LEFT = starting position, RIGHT = peak/contracted position).
+
+STYLE (MANDATORY — follow precisely):
+- Anatomical écorché figure: the human body is depicted WITHOUT SKIN, showing the raw musculature directly (like classical anatomical drawings by Vesalius or the book "Strength Training Anatomy" by Frédéric Delavier).
+- Every visible muscle fiber, tendon, and muscle belly must be rendered with realistic shading and volume.
+- The muscles actively engaged in the exercise should appear more saturated in red/crimson. Secondary muscles in natural pinkish tone.
+- Realistic human proportions, athletic male build.
+- Both figures must be the SAME person from the SAME camera angle (3/4 view preferred).
+- A curved arrow between the two positions indicating the direction of movement.
+
+TECHNICAL:
+- Plain white background, no gym equipment except what the exercise requires (barbell, dumbbell, bench, cable, etc.).
+- No text, no labels, no annotations, no watermarks.
+- High detail, crisp lines, professional medical illustration quality.
+- Wide landscape aspect ratio (roughly 2:1).
+- Both positions should clearly show the difference in joint angles and muscle engagement between start and end of the movement.`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`,
@@ -61,7 +73,17 @@ async function generateMuscleDiagram(exerciseName: string, muscles: string[], ap
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: `Generate an anatomical muscle map illustration showing the muscles targeted during the exercise "${exerciseName}". Targeted muscles: ${muscleList}. Style: two human body silhouettes side by side (front view and back view), with the targeted muscles highlighted in bright red/orange color, and the rest of the body in light gray. Realistic anatomical muscle rendering, like a fitness anatomy textbook (Frederic Delavier style). White background. No text, no labels. Clean, professional, detailed.` }] }],
+          contents: [{ parts: [{ text: `Create an anatomical muscle map for the exercise "${exerciseName}".
+
+Show exactly TWO full-body écorché figures side by side:
+- LEFT figure: front/anterior view
+- RIGHT figure: back/posterior view
+
+The targeted muscles (${muscleList}) must be highlighted in vivid red/crimson with strong saturation. All other muscles rendered in pale gray/beige with subtle shading to show muscle definition.
+
+STYLE: Frédéric Delavier "Strength Training Anatomy" — skinless anatomical figure, every muscle group clearly delineated with clean outlines and realistic shading. Athletic male build, neutral standing pose (arms slightly away from body so all muscles visible).
+
+TECHNICAL: White background. No text, no labels, no annotations. High detail, professional medical illustration quality. Portrait orientation.` }] }],
           generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
         }),
       }

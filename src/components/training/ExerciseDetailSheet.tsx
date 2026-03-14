@@ -25,8 +25,61 @@ interface ExerciseDetail {
   muscle_diagram: string | null; // URL from storage
 }
 
-const CACHE_KEY_PREFIX = 'exercise_detail_v6_';
+const CACHE_KEY_PREFIX = 'exercise_detail_v7_';
 const CACHE_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Pre-fetch exercise details in the background for a list of exercise names.
+ * Skips exercises already in localStorage cache.
+ * Called when a workout is loaded to avoid wait time when user opens detail.
+ */
+export async function prefetchExerciseDetails(exerciseNames: string[]) {
+  const uncached = exerciseNames.filter(name => {
+    const cacheKey = `${CACHE_KEY_PREFIX}${name.toLowerCase().replace(/\s+/g, '_')}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (!cached) return true;
+    try {
+      const { timestamp } = JSON.parse(cached);
+      return Date.now() - timestamp >= CACHE_EXPIRY_MS;
+    } catch {
+      return true;
+    }
+  });
+
+  if (uncached.length === 0) return;
+
+  // Fetch sequentially to avoid rate limits (max 2 concurrent)
+  const { data: { session } } = await (await import('@/integrations/supabase/client')).supabase.auth.getSession();
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/exercise-detail`;
+
+  for (const name of uncached) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          ...(session ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ exerciseName: name }),
+      });
+
+      if (!response.ok) continue;
+      const data = await response.json();
+      if (data?.error) continue;
+
+      const cacheKey = `${CACHE_KEY_PREFIX}${name.toLowerCase().replace(/\s+/g, '_')}`;
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
+      } catch {
+        // storage full, stop prefetching
+        break;
+      }
+    } catch {
+      // network error, skip
+    }
+  }
+}
 
 export const ExerciseDetailSheet = ({
   isOpen,
@@ -97,9 +150,9 @@ export const ExerciseDetailSheet = ({
 
       setDetail(data);
       // Cache the data - now safe since we use URLs instead of base64
-      const cacheKey = `${CACHE_KEY_PREFIX}${exerciseName.toLowerCase().replace(/\s+/g, '_')}`;
+      const cacheKey2 = `${CACHE_KEY_PREFIX}${exerciseName.toLowerCase().replace(/\s+/g, '_')}`;
       try {
-        localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
+        localStorage.setItem(cacheKey2, JSON.stringify({ data, timestamp: Date.now() }));
       } catch (e) {
         console.warn('Cache write failed, skipping', e);
       }

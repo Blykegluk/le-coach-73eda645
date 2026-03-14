@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { getExerciseIcon } from './ExerciseIcons';
 import { ActiveWorkoutSession } from './ActiveWorkoutSession';
-import { ExerciseDetailSheet } from './ExerciseDetailSheet';
+import { ExerciseDetailSheet, prefetchExerciseDetails } from './ExerciseDetailSheet';
 import { WorkoutTemplatesSheet } from './WorkoutTemplatesSheet';
 import { useAddWorkoutTemplate } from '@/hooks/queries/useWorkoutTemplates';
 import { toast } from 'sonner';
@@ -151,6 +151,13 @@ export const NextWorkoutCard = () => {
       initWorkout();
     }
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Prefetch exercise details (images) in background when workout is available
+  useEffect(() => {
+    if (workout?.exercises?.length) {
+      prefetchExerciseDetails(workout.exercises.map(e => e.name));
+    }
+  }, [workout]);
 
   // Subscribe to realtime changes on user_context (e.g. coach updates workout)
   useEffect(() => {
