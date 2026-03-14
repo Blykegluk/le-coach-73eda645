@@ -25,7 +25,7 @@ interface ExerciseDetail {
   muscle_diagram: string | null; // URL from storage
 }
 
-const CACHE_KEY_PREFIX = 'exercise_detail_v7_';
+const CACHE_KEY_PREFIX = 'exercise_detail_v8_';
 const CACHE_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**

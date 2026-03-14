@@ -11,24 +11,29 @@ const corsHeaders = {
  * Generate a SINGLE image containing both start and end positions side by side
  * This ensures visual coherence (same person, same style, same angle)
  */
-async function generatePositionsImage(exerciseName: string, apiKey: string): Promise<string | null> {
+async function generatePositionsImage(exerciseName: string, movementDescription: string, apiKey: string): Promise<string | null> {
   try {
-    const prompt = `Create a single wide landscape illustration of the exercise "${exerciseName}" showing exactly TWO key positions of the movement placed side by side (LEFT = starting position, RIGHT = peak/contracted position).
+    const prompt = `Create a single wide landscape illustration showing exactly TWO key positions of the exercise "${exerciseName}" placed side by side (LEFT = starting position, RIGHT = peak/end position).
 
-STYLE (MANDATORY — follow precisely):
-- Anatomical écorché figure: the human body is depicted WITHOUT SKIN, showing the raw musculature directly (like classical anatomical drawings by Vesalius or the book "Strength Training Anatomy" by Frédéric Delavier).
-- Every visible muscle fiber, tendon, and muscle belly must be rendered with realistic shading and volume.
-- The muscles actively engaged in the exercise should appear more saturated in red/crimson. Secondary muscles in natural pinkish tone.
+EXERCISE DESCRIPTION (use this to understand the exact body positions):
+${movementDescription}
+
+POSITION REQUIREMENTS:
+- The LEFT figure must show the exact starting position described above.
+- The RIGHT figure must show the exact end/peak position described above.
+- The two positions MUST be visually DIFFERENT — different joint angles, different limb positions. If the exercise involves extending an arm or leg, the LEFT should show it tucked/bent and the RIGHT should show it fully extended.
+- A curved red arrow between the two figures indicating the direction of movement.
+
+STYLE (MANDATORY):
+- Anatomical écorché figure: human body WITHOUT SKIN, showing raw musculature (like "Strength Training Anatomy" by Frédéric Delavier).
+- Muscles actively engaged in the exercise highlighted in red/crimson. Other muscles in natural pinkish tone.
 - Realistic human proportions, athletic male build.
-- Both figures must be the SAME person from the SAME camera angle (3/4 view preferred).
-- A curved arrow between the two positions indicating the direction of movement.
+- Both figures must be the SAME person from the SAME camera angle.
 
 TECHNICAL:
-- Plain white background, no gym equipment except what the exercise requires (barbell, dumbbell, bench, cable, etc.).
-- No text, no labels, no annotations, no watermarks.
-- High detail, crisp lines, professional medical illustration quality.
-- Wide landscape aspect ratio (roughly 2:1).
-- Both positions should clearly show the difference in joint angles and muscle engagement between start and end of the movement.`;
+- Plain white background, only necessary equipment (barbell, dumbbell, bench, etc.).
+- No text, no labels, no annotations.
+- Wide landscape aspect ratio (roughly 2:1).`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`,
@@ -179,8 +184,8 @@ serve(async (req) => {
     console.log(`Generating exercise detail for: ${exerciseName}`);
 
     // Check if images already exist in storage
-    const positionsPath = `exercise-images/${normalizedName}_positions.png`;
-    const musclePath = `exercise-images/${normalizedName}_muscles.png`;
+    const positionsPath = `exercise-images-v2/${normalizedName}_positions.png`;
+    const musclePath = `exercise-images-v2/${normalizedName}_muscles.png`;
 
     const { data: existingFiles } = await supabase.storage
       .from("chat-uploads")
@@ -256,7 +261,7 @@ Règles:
     if (!hasPositions || !hasMuscles) {
       console.log("Generating exercise illustrations via Gemini...");
       const [positionsBase64, muscleBase64] = await Promise.all([
-        !hasPositions ? generatePositionsImage(exerciseName, GEMINI_API_KEY) : Promise.resolve(null),
+        !hasPositions ? generatePositionsImage(exerciseName, aiDetail.how_to || '', GEMINI_API_KEY) : Promise.resolve(null),
         !hasMuscles ? generateMuscleDiagram(exerciseName, aiDetail.muscles_targeted || [], GEMINI_API_KEY) : Promise.resolve(null),
       ]);
 
