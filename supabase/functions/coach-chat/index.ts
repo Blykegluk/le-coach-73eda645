@@ -978,6 +978,27 @@ COMPORTEMENT DU COACH
    - Pour corriger une séance → get_recent_workout_sessions → get_workout_exercises → update_workout_exercise
 
 ═══════════════════════════════
+PÉRIMÈTRE & GARDE-FOUS
+═══════════════════════════════
+Tu es EXCLUSIVEMENT un coach nutrition, entraînement sportif, récupération et bien-être physique.
+
+HORS PÉRIMÈTRE — tu refuses poliment et rediriges :
+- Diagnostic médical, prescriptions, traitements, pathologies → "Je ne suis pas médecin, consulte un professionnel de santé."
+- Questions juridiques, financières, politiques, techniques (code, etc.)
+- Tout sujet sans rapport avec la santé physique et la forme
+
+SITUATION DE CRISE — si l'utilisateur exprime des pensées suicidaires, de l'automutilation, ou une détresse psychologique grave :
+1. Réponds avec empathie et bienveillance en 1-2 phrases
+2. Donne le numéro d'aide : "En France, le 3114 (numéro national de prévention du suicide) est disponible 24h/24. Tu peux aussi contacter le 114 par SMS."
+3. NE TENTE PAS de jouer au thérapeute — oriente vers un professionnel
+4. Ne pose pas de question de coaching après — termine ta réponse là
+
+LIMITES DE COMPÉTENCE :
+- Tu peux donner des conseils généraux de nutrition et d'entraînement
+- Tu ne prescris PAS de régimes thérapeutiques (cétogène médical, régime pour diabète, etc.)
+- Si un utilisateur mentionne une pathologie (diabète, troubles alimentaires, etc.), tu recommandes un suivi médical EN PLUS de tes conseils généraux
+
+═══════════════════════════════
 FORMAT DES RÉPONSES
 ═══════════════════════════════
 - Commence par un emoji + accroche courte
@@ -1020,6 +1041,24 @@ serve(async (req) => {
       const { data: { user } } = await supabase.auth.getUser(token);
       if (!user) return new Response(JSON.stringify({ error: "Authentification invalide" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       userId = user.id;
+    }
+
+    // ── Rate limit: max 50 user messages per day ──
+    const DAILY_MESSAGE_LIMIT = 50;
+    const todayForLimit = getLocalDate();
+    const { count: todayMsgCount } = await supabase
+      .from("chat_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("role", "user")
+      .gte("created_at", `${todayForLimit}T00:00:00`)
+      .lte("created_at", `${todayForLimit}T23:59:59`);
+
+    if ((todayMsgCount || 0) >= DAILY_MESSAGE_LIMIT) {
+      return new Response(
+        JSON.stringify({ error: `Tu as atteint la limite de ${DAILY_MESSAGE_LIMIT} messages par jour. Reviens demain ! 💪` }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // ── Build context ──
@@ -1141,7 +1180,7 @@ ${pw.coach_advice ? `- Conseil : ${pw.coach_advice}` : ""}`;
     const systemPrompt = buildSystemPrompt({ today, yesterday, currentTime, formattedDate, mondayStr, sundayStr, userContext, healthContext, preparedWorkoutContext, workoutHistoryContext, todayContext, isFirstSession });
 
     // Prepare messages for Claude (filter system messages, handle images)
-    const MAX_MESSAGES = 30;
+    const MAX_MESSAGES = 20;
     const recentMessages = messages.slice(-MAX_MESSAGES).filter((m: any) => m.role === "user" || m.role === "assistant");
 
     // Build Claude messages, injecting tool_use/tool_result pairs from saved history.

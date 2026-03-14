@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
-import { format, startOfDay, isToday, isYesterday, parseISO } from 'date-fns';
+import { useState, useCallback } from 'react';
+import { format, isToday, isYesterday } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useQueryClient } from '@tanstack/react-query';
 import { Dumbbell, Droplets, ChevronLeft, ChevronRight, Plus, Calendar, Zap, UtensilsCrossed } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { useNavigate, useOutletContext } from 'react-router-dom';
@@ -10,187 +10,34 @@ import { getMealIcon, getMealColorClasses } from '@/utils/mealColors';
 import JournalEntryActions from '@/components/journal/JournalEntryActions';
 import CircularProgressRings from '@/components/home/CircularProgressRings';
 import AppHeader from '@/components/layout/AppHeader';
+import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useNutritionGoals } from '@/hooks/useNutritionGoals';
-
-interface JournalEntry {
-  id: string;
-  type: 'workout' | 'meal' | 'water';
-  title: string;
-  subtitle?: string;
-  mealType?: string;
-  time: Date;
-  meta?: string;
-  status?: string;
-}
+import { useJournalDay, useJournalRealtimeInvalidation, journalKeys, type JournalEntry } from '@/hooks/queries/useJournalQueries';
 
 const JournalPage = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [entries, setEntries] = useState<JournalEntry[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
   const [showActions, setShowActions] = useState(false);
-  const [daySummary, setDaySummary] = useState({ calories: 0, protein: 0, carbs: 0, waterMl: 0 });
   const navigate = useNavigate();
   const { onOpenCoach } = useOutletContext<{ onOpenCoach: () => void }>();
+  const { user } = useAuth();
   const { profile } = useProfile();
   const nutritionGoals = useNutritionGoals(profile);
   const caloriesGoal = nutritionGoals.calories;
   const proteinGoal = nutritionGoals.protein;
   const carbsGoal = nutritionGoals.carbs;
 
-  const loadEntries = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useJournalDay(user?.id, selectedDate);
+  useJournalRealtimeInvalidation(user?.id);
 
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const startOfDayDate = startOfDay(selectedDate);
-      const endOfDayDate = new Date(startOfDayDate);
-      endOfDayDate.setDate(endOfDayDate.getDate() + 1);
+  const handleEntryUpdated = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: journalKeys.all });
+  }, [queryClient]);
 
-      const allEntries: JournalEntry[] = [];
-
-      const { data: workouts } = await supabase
-        .from('workout_sessions')
-        .select('id, workout_name, started_at, completed_at, total_duration_seconds, target_muscles, status, calories_burned, notes')
-        .eq('user_id', user.id)
-        .eq('status', 'completed')
-        .gte('started_at', startOfDayDate.toISOString())
-        .lt('started_at', endOfDayDate.toISOString())
-        .order('started_at', { ascending: true });
-
-      if (workouts) {
-        workouts.forEach(w => {
-          const duration = w.total_duration_seconds
-            ? `${Math.round(w.total_duration_seconds / 60)} min`
-            : 'Terminée';
-          allEntries.push({
-            id: `workout-${w.id}`,
-            type: 'workout',
-            title: w.workout_name,
-            subtitle: w.target_muscles?.join(', ') || w.notes || 'Entraînement',
-            time: parseISO(w.started_at),
-            meta: `${duration}${w.calories_burned ? ` · ${w.calories_burned} kcal` : ''}`,
-            status: 'completed',
-          });
-        });
-      }
-
-      const { data: meals } = await supabase
-        .from('nutrition_logs')
-        .select('id, food_name, meal_type, calories, protein, carbs, logged_at')
-        .eq('user_id', user.id)
-        .gte('logged_at', startOfDayDate.toISOString())
-        .lt('logged_at', endOfDayDate.toISOString())
-        .order('logged_at', { ascending: true });
-
-      let totalCalories = 0;
-      let totalProtein = 0;
-      let totalCarbs = 0;
-
-      if (meals) {
-        meals.forEach(m => {
-          const mealTypeLabels: Record<string, string> = {
-            breakfast: 'Petit-déjeuner',
-            lunch: 'Déjeuner',
-            dinner: 'Dîner',
-            snack: 'Collation',
-          };
-          totalCalories += m.calories || 0;
-          totalProtein += m.protein || 0;
-          totalCarbs += m.carbs || 0;
-          allEntries.push({
-            id: `meal-${m.id}`,
-            type: 'meal',
-            title: m.food_name,
-            subtitle: mealTypeLabels[m.meal_type] || m.meal_type,
-            mealType: m.meal_type,
-            time: parseISO(m.logged_at),
-            meta: m.calories ? `${m.calories} kcal` : undefined,
-          });
-        });
-      }
-
-      const { data: metrics } = await supabase
-        .from('daily_metrics')
-        .select('water_ml, updated_at')
-        .eq('user_id', user.id)
-        .eq('date', dateStr)
-        .maybeSingle();
-
-      const waterMl = metrics?.water_ml || 0;
-
-      if (waterMl) {
-        allEntries.push({
-          id: `water-${dateStr}`,
-          type: 'water',
-          title: 'Hydratation',
-          subtitle: `${waterMl} ml`,
-          time: parseISO(metrics!.updated_at),
-          meta: `${Math.round((waterMl / 2000) * 100)}%`,
-        });
-      }
-
-      allEntries.sort((a, b) => a.time.getTime() - b.time.getTime());
-      setEntries(allEntries);
-      setDaySummary({ calories: Math.round(totalCalories), protein: Math.round(totalProtein), carbs: Math.round(totalCarbs), waterMl });
-    } catch (error) {
-      console.error('Error loading journal entries:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [selectedDate]);
-
-  // Load entries on date change
-  useEffect(() => {
-    loadEntries();
-  }, [loadEntries]);
-
-  // Real-time subscription to refresh journal when data changes
-  useEffect(() => {
-    const setupRealtimeSubscription = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const nutritionChannel = supabase
-        .channel('journal_nutrition_changes')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'nutrition_logs', filter: `user_id=eq.${user.id}` },
-          () => { loadEntries(); }
-        )
-        .subscribe();
-
-      const workoutChannel = supabase
-        .channel('journal_workout_changes')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'workout_sessions', filter: `user_id=eq.${user.id}` },
-          () => { loadEntries(); }
-        )
-        .subscribe();
-
-      const metricsChannel = supabase
-        .channel('journal_metrics_changes')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'daily_metrics', filter: `user_id=eq.${user.id}` },
-          () => { loadEntries(); }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(nutritionChannel);
-        supabase.removeChannel(workoutChannel);
-        supabase.removeChannel(metricsChannel);
-      };
-    };
-
-    const cleanup = setupRealtimeSubscription();
-    return () => { cleanup.then(fn => fn?.()); };
-  }, [loadEntries]);
+  const entries = data?.entries ?? [];
+  const daySummary = data?.summary ?? { calories: 0, protein: 0, carbs: 0, waterMl: 0 };
 
   const navigateDay = (direction: 'prev' | 'next') => {
     const newDate = new Date(selectedDate);
@@ -347,7 +194,7 @@ const JournalPage = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate('/nutrition')}
+                onClick={() => onOpenCoach?.()}
                 className="gap-2"
               >
                 <UtensilsCrossed className="h-4 w-4" />
@@ -401,7 +248,7 @@ const JournalPage = () => {
         entry={selectedEntry}
         isOpen={showActions}
         onClose={() => setShowActions(false)}
-        onEntryUpdated={loadEntries}
+        onEntryUpdated={handleEntryUpdated}
       />
     </div>
   );

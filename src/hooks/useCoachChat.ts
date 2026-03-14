@@ -220,7 +220,12 @@ export function useCoachChat(onNavigateAway?: () => void) {
 
       if (!response.ok) {
         const errorBody = await response.text();
-        throw new Error(errorBody || `Erreur ${response.status}`);
+        let errorMessage = `Erreur ${response.status}`;
+        try {
+          const parsed = JSON.parse(errorBody);
+          if (parsed.error) errorMessage = parsed.error;
+        } catch { /* use default */ }
+        throw new Error(errorMessage);
       }
 
       // Read SSE stream

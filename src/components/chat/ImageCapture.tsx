@@ -94,7 +94,7 @@ export default function ImageCapture({ isOpen, onClose, onImageCaptured, userId 
       // Get signed URL (bucket is private)
       const { data: urlData, error: urlError } = await supabase.storage
         .from('chat-uploads')
-        .createSignedUrl(data.path, 3600); // 1 hour expiry
+        .createSignedUrl(data.path, 60 * 60 * 24 * 30); // 30 days expiry
 
       if (urlError) throw urlError;
 
