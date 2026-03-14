@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Dumbbell, Clock, RefreshCw, AlertCircle, ChevronDown, ChevronUp, Play, Info } from 'lucide-react';
+import { Dumbbell, Clock, RefreshCw, AlertCircle, ChevronDown, ChevronUp, Play, Info, Bookmark, BookOpen } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -8,6 +8,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { getExerciseIcon } from './ExerciseIcons';
 import { ActiveWorkoutSession } from './ActiveWorkoutSession';
 import { ExerciseDetailSheet } from './ExerciseDetailSheet';
+import { WorkoutTemplatesSheet } from './WorkoutTemplatesSheet';
+import { useAddWorkoutTemplate } from '@/hooks/queries/useWorkoutTemplates';
+import { toast } from 'sonner';
 
 interface Exercise {
   name: string;
@@ -38,6 +41,8 @@ export const NextWorkoutCard = () => {
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const addTemplate = useAddWorkoutTemplate(user?.id);
 
   // Load saved workout from database
   const loadSavedWorkout = useCallback(async () => {
@@ -176,6 +181,23 @@ export const NextWorkoutCard = () => {
     await generateNewWorkout();
   };
 
+  const handleSaveTemplate = () => {
+    if (!workout) return;
+    addTemplate.mutate(
+      { name: workout.workout_name, workout },
+      {
+        onSuccess: () => toast.success('Template sauvegardé !'),
+        onError: () => toast.error('Erreur lors de la sauvegarde'),
+      }
+    );
+  };
+
+  const handleLoadTemplate = async (templateWorkout: Workout) => {
+    setWorkout(templateWorkout);
+    await saveWorkout(templateWorkout);
+    toast.success('Template chargé !');
+  };
+
   const handleStartSession = () => {
     if (workout) {
       setIsSessionActive(true);
@@ -253,15 +275,35 @@ export const NextWorkoutCard = () => {
             </div>
             <h3 className="font-semibold text-foreground">{workout.workout_name}</h3>
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={handleRefresh} 
-            className="h-8 w-8"
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleSaveTemplate}
+              className="h-8 w-8"
+              title="Sauvegarder comme template"
+            >
+              <Bookmark className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTemplatesOpen(true)}
+              className="h-8 w-8"
+              title="Mes templates"
+            >
+              <BookOpen className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleRefresh}
+              className="h-8 w-8"
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         </div>
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <span className="flex items-center gap-1">
@@ -354,6 +396,13 @@ export const NextWorkoutCard = () => {
           </div>
         </div>
       )}
+
+      {/* Workout Templates Sheet */}
+      <WorkoutTemplatesSheet
+        isOpen={templatesOpen}
+        onClose={() => setTemplatesOpen(false)}
+        onSelect={handleLoadTemplate}
+      />
 
       {/* Exercise Detail Sheet */}
       <ExerciseDetailSheet

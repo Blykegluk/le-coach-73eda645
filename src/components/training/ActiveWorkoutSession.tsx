@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Play, Pause, SkipForward, SkipBack, Check, X, Edit2, Timer, Dumbbell, Info, AlertTriangle } from 'lucide-react';
+import { Play, Pause, SkipForward, SkipBack, Check, X, Edit2, Timer, Dumbbell, Info, AlertTriangle, ArrowRightLeft, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,9 @@ import { toast } from 'sonner';
 import { Workout } from './NextWorkoutCard';
 import { getExerciseIcon } from './ExerciseIcons';
 import { ExerciseDetailSheet } from './ExerciseDetailSheet';
+import { ExerciseSubstitutionSheet } from './ExerciseSubstitutionSheet';
 import ExerciseFeedbackButtons, { FeedbackType } from './ExerciseFeedbackButtons';
+import { useDetectPRs } from '@/hooks/queries/usePersonalRecords';
 interface ExerciseLog {
   exercise_name: string;
   exercise_order: number;
@@ -73,6 +75,9 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
   const [editingExercise, setEditingExercise] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ sets: '', reps: '', weight: '' });
   const [viewingExerciseIndex, setViewingExerciseIndex] = useState<number | null>(null);
+  const [substitutionOpen, setSubstitutionOpen] = useState(false);
+  const [newPRs, setNewPRs] = useState<string[]>([]);
+  const detectPRs = useDetectPRs();
 
   const currentExercise = workout.exercises[currentExerciseIndex];
   const currentLog = exerciseLogs[currentExerciseIndex];
@@ -264,6 +269,18 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
     setTimeout(() => setFeedbackMessage(null), 4000);
   }, [currentExerciseIndex, currentLog]);
 
+  // Substitute current exercise
+  const handleSubstitute = useCallback((newName: string) => {
+    setExerciseLogs(logs => logs.map((log, i) =>
+      i === currentExerciseIndex ? { ...log, exercise_name: newName } : log
+    ));
+    // Also update the workout object exercises array for display
+    workout.exercises[currentExerciseIndex] = {
+      ...workout.exercises[currentExerciseIndex],
+      name: newName,
+    };
+  }, [currentExerciseIndex, workout]);
+
   const handleEditExercise = (index: number) => {
     const log = exerciseLogs[index];
     setEditForm({
@@ -323,6 +340,32 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
 
       if (logsError) throw logsError;
 
+      // Detect personal records
+      try {
+        const prChecks = exerciseLogs
+          .filter(l => !l.skipped)
+          .map(l => {
+            const weightMatch = l.actual_weight.match(/(\d+(?:[.,]\d+)?)/);
+            const repsMatch = l.actual_reps.match(/(\d+)/);
+            const weight = weightMatch ? parseFloat(weightMatch[1].replace(',', '.')) : 0;
+            const reps = repsMatch ? parseInt(repsMatch[1]) : 0;
+            return {
+              exercise_name: l.exercise_name,
+              weight,
+              volume: l.actual_sets * reps * weight,
+            };
+          });
+
+        const prs = await detectPRs.mutateAsync({
+          userId: session.user.id,
+          sessionId,
+          exercises: prChecks,
+        });
+        if (prs.length > 0) setNewPRs(prs);
+      } catch (prErr) {
+        console.error('PR detection error:', prErr);
+      }
+
       // Also log as an activity
       await supabase
         .from('activities')
@@ -378,6 +421,22 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
               <p className="text-xs text-muted-foreground">Séries totales</p>
             </div>
           </div>
+
+          {newPRs.length > 0 && (
+            <div className="card-premium p-4 border-yellow-500/30 bg-yellow-500/5">
+              <div className="flex items-center gap-2 mb-2">
+                <Trophy className="h-5 w-5 text-yellow-500" />
+                <h3 className="font-semibold text-yellow-600">Nouveaux records !</h3>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {newPRs.map(name => (
+                  <span key={name} className="rounded-full bg-yellow-500/20 px-2.5 py-1 text-xs font-medium text-yellow-600">
+                    {name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           <h3 className="font-semibold mt-4">Récapitulatif des exercices</h3>
           <div className="space-y-2">
@@ -501,6 +560,9 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
                 <Info className="h-3.5 w-3.5" />
                 Détail
               </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => setSubstitutionOpen(true)}>
+                <ArrowRightLeft className="h-3.5 w-3.5" />
+              </Button>
               <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => handleEditExercise(currentExerciseIndex)}>
                 <Edit2 className="h-3.5 w-3.5" />
               </Button>
@@ -560,6 +622,22 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
             </p>
             <div className="card-premium px-6 py-3 mb-4 border-energy/30">
               <p className="font-mono text-3xl font-bold text-energy">{formatTime(restTimeRemaining)}</p>
+            </div>
+            {/* Custom rest timer buttons */}
+            <div className="flex gap-2">
+              {[30, 60, 90, 120].map(sec => (
+                <button
+                  key={sec}
+                  onClick={() => setRestTimeRemaining(sec)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    restTimeRemaining === sec
+                      ? 'bg-energy/20 text-energy border border-energy/30'
+                      : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {sec}s
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -652,6 +730,14 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Exercise Substitution Sheet */}
+      <ExerciseSubstitutionSheet
+        isOpen={substitutionOpen}
+        onClose={() => setSubstitutionOpen(false)}
+        exerciseName={currentExercise?.name || ''}
+        onSelect={handleSubstitute}
+      />
 
       {/* Exercise Detail Sheet - outside fixed container for proper z-index */}
       <ExerciseDetailSheet

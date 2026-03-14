@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Calendar, Dumbbell, Clock, Flame, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Dumbbell, Clock, Flame, ChevronDown, Weight } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, subWeeks, isWithinInterval } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
@@ -48,6 +48,7 @@ interface WeekData {
   sessions: number;
   totalMinutes: number;
   totalCalories: number;
+  totalVolume: number;
   activities: Activity[];
 }
 
@@ -123,8 +124,8 @@ const WeeklyCarousel = ({ userWeight = 70 }: WeeklyCarouselProps) => {
     const fetchAllActivities = async () => {
       if (!user) return;
 
-      // Fetch activities and workout sessions in parallel
-      const [activitiesRes, sessionsRes] = await Promise.all([
+      // Fetch activities, workout sessions, and exercise logs in parallel
+      const [activitiesRes, sessionsRes, logsRes] = await Promise.all([
         supabase
           .from('activities')
           .select('*')
@@ -138,10 +139,16 @@ const WeeklyCarousel = ({ userWeight = 70 }: WeeklyCarouselProps) => {
           .eq('status', 'completed')
           .order('started_at', { ascending: false })
           .limit(50),
+        supabase
+          .from('workout_exercise_logs')
+          .select('session_id, actual_sets, actual_reps, actual_weight, skipped')
+          .eq('user_id', user.id)
+          .limit(500),
       ]);
 
       const data = activitiesRes.data || [];
       const sessions = sessionsRes.data || [];
+      const allLogs = logsRes.data || [];
 
       // Map sessions by date for quick lookup
       const sessionsMap = new Map<string, WorkoutSession>();
@@ -150,6 +157,26 @@ const WeeklyCarousel = ({ userWeight = 70 }: WeeklyCarouselProps) => {
         sessionsMap.set(dateKey, s as WorkoutSession);
       });
       setWorkoutSessions(sessionsMap);
+
+      // Compute volume per session
+      const volumeBySession = new Map<string, number>();
+      allLogs.forEach((log: { session_id: string; actual_sets: number | null; actual_reps: string | null; actual_weight: string | null; skipped: boolean | null }) => {
+        if (log.skipped) return;
+        const sets = log.actual_sets || 0;
+        const repsMatch = (log.actual_reps || '').match(/(\d+)/);
+        const reps = repsMatch ? parseInt(repsMatch[1]) : 0;
+        const weightMatch = (log.actual_weight || '').match(/(\d+(?:[.,]\d+)?)/);
+        const weight = weightMatch ? parseFloat(weightMatch[1].replace(',', '.')) : 0;
+        const vol = sets * reps * weight;
+        volumeBySession.set(log.session_id, (volumeBySession.get(log.session_id) || 0) + vol);
+      });
+
+      // Map session volume to date
+      const volumeByDate = new Map<string, number>();
+      sessions.forEach(s => {
+        const dateKey = format(new Date(s.started_at), 'yyyy-MM-dd');
+        volumeByDate.set(dateKey, volumeBySession.get(s.id) || 0);
+      });
 
       // Generate last 8 weeks
       const now = new Date();
@@ -164,12 +191,16 @@ const WeeklyCarousel = ({ userWeight = 70 }: WeeklyCarouselProps) => {
         );
 
         const stats = weekActivities.reduce(
-          (acc, a) => ({
-            sessions: acc.sessions + 1,
-            totalMinutes: acc.totalMinutes + a.duration_min,
-            totalCalories: acc.totalCalories + estimateCalories(a as Activity, userWeight),
-          }),
-          { sessions: 0, totalMinutes: 0, totalCalories: 0 }
+          (acc, a) => {
+            const dateKey = format(new Date(a.performed_at), 'yyyy-MM-dd');
+            return {
+              sessions: acc.sessions + 1,
+              totalMinutes: acc.totalMinutes + a.duration_min,
+              totalCalories: acc.totalCalories + estimateCalories(a as Activity, userWeight),
+              totalVolume: acc.totalVolume + (volumeByDate.get(dateKey) || 0),
+            };
+          },
+          { sessions: 0, totalMinutes: 0, totalCalories: 0, totalVolume: 0 }
         );
 
         let label: string;
@@ -292,7 +323,7 @@ const WeeklyCarousel = ({ userWeight = 70 }: WeeklyCarouselProps) => {
             {/* Stats grid - clickable */}
             <div
               onClick={() => setDetailSheet({ isOpen: true, week: currentWeek })}
-              className="grid grid-cols-3 gap-4 text-center cursor-pointer hover:bg-primary/5 rounded-xl p-2 -m-2 transition-colors"
+              className="grid grid-cols-4 gap-3 text-center cursor-pointer hover:bg-primary/5 rounded-xl p-2 -m-2 transition-colors"
             >
               <div>
                 <p className="text-2xl font-bold text-gradient-primary">{currentWeek.sessions}</p>
@@ -304,8 +335,14 @@ const WeeklyCarousel = ({ userWeight = 70 }: WeeklyCarouselProps) => {
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">{currentWeek.totalCalories}</p>
-                <p className="text-xs text-muted-foreground">kcal brûlées</p>
+                <p className="text-xs text-muted-foreground">kcal</p>
               </div>
+              {currentWeek.totalVolume > 0 && (
+                <div>
+                  <p className="text-2xl font-bold text-foreground">{Math.round(currentWeek.totalVolume / 1000)}k</p>
+                  <p className="text-xs text-muted-foreground">volume</p>
+                </div>
+              )}
             </div>
 
             {/* Hint */}
@@ -343,19 +380,25 @@ const WeeklyCarousel = ({ userWeight = 70 }: WeeklyCarouselProps) => {
               <div className="space-y-3 pr-4">
                 {/* Summary card */}
                 <div className="card-premium p-4 mb-4">
-                  <div className="grid grid-cols-3 gap-4 text-center">
+                  <div className={`grid ${detailSheet.week.totalVolume > 0 ? 'grid-cols-4' : 'grid-cols-3'} gap-3 text-center`}>
                     <div>
                       <p className="text-xl font-bold text-gradient-primary">{detailSheet.week.sessions}</p>
                       <p className="text-xs text-muted-foreground">séances</p>
                     </div>
                     <div>
                       <p className="text-xl font-bold text-foreground">{detailSheet.week.totalMinutes}</p>
-                      <p className="text-xs text-muted-foreground">min totales</p>
+                      <p className="text-xs text-muted-foreground">min</p>
                     </div>
                     <div>
                       <p className="text-xl font-bold text-foreground">{detailSheet.week.totalCalories}</p>
                       <p className="text-xs text-muted-foreground">kcal</p>
                     </div>
+                    {detailSheet.week.totalVolume > 0 && (
+                      <div>
+                        <p className="text-xl font-bold text-foreground">{Math.round(detailSheet.week.totalVolume / 1000)}k</p>
+                        <p className="text-xs text-muted-foreground">volume</p>
+                      </div>
+                    )}
                   </div>
                 </div>
 

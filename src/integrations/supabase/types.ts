@@ -443,6 +443,68 @@ export type Database = {
         }
         Relationships: []
       }
+      personal_records: {
+        Row: {
+          id: string
+          user_id: string
+          exercise_name: string
+          record_type: string
+          value: number
+          achieved_at: string
+          session_id: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          exercise_name: string
+          record_type: string
+          value: number
+          achieved_at?: string
+          session_id?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          exercise_name?: string
+          record_type?: string
+          value?: number
+          achieved_at?: string
+          session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personal_records_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "workout_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workout_templates: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          workout_data: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          workout_data: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          workout_data?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
       workout_exercise_logs: {
         Row: {
           actual_reps: string | null

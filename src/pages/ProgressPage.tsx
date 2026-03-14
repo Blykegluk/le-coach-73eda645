@@ -10,6 +10,7 @@ import ExerciseProgressionSection from '@/components/progress/ExerciseProgressio
 import NutritionProgressSection from '@/components/progress/NutritionProgressSection';
 import BodyCompositionSection from '@/components/progress/BodyCompositionSection';
 import WeeklyCarousel from '@/components/training/WeeklyCarousel';
+import TrainingCalendar from '@/components/training/TrainingCalendar';
 
 const ProgressPage = () => {
   const { user } = useAuth();
@@ -27,6 +28,8 @@ const ProgressPage = () => {
       <AppHeader title="Progression" />
 
       <StatsGrid stats={stats ?? null} isLoading={statsLoading} />
+
+      <TrainingCalendar userId={userId} />
 
       <WeeklyCarousel userWeight={userWeight} />
 
