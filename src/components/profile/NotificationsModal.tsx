@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Bell } from 'lucide-react';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { subscribeToPush, unsubscribeFromPush, isPushSubscribed } from '@/lib/pushSubscription';
 
 interface NotificationsModalProps {
   isOpen: boolean;
@@ -19,16 +20,26 @@ const NOTIFICATION_OPTIONS = [
   { key: 'tips', label: 'Tips du coach', desc: 'Conseils personnalisés quotidiens', emoji: '💡' },
 ];
 
+const DEFAULT_PREFS = Object.fromEntries(NOTIFICATION_OPTIONS.map(o => [o.key, true]));
+
 export default function NotificationsModal({ isOpen, onClose }: NotificationsModalProps) {
   const { user } = useAuth();
   const { profile, refetch } = useProfile();
-  
-  const notificationsEnabled = (profile as any)?.notifications_enabled ?? true;
-  const [enabled, setEnabled] = useState(notificationsEnabled);
-  const [toggles, setToggles] = useState<Record<string, boolean>>(
-    Object.fromEntries(NOTIFICATION_OPTIONS.map(o => [o.key, true]))
-  );
+
+  const [enabled, setEnabled] = useState(false);
+  const [toggles, setToggles] = useState<Record<string, boolean>>(DEFAULT_PREFS);
   const [isSaving, setIsSaving] = useState(false);
+  const [pushSupported] = useState(() => 'serviceWorker' in navigator && 'PushManager' in window);
+
+  // Load saved preferences when modal opens
+  useEffect(() => {
+    if (!isOpen || !profile) return;
+    const p = profile as any;
+    setEnabled(p.notifications_enabled ?? false);
+    if (p.notification_preferences && typeof p.notification_preferences === 'object') {
+      setToggles({ ...DEFAULT_PREFS, ...p.notification_preferences });
+    }
+  }, [isOpen, profile]);
 
   if (!isOpen) return null;
 
@@ -36,13 +47,40 @@ export default function NotificationsModal({ isOpen, onClose }: NotificationsMod
     setToggles(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const handleMasterToggle = async () => {
+    const newValue = !enabled;
+    setEnabled(newValue);
+
+    // If enabling and push is supported, request permission proactively
+    if (newValue && pushSupported && user) {
+      const alreadySubscribed = await isPushSubscribed();
+      if (!alreadySubscribed) {
+        await subscribeToPush(user.id);
+      }
+    }
+  };
+
   const handleSave = async () => {
     if (!user) return;
     setIsSaving(true);
     try {
+      // If disabling, unsubscribe from push
+      if (!enabled) {
+        await unsubscribeFromPush(user.id);
+      } else if (pushSupported) {
+        // Ensure push subscription exists when enabling
+        const alreadySubscribed = await isPushSubscribed();
+        if (!alreadySubscribed) {
+          await subscribeToPush(user.id);
+        }
+      }
+
       const { error } = await supabase
         .from('profiles')
-        .update({ notifications_enabled: enabled } as Record<string, unknown>)
+        .update({
+          notifications_enabled: enabled,
+          notification_preferences: toggles,
+        } as Record<string, unknown>)
         .eq('user_id', user.id);
 
       if (error) throw error;
@@ -72,6 +110,12 @@ export default function NotificationsModal({ isOpen, onClose }: NotificationsMod
           </button>
         </div>
 
+        {!pushSupported && (
+          <div className="mb-4 rounded-xl bg-amber-500/10 p-3 text-xs text-amber-400">
+            Les notifications push ne sont pas supportées par ce navigateur.
+          </div>
+        )}
+
         {/* Master toggle */}
         <div className="mb-5 flex items-center justify-between rounded-xl bg-muted/30 p-4">
           <div>
@@ -79,7 +123,7 @@ export default function NotificationsModal({ isOpen, onClose }: NotificationsMod
             <p className="text-xs text-muted-foreground">Toutes les notifications de l'app</p>
           </div>
           <button
-            onClick={() => setEnabled(!enabled)}
+            onClick={handleMasterToggle}
             className={`relative h-7 w-12 rounded-full transition-all duration-300 ${
               enabled ? 'bg-primary shadow-glow-sm' : 'bg-muted'
             }`}

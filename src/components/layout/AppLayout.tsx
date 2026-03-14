@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import MobileTabBar from './MobileTabBar';
 import DesktopSidebar from './DesktopSidebar';
 import CoachDrawer from './CoachDrawer';
+import OfflineBanner from './OfflineBanner';
 
 const AppLayout = () => {
   const [isCoachOpen, setIsCoachOpen] = useState(false);
@@ -16,6 +17,7 @@ const AppLayout = () => {
       
       {/* Main content area */}
       <div className="flex flex-1 flex-col overflow-hidden">
+        <OfflineBanner />
         {/* Scrollable content */}
         <main className="flex-1 overflow-y-auto">
           <Outlet context={{ onOpenCoach: handleOpenCoach }} />
