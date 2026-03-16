@@ -31,6 +31,7 @@ interface ExerciseLog {
 
 interface ActiveWorkoutSessionProps {
   workout: Workout;
+  programSessionId?: string;
   onClose: () => void;
   onComplete: () => void;
 }
@@ -79,7 +80,7 @@ function clearPersistedState() {
   sessionStorage.removeItem(STORAGE_KEY);
 }
 
-export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWorkoutSessionProps) => {
+export const ActiveWorkoutSession = ({ workout, programSessionId, onClose, onComplete }: ActiveWorkoutSessionProps) => {
   const restored = useRef(loadPersistedState(workout.workout_name));
   const now = Date.now();
 
@@ -491,6 +492,21 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
           duration_min: Math.round(globalTime / 60),
           notes: `${workout.workout_name} - ${exerciseLogs.filter(l => !l.skipped).length} exercices`,
         });
+
+      // Mark program session as completed (if part of a program)
+      if (programSessionId) {
+        try {
+          await supabase
+            .from('program_sessions')
+            .update({
+              completed_session_id: sessionId,
+              completed_at: new Date().toISOString(),
+            })
+            .eq('id', programSessionId);
+        } catch (psErr) {
+          console.error('Error marking program session complete:', psErr);
+        }
+      }
 
       clearPersistedState();
       toast.success('🎉 Séance enregistrée avec succès !');

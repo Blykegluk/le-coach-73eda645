@@ -481,6 +481,153 @@ export type Database = {
           },
         ]
       }
+      training_programs: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          description: string | null
+          goal: string
+          difficulty: string
+          duration_weeks: number
+          sessions_per_week: number
+          progression_rules: Json
+          current_week: number
+          status: string
+          started_at: string
+          completed_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          description?: string | null
+          goal: string
+          difficulty?: string
+          duration_weeks: number
+          sessions_per_week: number
+          progression_rules?: Json
+          current_week?: number
+          status?: string
+          started_at?: string
+          completed_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          description?: string | null
+          goal?: string
+          difficulty?: string
+          duration_weeks?: number
+          sessions_per_week?: number
+          progression_rules?: Json
+          current_week?: number
+          status?: string
+          started_at?: string
+          completed_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      program_weeks: {
+        Row: {
+          id: string
+          program_id: string
+          user_id: string
+          week_number: number
+          focus: string | null
+          notes: string | null
+          is_deload: boolean
+        }
+        Insert: {
+          id?: string
+          program_id: string
+          user_id: string
+          week_number: number
+          focus?: string | null
+          notes?: string | null
+          is_deload?: boolean
+        }
+        Update: {
+          id?: string
+          program_id?: string
+          user_id?: string
+          week_number?: number
+          focus?: string | null
+          notes?: string | null
+          is_deload?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "program_weeks_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "training_programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      program_sessions: {
+        Row: {
+          id: string
+          program_id: string
+          week_id: string
+          user_id: string
+          session_order: number
+          day_of_week: number | null
+          workout_data: Json
+          completed_session_id: string | null
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          program_id: string
+          week_id: string
+          user_id: string
+          session_order: number
+          day_of_week?: number | null
+          workout_data: Json
+          completed_session_id?: string | null
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          program_id?: string
+          week_id?: string
+          user_id?: string
+          session_order?: number
+          day_of_week?: number | null
+          workout_data?: Json
+          completed_session_id?: string | null
+          completed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "program_sessions_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "training_programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "program_sessions_week_id_fkey"
+            columns: ["week_id"]
+            isOneToOne: false
+            referencedRelation: "program_weeks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "program_sessions_completed_session_id_fkey"
+            columns: ["completed_session_id"]
+            isOneToOne: false
+            referencedRelation: "workout_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workout_templates: {
         Row: {
           id: string

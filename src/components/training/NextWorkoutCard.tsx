@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Dumbbell, Clock, RefreshCw, AlertCircle, ChevronDown, ChevronUp, Play, Info, Bookmark, BookOpen } from 'lucide-react';
+import { Dumbbell, Clock, RefreshCw, AlertCircle, ChevronDown, ChevronUp, Play, Info, Bookmark, BookOpen, CalendarRange, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -9,8 +9,12 @@ import { getExerciseIcon } from './ExerciseIcons';
 import { ActiveWorkoutSession } from './ActiveWorkoutSession';
 import { ExerciseDetailSheet, prefetchExerciseDetails } from './ExerciseDetailSheet';
 import { WorkoutTemplatesSheet } from './WorkoutTemplatesSheet';
+import { ProgramCreatorSheet } from './ProgramCreatorSheet';
+import { ProgramDetailSheet } from './ProgramDetailSheet';
 import { useAddWorkoutTemplate } from '@/hooks/queries/useWorkoutTemplates';
+import { useActiveProgram, useNextProgramSession, useTrainingPrograms } from '@/hooks/queries/useTrainingPrograms';
 import { toast } from 'sonner';
+import type { Json } from '@/integrations/supabase/types';
 
 interface Exercise {
   name: string;
@@ -52,7 +56,19 @@ export const NextWorkoutCard = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [programCreatorOpen, setProgramCreatorOpen] = useState(false);
+  const [programDetailOpen, setProgramDetailOpen] = useState(false);
+  const [activeProgramSessionId, setActiveProgramSessionId] = useState<string | null>(null);
   const addTemplate = useAddWorkoutTemplate(user?.id);
+
+  // Program hooks
+  const { data: activeProgram } = useActiveProgram(user?.id);
+  const { data: allPrograms } = useTrainingPrograms(user?.id);
+  const { data: nextProgramSession } = useNextProgramSession(
+    user?.id,
+    activeProgram?.id,
+    activeProgram?.current_week,
+  );
 
   // Load saved workout from database
   const loadSavedWorkout = useCallback(async () => {
@@ -217,7 +233,26 @@ export const NextWorkoutCard = () => {
 
   const handleStartSession = () => {
     if (workout) {
+      setActiveProgramSessionId(null);
       setIsSessionActive(true);
+    }
+  };
+
+  const handleStartProgramSession = (workoutData: Json, programSessionId: string) => {
+    // Load program session workout data as the active workout
+    if (workoutData && typeof workoutData === 'object' && !Array.isArray(workoutData)) {
+      const w = workoutData as Record<string, unknown>;
+      setWorkout({
+        workout_name: (w.workout_name as string) || 'Séance programme',
+        target_muscles: (w.target_muscles as string[]) || [],
+        estimated_duration_min: (w.estimated_duration_min as number) || 45,
+        exercises: (w.exercises as Exercise[]) || [],
+        warmup_notes: (w.warmup_notes as string) || '',
+        coach_advice: (w.coach_advice as string) || '',
+      });
+      setActiveProgramSessionId(programSessionId);
+      setIsSessionActive(true);
+      setProgramDetailOpen(false);
     }
   };
 
@@ -232,9 +267,10 @@ export const NextWorkoutCard = () => {
   // Show active session
   if (isSessionActive && workout) {
     return (
-      <ActiveWorkoutSession 
+      <ActiveWorkoutSession
         workout={workout}
-        onClose={() => { sessionStorage.removeItem('active_workout_session'); setIsSessionActive(false); }}
+        programSessionId={activeProgramSessionId ?? undefined}
+        onClose={() => { sessionStorage.removeItem('active_workout_session'); setIsSessionActive(false); setActiveProgramSessionId(null); }}
         onComplete={handleSessionComplete}
       />
     );
@@ -282,6 +318,78 @@ export const NextWorkoutCard = () => {
   if (!workout) return null;
 
   return (
+    <div className="space-y-3">
+    {/* Active Program Banner */}
+    {activeProgram && (
+      <button
+        onClick={() => setProgramDetailOpen(true)}
+        className="flex w-full items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-3 text-left transition-colors hover:bg-primary/10"
+      >
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20">
+          <CalendarRange className="h-5 w-5 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-foreground truncate">{activeProgram.name}</p>
+          <p className="text-xs text-muted-foreground">
+            Semaine {activeProgram.current_week}/{activeProgram.duration_weeks}
+            {nextProgramSession?.week && nextProgramSession.week.is_deload && ' • Deload'}
+          </p>
+        </div>
+        <div className="text-xs text-primary font-medium">Voir</div>
+      </button>
+    )}
+
+    {/* Next program session quick-start */}
+    {activeProgram && nextProgramSession?.session && (
+      <div className="rounded-2xl border border-border bg-card p-3">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-medium text-muted-foreground">Prochaine séance du programme</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">
+              {(() => {
+                const wd = nextProgramSession.session.workout_data;
+                if (wd && typeof wd === 'object' && !Array.isArray(wd)) {
+                  return (wd as Record<string, unknown>).workout_name as string || 'Séance';
+                }
+                return 'Séance';
+              })()}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Séance {nextProgramSession.session.session_order} • Semaine {nextProgramSession.week.week_number}
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => handleStartProgramSession(
+              nextProgramSession.session.workout_data,
+              nextProgramSession.session.id,
+            )}
+          >
+            <Play className="mr-1 h-3 w-3" />
+            Go
+          </Button>
+        </div>
+      </div>
+    )}
+
+    {/* Create program button (if none active) */}
+    {!activeProgram && (
+      <button
+        onClick={() => setProgramCreatorOpen(true)}
+        className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-border bg-muted/20 p-3 text-left transition-colors hover:bg-muted/40"
+      >
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted">
+          <Plus className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-foreground">Créer un programme</p>
+          <p className="text-xs text-muted-foreground">Programme multi-semaines personnalisé par l'IA</p>
+        </div>
+      </button>
+    )}
+
     <div className="rounded-2xl border border-border bg-card overflow-hidden">
       {/* Header */}
       <div className="p-4 bg-gradient-to-r from-primary/10 to-primary/5">
@@ -431,6 +539,23 @@ export const NextWorkoutCard = () => {
         weight={selectedExercise?.weight_recommendation}
         notes={selectedExercise?.notes}
       />
+    </div>
+
+    {/* Program Sheets */}
+    <ProgramCreatorSheet
+      isOpen={programCreatorOpen}
+      onOpenChange={setProgramCreatorOpen}
+      onCreated={() => setProgramCreatorOpen(false)}
+    />
+
+    {activeProgram && (
+      <ProgramDetailSheet
+        isOpen={programDetailOpen}
+        onOpenChange={setProgramDetailOpen}
+        program={activeProgram}
+        onStartSession={handleStartProgramSession}
+      />
+    )}
     </div>
   );
 };

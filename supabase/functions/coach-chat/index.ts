@@ -94,6 +94,8 @@ const toolSchemas: Record<string, z.ZodSchema> = {
     exclude_exercises: z.array(z.string().max(50)).optional(),
     special_request: z.string().max(500).optional(),
   }),
+  get_active_program: z.object({}),
+  get_program_progress: z.object({ program_id: z.string().uuid() }),
 };
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
@@ -441,6 +443,20 @@ const tools = [
       type: "object",
       properties: { exercise_id: { type: "string" } },
       required: ["exercise_id"],
+    },
+  },
+  {
+    name: "get_active_program",
+    description: "Récupère le programme d'entraînement multi-semaines actif de l'utilisateur, avec sa progression.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "get_program_progress",
+    description: "Récupère le détail d'un programme (semaines, séances complétées/restantes).",
+    input_schema: {
+      type: "object",
+      properties: { program_id: { type: "string" } },
+      required: ["program_id"],
     },
     cache_control: { type: "ephemeral" },
   },
@@ -896,6 +912,56 @@ Retourne UNIQUEMENT ce JSON:
         return { success: true, message: `🗑️ "${exercise.exercise_name}" supprimé` };
       }
 
+      case "get_active_program": {
+        const { data: program } = await supabase.from("training_programs").select("*").eq("user_id", userId).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle();
+        if (!program) return { success: true, message: "Aucun programme actif", data: null };
+
+        // Get completion stats
+        const { data: sessions } = await supabase.from("program_sessions").select("id, completed_at").eq("program_id", program.id);
+        const totalSessions = sessions?.length || 0;
+        const completedSessions = sessions?.filter((s: any) => s.completed_at).length || 0;
+
+        return {
+          success: true,
+          message: `Programme actif: ${program.name} (semaine ${program.current_week}/${program.duration_weeks}, ${completedSessions}/${totalSessions} séances)`,
+          data: {
+            id: program.id, name: program.name, description: program.description,
+            goal: program.goal, difficulty: program.difficulty,
+            current_week: program.current_week, duration_weeks: program.duration_weeks,
+            sessions_per_week: program.sessions_per_week, status: program.status,
+            started_at: program.started_at, total_sessions: totalSessions,
+            completed_sessions: completedSessions,
+          },
+        };
+      }
+
+      case "get_program_progress": {
+        const { data: program } = await supabase.from("training_programs").select("*").eq("id", toolInput.program_id).eq("user_id", userId).maybeSingle();
+        if (!program) return { success: false, message: "Programme non trouvé" };
+
+        const { data: weeks } = await supabase.from("program_weeks").select("*").eq("program_id", program.id).order("week_number", { ascending: true });
+        const { data: sessions } = await supabase.from("program_sessions").select("id, week_id, session_order, completed_at, workout_data").eq("program_id", program.id).order("session_order", { ascending: true });
+
+        const weekDetails = (weeks || []).map((w: any) => {
+          const weekSessions = (sessions || []).filter((s: any) => s.week_id === w.id);
+          return {
+            week_number: w.week_number, focus: w.focus, is_deload: w.is_deload,
+            sessions: weekSessions.map((s: any) => ({
+              order: s.session_order,
+              workout_name: s.workout_data?.workout_name || "Séance",
+              completed: !!s.completed_at,
+              completed_at: s.completed_at,
+            })),
+          };
+        });
+
+        return {
+          success: true,
+          message: `Programme "${program.name}": semaine ${program.current_week}/${program.duration_weeks}`,
+          data: { program: { id: program.id, name: program.name, goal: program.goal, current_week: program.current_week, duration_weeks: program.duration_weeks }, weeks: weekDetails },
+        };
+      }
+
       default:
         return { success: false, message: `Outil inconnu: ${toolName}` };
     }
@@ -950,6 +1016,7 @@ Avant de répondre, consulte SYSTÉMATIQUEMENT les données pertinentes selon le
 - Sport/séance → appelle get_health_context + get_recent_workout_sessions (pour respecter split, blessures, historique)
 - Bilan général → appelle get_daily_summary + get_recent_workout_sessions + get_body_composition_history
 - Génération séance → OBLIGATOIRE : get_health_context + get_recent_workout_sessions AVANT generate_workout
+- Programme multi-semaines → appelle get_active_program pour vérifier si l'utilisateur suit un programme. Si oui, mentionne sa progression et adapte tes conseils.
 
 Tu peux appeler plusieurs outils en parallèle. Ne réponds JAMAIS sans avoir consulté les données nécessaires.
 `}
