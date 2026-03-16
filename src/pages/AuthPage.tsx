@@ -5,10 +5,21 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Activity, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Activity, Mail, Lock, Eye, EyeOff, Loader2, Dumbbell, Utensils, Brain, TrendingUp } from 'lucide-react';
 import { useEffect } from 'react';
+import { trackEvent } from '@/lib/analytics';
 
 type AuthMode = 'landing' | 'login' | 'signup';
+
+function FeatureCard({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
+  return (
+    <div className="rounded-2xl border border-border/50 bg-card/30 backdrop-blur-sm p-4">
+      <div className="mb-2">{icon}</div>
+      <p className="text-sm font-semibold text-foreground">{title}</p>
+      <p className="text-[11px] text-muted-foreground leading-tight">{description}</p>
+    </div>
+  );
+}
 
 const AuthPage = () => {
   const navigate = useNavigate();
@@ -69,6 +80,7 @@ const AuthPage = () => {
             throw error;
           }
         } else {
+          trackEvent('signup', { method: 'email' });
           toast.success("Un lien de confirmation a été envoyé à votre adresse.");
         }
       } else {
@@ -84,6 +96,7 @@ const AuthPage = () => {
             throw error;
           }
         } else {
+          trackEvent('login', { method: 'email' });
           navigate('/', { replace: true });
         }
       }
@@ -108,7 +121,7 @@ const AuthPage = () => {
   // Landing view
   if (mode === 'landing') {
     return (
-      <div className="flex h-screen w-screen flex-col bg-gradient-glow overflow-hidden">
+      <div className="flex min-h-screen w-screen flex-col bg-gradient-glow overflow-x-hidden">
         {/* Background glow effects */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px]" />
@@ -116,21 +129,21 @@ const AuthPage = () => {
         </div>
 
         {/* Hero Section */}
-        <div className="relative flex flex-1 flex-col items-center justify-center px-6">
+        <div className="relative flex flex-col items-center pt-16 pb-8 px-6">
           {/* Logo */}
-          <div className="mb-8 relative">
+          <div className="mb-6 relative">
             <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-primary to-primary-glow shadow-glow-lg">
               <Activity className="h-10 w-10 text-primary-foreground" />
             </div>
             <div className="absolute inset-0 rounded-3xl bg-primary/30 blur-xl -z-10 animate-pulse-soft" />
           </div>
-          
+
           {/* Title & Slogan */}
           <h1 className="mb-2 text-center text-3xl font-bold text-foreground">
-            Votre Coach Santé
+            The Perfect Coach
           </h1>
-          <p className="mb-12 max-w-xs text-center text-muted-foreground">
-            Nutrition, entraînement et récupération. Tout piloté par IA.
+          <p className="mb-8 max-w-xs text-center text-muted-foreground">
+            Ton coach IA qui s'adapte à toi. Nutrition, entraînement et suivi personnalisé.
           </p>
 
           {/* Auth Buttons */}
@@ -186,6 +199,39 @@ const AuthPage = () => {
               Avec email et mot de passe
             </Button>
           </div>
+        </div>
+
+        {/* Features Section */}
+        <div className="relative px-6 py-8">
+          <div className="mx-auto max-w-sm grid grid-cols-2 gap-3">
+            <FeatureCard
+              icon={<Brain className="h-5 w-5 text-primary" />}
+              title="Coach IA"
+              description="Conseils personnalisés en temps réel"
+            />
+            <FeatureCard
+              icon={<Dumbbell className="h-5 w-5 text-blue-400" />}
+              title="Programmes"
+              description="Séances générées selon tes objectifs"
+            />
+            <FeatureCard
+              icon={<Utensils className="h-5 w-5 text-orange-400" />}
+              title="Nutrition"
+              description="Analyse tes repas par photo ou texte"
+            />
+            <FeatureCard
+              icon={<TrendingUp className="h-5 w-5 text-green-400" />}
+              title="Suivi"
+              description="PRs, volume, calendrier d'entraînement"
+            />
+          </div>
+        </div>
+
+        {/* Social proof */}
+        <div className="relative px-6 pb-4 text-center">
+          <p className="text-xs text-muted-foreground">
+            Essai gratuit 14 jours · Aucune carte requise
+          </p>
         </div>
 
         {/* Footer */}

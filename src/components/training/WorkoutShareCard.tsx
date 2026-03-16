@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Share2, Loader2, Dumbbell, Clock, Flame, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { captureAndShare } from '@/lib/shareUtils';
+import { trackEvent } from '@/lib/analytics';
 import { toast } from 'sonner';
 
 interface WorkoutShareCardProps {
@@ -31,7 +32,10 @@ export function WorkoutShareCard({
         `Séance terminée : ${workoutName}`,
         `${workoutName} — ${durationMin}min, ${exerciseCount} exercices avec The Perfect Coach`,
       );
-      if (success) toast.success('Image partagée !');
+      if (success) {
+        trackEvent('share_clicked', { type: 'workout' });
+        toast.success('Image partagée !');
+      }
     } catch {
       toast.error('Erreur lors du partage');
     } finally {

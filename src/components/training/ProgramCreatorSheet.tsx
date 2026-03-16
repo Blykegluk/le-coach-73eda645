@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Dumbbell, Target, Calendar, Zap } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGenerateProgram } from '@/hooks/queries/useTrainingPrograms';
+import { trackEvent } from '@/lib/analytics';
 import { toast } from 'sonner';
 
 interface ProgramCreatorSheetProps {
@@ -57,6 +58,7 @@ export function ProgramCreatorSheet({ isOpen, onOpenChange, onCreated }: Program
         sessions_per_week: sessionsPerWeek,
       });
 
+      trackEvent('program_created', { goal, difficulty, weeks: durationWeeks, sessions_per_week: sessionsPerWeek });
       toast.success('Programme créé !');
       onOpenChange(false);
       onCreated?.(result.program_id);

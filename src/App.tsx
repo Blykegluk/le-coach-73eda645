@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -10,15 +11,24 @@ import ProtectedRoute from "@/components/layout/ProtectedRoute";
 import OnboardingGate from "@/components/layout/OnboardingGate";
 import SubscriptionGate from "@/components/layout/SubscriptionGate";
 import AppLayout from "@/components/layout/AppLayout";
-import HomePage from "@/pages/HomePage";
-import JournalPage from "@/pages/JournalPage";
-// TrainingPage & PerformancePage are replaced by ProgressPage
-import ProfilePage from "@/pages/ProfilePage";
-import AuthPage from "@/pages/AuthPage";
-import OnboardingPage from "@/pages/OnboardingPage";
-import ProgressPage from "@/pages/ProgressPage";
-import NutritionPage from "@/pages/NutritionPage";
-import NotFound from "@/pages/NotFound";
+
+// Lazy-loaded pages for code splitting
+const HomePage = lazy(() => import("@/pages/HomePage"));
+const JournalPage = lazy(() => import("@/pages/JournalPage"));
+const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
+const AuthPage = lazy(() => import("@/pages/AuthPage"));
+const OnboardingPage = lazy(() => import("@/pages/OnboardingPage"));
+const ProgressPage = lazy(() => import("@/pages/ProgressPage"));
+const NutritionPage = lazy(() => import("@/pages/NutritionPage"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
+
+function PageLoader() {
+  return (
+    <div className="flex h-screen items-center justify-center bg-background">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+    </div>
+  );
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,6 +49,7 @@ const App = () => (
           <SubscriptionProvider>
             <WorkoutProvider>
               <BrowserRouter>
+                <Suspense fallback={<PageLoader />}>
                 <Routes>
                   {/* Public route */}
                   <Route path="/auth" element={<AuthPage />} />
@@ -67,6 +78,7 @@ const App = () => (
                   
                   <Route path="*" element={<NotFound />} />
                 </Routes>
+                </Suspense>
               </BrowserRouter>
             </WorkoutProvider>
           </SubscriptionProvider>

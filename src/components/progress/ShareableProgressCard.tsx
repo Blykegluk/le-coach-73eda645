@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Share2, Download, Loader2, Trophy, Flame, Dumbbell, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { captureAndShare, captureElement, shareImage } from '@/lib/shareUtils';
+import { trackEvent } from '@/lib/analytics';
 import { toast } from 'sonner';
 
 interface ShareableProgressCardProps {
@@ -28,7 +29,10 @@ export function ShareableProgressCard({ userName, stats }: ShareableProgressCard
         `${userName} — Progression`,
         `Mes stats fitness avec The Perfect Coach`,
       );
-      if (success) toast.success('Image partagée !');
+      if (success) {
+        trackEvent('share_clicked', { type: 'progress' });
+        toast.success('Image partagée !');
+      }
     } catch {
       toast.error('Erreur lors du partage');
     } finally {

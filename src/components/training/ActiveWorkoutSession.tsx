@@ -8,6 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Workout } from './NextWorkoutCard';
+import { trackEvent } from '@/lib/analytics';
 import { getExerciseIcon } from './ExerciseIcons';
 import { ExerciseDetailSheet } from './ExerciseDetailSheet';
 import { ExerciseSubstitutionSheet } from './ExerciseSubstitutionSheet';
@@ -507,6 +508,12 @@ export const ActiveWorkoutSession = ({ workout, programSessionId, onClose, onCom
           console.error('Error marking program session complete:', psErr);
         }
       }
+
+      trackEvent('workout_completed', {
+        duration_min: Math.round(globalTime / 60),
+        exercises: exerciseLogs.filter(l => !l.skipped).length,
+        from_program: !!programSessionId,
+      });
 
       clearPersistedState();
       toast.success('🎉 Séance enregistrée avec succès !');
