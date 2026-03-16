@@ -317,6 +317,16 @@ export const NextWorkoutCard = () => {
 
   if (!workout) return null;
 
+  // Extract next program session workout name
+  const nextProgramWorkoutName = (() => {
+    if (!nextProgramSession?.session) return 'Séance';
+    const wd = nextProgramSession.session.workout_data;
+    if (wd && typeof wd === 'object' && !Array.isArray(wd)) {
+      return (wd as Record<string, unknown>).workout_name as string || 'Séance';
+    }
+    return 'Séance';
+  })();
+
   return (
     <div className="space-y-3">
     {/* Active Program Banner */}
@@ -348,13 +358,7 @@ export const NextWorkoutCard = () => {
         <div className="flex items-center gap-3">
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground truncate">
-              {(() => {
-                const wd = nextProgramSession.session.workout_data;
-                if (wd && typeof wd === 'object' && !Array.isArray(wd)) {
-                  return (wd as Record<string, unknown>).workout_name as string || 'Séance';
-                }
-                return 'Séance';
-              })()}
+              {nextProgramWorkoutName}
             </p>
             <p className="text-xs text-muted-foreground">
               Séance {nextProgramSession.session.session_order} • Semaine {nextProgramSession.week.week_number}
