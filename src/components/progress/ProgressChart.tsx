@@ -67,6 +67,18 @@ const ProgressChart = ({
     [label],
   );
 
+  // Compute Y axis domain with padding so small changes are visible
+  const yDomain = useMemo(() => {
+    if (!data || data.length === 0) return undefined;
+    const values = data.map(d => d.value);
+    if (targetValue != null) values.push(targetValue);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min;
+    const padding = range > 0 ? range * 0.3 : 2; // At least ±2 if all values identical
+    return [Math.floor((min - padding) * 10) / 10, Math.ceil((max + padding) * 10) / 10] as [number, number];
+  }, [data, targetValue]);
+
   if (!data || data.length === 0) {
     return (
       <div
@@ -77,6 +89,8 @@ const ProgressChart = ({
       </div>
     );
   }
+
+  const showDots = data.length <= 10;
 
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -97,7 +111,7 @@ const ProgressChart = ({
           interval="preserveStartEnd"
         />
 
-        <YAxis hide />
+        <YAxis hide domain={yDomain} />
 
         <Tooltip
           content={<CustomTooltip unit={unit} labelText={label} />}
@@ -125,7 +139,7 @@ const ProgressChart = ({
           stroke={color}
           strokeWidth={2}
           fill={`url(#${gradientId})`}
-          dot={false}
+          dot={showDots ? { r: 3, fill: color, stroke: '#1a1a1a', strokeWidth: 2 } : false}
           activeDot={{ r: 4, fill: color, stroke: '#1a1a1a', strokeWidth: 2 }}
         />
       </AreaChart>

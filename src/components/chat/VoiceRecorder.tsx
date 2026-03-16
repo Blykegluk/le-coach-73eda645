@@ -13,8 +13,6 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
   const [transcript, setTranscript] = useState('');
   const [status, setStatus] = useState<'idle' | 'recording' | 'processing' | 'sent' | 'error'>('idle');
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
@@ -39,9 +37,6 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
       if (recognitionRef.current) {
         try { recognitionRef.current.abort(); } catch {}
       }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
-      }
     };
   }, []);
 
@@ -57,16 +52,6 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
     }
   }, [isOpen]);
 
-  const stopMediaTracks = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      try { mediaRecorderRef.current.stop(); } catch {}
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-    }
-  }, []);
-
   const doSend = useCallback(() => {
     if (sentRef.current) return;
     sentRef.current = true;
@@ -76,8 +61,6 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
     if (!text) text = interimTranscriptRef.current.trim();
 
     console.log('[VoiceRecorder] doSend called, text:', JSON.stringify(text));
-
-    stopMediaTracks();
 
     if (text) {
       onTranscriptionRef.current(text);
@@ -95,16 +78,60 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
 
     finalTranscriptRef.current = '';
     interimTranscriptRef.current = '';
-  }, [stopMediaTracks]);
+  }, []);
 
   const startRecording = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
+    if (!hasSpeechRecognition) {
+      setStatus('error');
+      return;
+    }
 
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      mediaRecorder.start();
+    try {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'fr-FR';
+
+      recognition.onresult = (event: { resultIndex: number; results: { length: number; [key: number]: { isFinal: boolean; 0: { transcript: string } } } }) => {
+        let final = '';
+        let interim = '';
+        for (let i = 0; i < event.results.length; i++) {
+          const t = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            final += t;
+          } else {
+            interim += t;
+          }
+        }
+        finalTranscriptRef.current = final;
+        interimTranscriptRef.current = interim;
+        setTranscript(final + interim);
+      };
+
+      recognition.onerror = (event: { error: string }) => {
+        console.error('[VoiceRecorder] recognition error:', event.error);
+        if (event.error === 'no-speech' || event.error === 'aborted') {
+          return; // non-fatal
+        }
+        // Fatal error (not-allowed, network, etc.)
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        setIsRecording(false);
+        setStatus('error');
+      };
+
+      recognition.onend = () => {
+        console.log('[VoiceRecorder] recognition onend');
+        // Small delay to let last results process
+        setTimeout(() => doSend(), 100);
+      };
+
+      recognition.start();
+      console.log('[VoiceRecorder] recognition started');
 
       setIsRecording(true);
       setStatus('recording');
@@ -114,52 +141,11 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
       interimTranscriptRef.current = '';
       sentRef.current = false;
 
-      if (hasSpeechRecognition) {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-        recognitionRef.current = recognition;
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'fr-FR';
-
-        recognition.onresult = (event: { resultIndex: number; results: { length: number; [key: number]: { isFinal: boolean; 0: { transcript: string } } } }) => {
-          let final = '';
-          let interim = '';
-          for (let i = 0; i < event.results.length; i++) {
-            const t = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-              final += t;
-            } else {
-              interim += t;
-            }
-          }
-          finalTranscriptRef.current = final;
-          interimTranscriptRef.current = interim;
-          setTranscript(final + interim);
-        };
-
-        recognition.onerror = (event: { error: string }) => {
-          console.error('[VoiceRecorder] recognition error:', event.error);
-          if (event.error === 'no-speech' || event.error === 'aborted') {
-            return; // non-fatal
-          }
-        };
-
-        recognition.onend = () => {
-          console.log('[VoiceRecorder] recognition onend');
-          // Small delay to let last results process
-          setTimeout(() => doSend(), 100);
-        };
-
-        recognition.start();
-        console.log('[VoiceRecorder] recognition started');
-      }
-
       timerRef.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
     } catch (error) {
-      console.error('[VoiceRecorder] Microphone access error:', error);
+      console.error('[VoiceRecorder] Start error:', error);
       setStatus('error');
     }
   }, [hasSpeechRecognition, doSend]);
@@ -193,7 +179,6 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
       try { recognitionRef.current.abort(); } catch {}
       recognitionRef.current = null;
     }
-    stopMediaTracks();
     setIsRecording(false);
     setStatus('idle');
     setTranscript('');
@@ -202,7 +187,7 @@ export default function VoiceRecorder({ isOpen, onClose, onTranscription }: Voic
     interimTranscriptRef.current = '';
     sentRef.current = false;
     onClose();
-  }, [stopMediaTracks, onClose]);
+  }, [onClose]);
 
   const handleRetry = useCallback(() => {
     setStatus('idle');

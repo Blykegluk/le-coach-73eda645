@@ -38,7 +38,17 @@ export const NextWorkoutCard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isSessionActive, setIsSessionActive] = useState(false);
+  const [isSessionActive, setIsSessionActive] = useState(() => {
+    // Auto-resume if there's a persisted active session
+    try {
+      const raw = sessionStorage.getItem('active_workout_session');
+      if (raw) {
+        const state = JSON.parse(raw);
+        return state.phase !== 'completed';
+      }
+    } catch {}
+    return false;
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
@@ -224,7 +234,7 @@ export const NextWorkoutCard = () => {
     return (
       <ActiveWorkoutSession 
         workout={workout}
-        onClose={() => setIsSessionActive(false)}
+        onClose={() => { sessionStorage.removeItem('active_workout_session'); setIsSessionActive(false); }}
         onComplete={handleSessionComplete}
       />
     );

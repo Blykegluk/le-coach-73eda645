@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Pause, SkipForward, SkipBack, Check, X, Edit2, Timer, Dumbbell, Info, AlertTriangle, ArrowRightLeft, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -13,6 +13,7 @@ import { ExerciseDetailSheet } from './ExerciseDetailSheet';
 import { ExerciseSubstitutionSheet } from './ExerciseSubstitutionSheet';
 import ExerciseFeedbackButtons, { FeedbackType } from './ExerciseFeedbackButtons';
 import { useDetectPRs } from '@/hooks/queries/usePersonalRecords';
+
 interface ExerciseLog {
   exercise_name: string;
   exercise_order: number;
@@ -36,24 +37,82 @@ interface ActiveWorkoutSessionProps {
 
 type SessionPhase = 'exercise' | 'rest' | 'completed';
 type ExerciseFeedback = 'too_easy' | 'pain' | 'ok' | null;
+
+const STORAGE_KEY = 'active_workout_session';
+
+interface PersistedState {
+  sessionId: string | null;
+  currentExerciseIndex: number;
+  currentSet: number;
+  phase: SessionPhase;
+  isPaused: boolean;
+  exerciseLogs: ExerciseLog[];
+  // Timestamps for accurate time tracking across backgrounding
+  sessionStartedAt: number;     // Date.now() when session started
+  totalPausedMs: number;        // Total ms spent paused
+  lastPauseStartedAt: number | null; // Date.now() when current pause started
+  phaseStartedAt: number;       // Date.now() when current phase started
+  restEndAt: number | null;     // Date.now() + restMs when rest started
+  workoutName: string;          // To verify we're resuming the right session
+}
+
 const formatTime = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
+function loadPersistedState(workoutName: string): PersistedState | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const state = JSON.parse(raw) as PersistedState;
+    if (state.workoutName !== workoutName) return null;
+    if (state.phase === 'completed') return null;
+    return state;
+  } catch {
+    return null;
+  }
+}
+
+function clearPersistedState() {
+  sessionStorage.removeItem(STORAGE_KEY);
+}
+
 export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWorkoutSessionProps) => {
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
-  const [currentSet, setCurrentSet] = useState(1);
-  const [phase, setPhase] = useState<SessionPhase>('exercise');
-  const [isPaused, setIsPaused] = useState(false);
+  const restored = useRef(loadPersistedState(workout.workout_name));
+  const now = Date.now();
+
+  const [sessionId, setSessionId] = useState<string | null>(restored.current?.sessionId ?? null);
+  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(restored.current?.currentExerciseIndex ?? 0);
+  const [currentSet, setCurrentSet] = useState(restored.current?.currentSet ?? 1);
+  const [phase, setPhase] = useState<SessionPhase>(restored.current?.phase ?? 'exercise');
+  const [isPaused, setIsPaused] = useState(restored.current?.isPaused ?? false);
+
+  // Timestamp-based timing
+  const [sessionStartedAt] = useState(restored.current?.sessionStartedAt ?? now);
+  const [totalPausedMs, setTotalPausedMs] = useState(() => {
+    if (!restored.current) return 0;
+    // If we were paused when backgrounded, add time since pause started
+    if (restored.current.isPaused && restored.current.lastPauseStartedAt) {
+      return restored.current.totalPausedMs + (now - restored.current.lastPauseStartedAt);
+    }
+    return restored.current.totalPausedMs;
+  });
+  const [lastPauseStartedAt, setLastPauseStartedAt] = useState<number | null>(() => {
+    if (restored.current?.isPaused) return now; // Reset pause reference to now
+    return null;
+  });
+  const [phaseStartedAt, setPhaseStartedAt] = useState(restored.current?.phaseStartedAt ?? now);
+  const [restEndAt, setRestEndAt] = useState<number | null>(restored.current?.restEndAt ?? null);
+
+  // Computed times from timestamps
   const [globalTime, setGlobalTime] = useState(0);
   const [phaseTime, setPhaseTime] = useState(0);
   const [restTimeRemaining, setRestTimeRemaining] = useState(0);
-  
-  const [exerciseLogs, setExerciseLogs] = useState<ExerciseLog[]>(() => 
-    workout.exercises.map((ex, index) => ({
+
+  const [exerciseLogs, setExerciseLogs] = useState<ExerciseLog[]>(() =>
+    restored.current?.exerciseLogs ?? workout.exercises.map((ex, index) => ({
       exercise_name: ex.name,
       exercise_order: index,
       planned_sets: ex.sets,
@@ -68,7 +127,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
       feedback: null,
     }))
   );
-  
+
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [isProcessingFeedback, setIsProcessingFeedback] = useState(false);
 
@@ -86,8 +145,33 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
   const completedSets = workout.exercises.slice(0, currentExerciseIndex).reduce((sum, ex) => sum + ex.sets, 0) + (currentSet - 1) + (phase === 'rest' ? 1 : 0);
   const progress = (completedSets / totalExerciseSets) * 100;
 
-  // Create session on mount
+  // Persist state to sessionStorage on every meaningful change
   useEffect(() => {
+    if (phase === 'completed') {
+      clearPersistedState();
+      return;
+    }
+    const state: PersistedState = {
+      sessionId,
+      currentExerciseIndex,
+      currentSet,
+      phase,
+      isPaused,
+      exerciseLogs,
+      sessionStartedAt,
+      totalPausedMs,
+      lastPauseStartedAt,
+      phaseStartedAt,
+      restEndAt,
+      workoutName: workout.workout_name,
+    };
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }, [sessionId, currentExerciseIndex, currentSet, phase, isPaused, exerciseLogs, sessionStartedAt, totalPausedMs, lastPauseStartedAt, phaseStartedAt, restEndAt, workout.workout_name]);
+
+  // Create session on mount (only if not restored)
+  useEffect(() => {
+    if (restored.current?.sessionId) return; // Already have a session from restoration
+
     const createSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -114,59 +198,84 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
     createSession();
   }, [workout]);
 
-  // Global timer
+  // Unified timer: compute all times from timestamps
   useEffect(() => {
-    if (isPaused || phase === 'completed') return;
-    const interval = setInterval(() => {
-      setGlobalTime(t => t + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [isPaused, phase]);
+    if (phase === 'completed') return;
 
-  // Phase timer (exercise or rest)
-  useEffect(() => {
-    if (isPaused || phase === 'completed') return;
+    const tick = () => {
+      const tickNow = Date.now();
 
-    const interval = setInterval(() => {
-      if (phase === 'exercise') {
-        setPhaseTime(t => t + 1);
-        // Update current exercise duration
-        setExerciseLogs(logs => logs.map((log, i) => 
-          i === currentExerciseIndex ? { ...log, duration_seconds: log.duration_seconds + 1 } : log
-        ));
-      } else if (phase === 'rest') {
-        setRestTimeRemaining(t => {
-          if (t <= 1) {
-            // Auto-advance: next set or next exercise
-            handleRestComplete();
-            return 0;
-          }
-          return t - 1;
-        });
+      // Global time = elapsed - paused time
+      let paused = totalPausedMs;
+      if (isPaused && lastPauseStartedAt) {
+        paused += tickNow - lastPauseStartedAt;
       }
-    }, 1000);
+      const globalMs = tickNow - sessionStartedAt - paused;
+      setGlobalTime(Math.max(0, Math.floor(globalMs / 1000)));
 
+      if (!isPaused) {
+        if (phase === 'exercise') {
+          const phaseMs = tickNow - phaseStartedAt;
+          setPhaseTime(Math.max(0, Math.floor(phaseMs / 1000)));
+        } else if (phase === 'rest' && restEndAt) {
+          const remaining = Math.max(0, Math.ceil((restEndAt - tickNow) / 1000));
+          setRestTimeRemaining(remaining);
+          if (remaining <= 0) {
+            handleRestComplete();
+          }
+        }
+      }
+    };
+
+    tick(); // Immediate first tick (catches up after backgrounding)
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [isPaused, phase, currentExerciseIndex]);
+  }, [isPaused, phase, sessionStartedAt, totalPausedMs, lastPauseStartedAt, phaseStartedAt, restEndAt]);
+
+  // Toggle pause with timestamp tracking
+  const togglePause = useCallback(() => {
+    const toggleNow = Date.now();
+    if (isPaused) {
+      // Resuming: accumulate paused time
+      if (lastPauseStartedAt) {
+        setTotalPausedMs(prev => prev + (toggleNow - lastPauseStartedAt));
+      }
+      setLastPauseStartedAt(null);
+      setIsPaused(false);
+    } else {
+      // Pausing: record when pause started
+      setLastPauseStartedAt(toggleNow);
+      setIsPaused(true);
+    }
+  }, [isPaused, lastPauseStartedAt]);
 
   // Complete a set → start rest
   const handleSetDone = useCallback(() => {
     const restTime = currentLog?.rest_seconds || 60;
+    const doneNow = Date.now();
+    // Record exercise duration for this phase
+    const phaseDuration = Math.floor((doneNow - phaseStartedAt) / 1000);
+    setExerciseLogs(logs => logs.map((log, i) =>
+      i === currentExerciseIndex ? { ...log, duration_seconds: log.duration_seconds + phaseDuration } : log
+    ));
+    setRestEndAt(doneNow + restTime * 1000);
     setRestTimeRemaining(restTime);
     setPhase('rest');
     setPhaseTime(0);
-  }, [currentLog]);
+    setPhaseStartedAt(doneNow);
+  }, [currentLog, phaseStartedAt, currentExerciseIndex]);
 
   // After rest: go to next set or next exercise
   const handleRestComplete = useCallback(() => {
+    const restNow = Date.now();
+    setRestEndAt(null);
     if (currentSet < totalSets) {
-      // More sets remaining → next set
       setCurrentSet(s => s + 1);
       setPhase('exercise');
       setPhaseTime(0);
+      setPhaseStartedAt(restNow);
       setRestTimeRemaining(0);
     } else {
-      // All sets done → next exercise
       if (currentExerciseIndex >= workout.exercises.length - 1) {
         setPhase('completed');
       } else {
@@ -174,6 +283,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
         setCurrentSet(1);
         setPhase('exercise');
         setPhaseTime(0);
+        setPhaseStartedAt(restNow);
         setRestTimeRemaining(0);
         setFeedbackMessage(null);
       }
@@ -185,21 +295,27 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
       setPhase('completed');
       return;
     }
+    const nextNow = Date.now();
     setCurrentExerciseIndex(i => i + 1);
     setCurrentSet(1);
     setPhase('exercise');
     setPhaseTime(0);
+    setPhaseStartedAt(nextNow);
     setRestTimeRemaining(0);
+    setRestEndAt(null);
     setFeedbackMessage(null);
   }, [currentExerciseIndex, workout.exercises.length]);
 
   const handlePreviousExercise = useCallback(() => {
     if (currentExerciseIndex <= 0) return;
+    const prevNow = Date.now();
     setCurrentExerciseIndex(i => i - 1);
     setCurrentSet(1);
     setPhase('exercise');
     setPhaseTime(0);
+    setPhaseStartedAt(prevNow);
     setRestTimeRemaining(0);
+    setRestEndAt(null);
     setFeedbackMessage(null);
   }, [currentExerciseIndex]);
 
@@ -376,6 +492,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
           notes: `${workout.workout_name} - ${exerciseLogs.filter(l => !l.skipped).length} exercices`,
         });
 
+      clearPersistedState();
       toast.success('🎉 Séance enregistrée avec succès !');
       onComplete();
     } catch (error) {
@@ -385,6 +502,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
   };
 
   const handleAbort = async () => {
+    clearPersistedState();
     if (sessionId) {
       await supabase
         .from('workout_sessions')
@@ -526,7 +644,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
         <div className="text-center">
           <p className="font-mono text-sm font-bold">{formatTime(globalTime)}</p>
         </div>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsPaused(!isPaused)}>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={togglePause}>
           {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
         </Button>
       </div>
@@ -544,28 +662,34 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
       <div className="flex-1 flex flex-col items-center justify-center px-4 min-h-0">
         {phase === 'exercise' ? (
           <div className="flex flex-col items-center w-full max-w-sm">
-            {/* Exercise icon + name row */}
-            <div className="flex items-center gap-3 mb-3 w-full">
-              <button
-                onClick={() => setViewingExerciseIndex(currentExerciseIndex)}
-                className="h-14 w-14 rounded-xl card-premium flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
-              >
-                <ExerciseIcon className="h-9 w-9 text-primary" />
-              </button>
-              <div className="flex-1 min-w-0">
-                <h2 className="text-base font-bold truncate">{currentExercise?.name}</h2>
-                <p className="text-xs text-muted-foreground">{currentLog?.actual_weight}</p>
+            {/* Exercise name + actions */}
+            <div className="w-full mb-3">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setViewingExerciseIndex(currentExerciseIndex)}
+                  className="h-14 w-14 rounded-xl card-premium flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
+                >
+                  <ExerciseIcon className="h-9 w-9 text-primary" />
+                </button>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-base font-bold leading-tight">{currentExercise?.name}</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">{currentLog?.actual_weight}</p>
+                </div>
               </div>
-              <Button variant="ghost" size="sm" className="h-8 px-2 flex-shrink-0 text-xs gap-1" onClick={() => setViewingExerciseIndex(currentExerciseIndex)}>
-                <Info className="h-3.5 w-3.5" />
-                Détail
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => setSubstitutionOpen(true)}>
-                <ArrowRightLeft className="h-3.5 w-3.5" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => handleEditExercise(currentExerciseIndex)}>
-                <Edit2 className="h-3.5 w-3.5" />
-              </Button>
+              <div className="flex items-center justify-center gap-1 mt-2">
+                <Button variant="ghost" size="sm" className="h-8 px-3 text-xs gap-1" onClick={() => setViewingExerciseIndex(currentExerciseIndex)}>
+                  <Info className="h-3.5 w-3.5" />
+                  Détail
+                </Button>
+                <Button variant="ghost" size="sm" className="h-8 px-3 text-xs gap-1" onClick={() => setSubstitutionOpen(true)}>
+                  <ArrowRightLeft className="h-3.5 w-3.5" />
+                  Remplacer
+                </Button>
+                <Button variant="ghost" size="sm" className="h-8 px-3 text-xs gap-1" onClick={() => handleEditExercise(currentExerciseIndex)}>
+                  <Edit2 className="h-3.5 w-3.5" />
+                  Modifier
+                </Button>
+              </div>
             </div>
 
             {/* Set indicator pills */}
@@ -628,7 +752,7 @@ export const ActiveWorkoutSession = ({ workout, onClose, onComplete }: ActiveWor
               {[30, 60, 90, 120].map(sec => (
                 <button
                   key={sec}
-                  onClick={() => setRestTimeRemaining(sec)}
+                  onClick={() => { setRestTimeRemaining(sec); setRestEndAt(Date.now() + sec * 1000); }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                     restTimeRemaining === sec
                       ? 'bg-energy/20 text-energy border border-energy/30'
