@@ -1,0 +1,29 @@
+project_id = "ldllojtzoetwcwbjmfib"
+
+[functions.coach-chat]
+verify_jwt = false
+
+[functions.goal-assistant]
+verify_jwt = false
+
+
+[functions.next-workout]
+verify_jwt = false
+
+[functions.analyze-meal]
+verify_jwt = false
+
+[functions.exercise-detail]
+verify_jwt = false
+
+[functions.exercise-video]
+verify_jwt = false
+
+[functions.create-checkout]
+verify_jwt = false
+
+[functions.check-subscription]
+verify_jwt = false
+
+[functions.customer-portal]
+verify_jwt = false

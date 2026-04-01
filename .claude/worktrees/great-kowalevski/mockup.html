@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup - The Perfect Coach</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0f1a; color: #e2e8f0; overflow-x: hidden; }
+
+  .phone { width: 390px; height: 844px; margin: 20px auto; border-radius: 40px; border: 3px solid #1e293b; overflow: hidden; position: relative; background: #0d1320; display: flex; flex-direction: column; }
+  .phones { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; padding: 20px; }
+
+  h2.section-title { text-align: center; color: #2dd4bf; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 30px 0 10px; }
+
+  /* Header */
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 50px 20px 12px; flex-shrink: 0; }
+  .header h1 { font-size: 22px; font-weight: 700; }
+  .header h1 .accent { color: #2dd4bf; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #2dd4bf, #06b6d4); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #0a0f1a; cursor: pointer; }
+
+  /* Content */
+  .content { flex: 1; overflow-y: auto; padding: 0 16px 16px; }
+
+  /* Cards */
+  .card { background: #131b2e; border: 1px solid #1e293b; border-radius: 16px; padding: 16px; margin-bottom: 12px; }
+  .card-glow { border-color: #2dd4bf33; background: linear-gradient(135deg, #131b2e, #0d2a2a); }
+
+  /* Workout card */
+  .workout-card { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .workout-icon { width: 44px; height: 44px; border-radius: 12px; background: #2dd4bf20; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+  .workout-info h3 { font-size: 16px; font-weight: 700; }
+  .workout-info p { font-size: 12px; color: #64748b; }
+  .btn-primary { width: 100%; padding: 10px; border-radius: 12px; background: linear-gradient(90deg, #2dd4bf, #06b6d4); color: #0a0f1a; font-weight: 600; font-size: 14px; border: none; cursor: pointer; }
+  .btn-row { display: flex; gap: 8px; }
+  .btn-outline { flex: 1; padding: 10px; border-radius: 12px; background: transparent; border: 1px solid #1e293b; color: #e2e8f0; font-size: 13px; cursor: pointer; }
+
+  /* Rings */
+  .rings-row { display: flex; justify-content: space-around; padding: 16px 0; }
+  .ring { text-align: center; }
+  .ring-circle { width: 70px; height: 70px; border-radius: 50%; border: 4px solid #1e293b; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; position: relative; }
+  .ring-circle.cal { border-color: #ef4444; border-top-color: #1e293b; border-right-color: #1e293b; }
+  .ring-circle.prot { border-color: #1e293b; }
+  .ring-circle.water { border-color: #3b82f6; border-top-color: #1e293b; border-right-color: #1e293b; border-bottom-color: #1e293b; }
+  .ring-circle span { font-size: 18px; }
+  .ring-label { font-size: 12px; color: #94a3b8; }
+  .ring-value { font-size: 14px; font-weight: 700; }
+  .ring-value small { font-weight: 400; color: #64748b; font-size: 11px; }
+
+  /* Stats grid */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .stat-card { background: #131b2e; border: 1px solid #1e293b; border-radius: 12px; padding: 12px; }
+  .stat-label { font-size: 11px; color: #64748b; display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .stat-value { font-size: 22px; font-weight: 700; }
+
+  /* Health stats */
+  .health-label { font-size: 13px; font-weight: 600; margin-bottom: 8px; color: #94a3b8; }
+  .health-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .health-item { background: #131b2e; border: 1px solid #1e293b; border-radius: 12px; padding: 12px; }
+  .health-item .icon { font-size: 16px; margin-bottom: 4px; }
+  .health-item .name { font-size: 12px; color: #94a3b8; }
+  .health-item .val { font-size: 11px; color: #64748b; margin-top: 2px; }
+
+  /* Tab bar */
+  .tabbar { display: flex; align-items: center; justify-content: space-around; padding: 8px 8px 28px; border-top: 1px solid #1e293b; background: #0d1320ee; backdrop-filter: blur(12px); flex-shrink: 0; position: relative; }
+  .tab { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 16px; font-size: 10px; color: #64748b; cursor: pointer; }
+  .tab.active { color: #2dd4bf; }
+  .tab .icon { font-size: 20px; }
+  .tab.active .dot { width: 4px; height: 4px; border-radius: 50%; background: #2dd4bf; margin-top: 2px; }
+
+  .coach-btn { display: flex; flex-direction: column; align-items: center; margin-top: -28px; }
+  .coach-circle { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #2dd4bf, #06b6d4); display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 0 20px #2dd4bf44; }
+  .coach-label { font-size: 10px; font-weight: 600; color: #2dd4bf; margin-top: 4px; }
+
+  /* Page label */
+  .page-label { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: #2dd4bf; color: #0a0f1a; padding: 3px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; z-index: 10; }
+
+  /* Journal specific */
+  .day-nav { display: flex; align-items: center; justify-content: space-between; padding: 8px 0 16px; }
+  .day-nav .arrow { color: #64748b; font-size: 20px; cursor: pointer; }
+  .day-nav .date { text-align: center; }
+  .day-nav .date strong { font-size: 15px; display: block; }
+  .day-nav .date small { font-size: 12px; color: #64748b; }
+
+  .timeline-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #1e293b22; }
+  .timeline-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+  .timeline-dot.meal { background: #f59e0b; }
+  .timeline-dot.workout { background: #2dd4bf; }
+  .timeline-dot.water { background: #3b82f6; }
+  .timeline-time { font-size: 11px; color: #64748b; width: 40px; flex-shrink: 0; }
+  .timeline-content { flex: 1; }
+  .timeline-content strong { font-size: 13px; }
+  .timeline-content p { font-size: 11px; color: #64748b; }
+
+  /* Progression specific */
+  .session-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #1e293b22; }
+  .session-icon { width: 36px; height: 36px; border-radius: 10px; background: #2dd4bf15; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .session-info { flex: 1; }
+  .session-info strong { font-size: 13px; display: block; }
+  .session-info small { font-size: 11px; color: #64748b; }
+  .session-meta { text-align: right; font-size: 12px; color: #64748b; }
+
+  /* Annotations */
+  .annotation { position: absolute; background: #fbbf24; color: #0a0f1a; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; z-index: 20; }
+  .arrow-line { position: absolute; border-left: 2px dashed #fbbf24; z-index: 19; }
+
+  .comparison { display: flex; gap: 60px; justify-content: center; flex-wrap: wrap; padding: 20px; }
+  .comp-label { text-align: center; margin-bottom: 10px; font-size: 13px; color: #64748b; }
+  .comp-label strong { color: #e2e8f0; }
+</style>
+</head>
+<body>
+
+<h2 class="section-title" style="margin-top:20px;">Page 1 — Aujourd'hui (ex Accueil)</h2>
+<div class="phones">
+  <div class="phone">
+    <div class="page-label">AUJOURD'HUI</div>
+    <div class="header">
+      <h1><span class="accent">The Perfect</span> Coach</h1>
+      <div class="avatar">A</div>
+    </div>
+    <div class="content">
+      <!-- Workout card -->
+      <div class="card card-glow">
+        <div class="workout-card">
+          <div class="workout-icon">💪</div>
+          <div class="workout-info">
+            <h3>Lancer la séance</h3>
+            <p>Focus Pecs & Triceps</p>
+          </div>
+        </div>
+        <div style="font-size:12px; color:#64748b; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+          🏋️ Push Day — Intermédiaire
+        </div>
+        <div class="btn-row">
+          <button class="btn-outline">👁 Aperçu</button>
+          <button class="btn-primary" style="flex:1;">Commencer ›</button>
+        </div>
+      </div>
+
+      <!-- Rings -->
+      <div class="card">
+        <div class="rings-row">
+          <div class="ring">
+            <div class="ring-circle cal"><span>🔥</span></div>
+            <div class="ring-label">Calories</div>
+            <div class="ring-value">1420<small>/2755</small></div>
+          </div>
+          <div class="ring">
+            <div class="ring-circle prot"><span>🥩</span></div>
+            <div class="ring-label">Protéines</div>
+            <div class="ring-value">85g<small>/152</small></div>
+          </div>
+          <div class="ring">
+            <div class="ring-circle water"><span>💧</span></div>
+            <div class="ring-label">Eau</div>
+            <div class="ring-value">1.2L<small>/2</small></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Health stats -->
+      <div class="health-label">Statistiques santé</div>
+      <div class="health-grid">
+        <div class="health-item"><div class="icon">🌙</div><div class="name">Sommeil</div><div class="val">7h 23min</div></div>
+        <div class="health-item"><div class="icon">❤️</div><div class="name">Rythme cardiaque</div><div class="val">68 bpm</div></div>
+        <div class="health-item"><div class="icon">👣</div><div class="name">Pas</div><div class="val">8 432</div></div>
+        <div class="health-item"><div class="icon">⏱</div><div class="name">Minutes actives</div><div class="val">45 min</div></div>
+      </div>
+    </div>
+
+    <!-- Tab bar -->
+    <div class="tabbar">
+      <div class="tab active">
+        <div class="icon">🏠</div>
+        <span>Aujourd'hui</span>
+        <div class="dot"></div>
+      </div>
+      <div class="tab">
+        <div class="icon">📈</div>
+        <span>Progression</span>
+      </div>
+      <div class="coach-btn">
+        <div class="coach-circle">💬</div>
+        <div class="coach-label">Coach</div>
+      </div>
+      <div class="tab">
+        <div class="icon">📅</div>
+        <span>Journal</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2 class="section-title">Page 2 — Progression (fusionne Training + Performance)</h2>
+<div class="phones">
+  <div class="phone">
+    <div class="page-label">PROGRESSION</div>
+    <div class="header">
+      <h1><span class="accent">The Perfect</span> Coach</h1>
+      <div class="avatar">A</div>
+    </div>
+    <div class="content">
+      <!-- Stats grid -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">🏋️ Séances totales</div>
+          <div class="stat-value">24</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">⏱ Temps total</div>
+          <div class="stat-value">18h</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">🔥 Calories brûlées</div>
+          <div class="stat-value">12.4k</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">🏆 Série actuelle</div>
+          <div class="stat-value">5 j</div>
+        </div>
+      </div>
+
+      <!-- Objectif -->
+      <div class="card">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="width:32px;height:32px;border-radius:50%;background:#2dd4bf20;display:flex;align-items:center;justify-content:center;">📐</div>
+          <div>
+            <div style="font-size:14px;font-weight:600;">Objectif poids</div>
+            <div style="font-size:12px;color:#64748b;">75.8kg → 72kg</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent sessions -->
+      <div class="health-label">Séances récentes</div>
+      <div class="card" style="padding:8px 16px;">
+        <div class="session-item">
+          <div class="session-icon">💪</div>
+          <div class="session-info">
+            <strong>Push Day — Pecs & Triceps</strong>
+            <small>Aujourd'hui • 52 min</small>
+          </div>
+          <div class="session-meta">485 kcal</div>
+        </div>
+        <div class="session-item">
+          <div class="session-icon">🦵</div>
+          <div class="session-info">
+            <strong>Leg Day — Quadriceps</strong>
+            <small>Hier • 48 min</small>
+          </div>
+          <div class="session-meta">520 kcal</div>
+        </div>
+        <div class="session-item">
+          <div class="session-icon">🏃</div>
+          <div class="session-info">
+            <strong>Cardio HIIT</strong>
+            <small>Mar 5 • 30 min</small>
+          </div>
+          <div class="session-meta">310 kcal</div>
+        </div>
+        <div class="session-item" style="border:none;">
+          <div class="session-icon">💪</div>
+          <div class="session-info">
+            <strong>Pull Day — Dos & Biceps</strong>
+            <small>Mar 3 • 55 min</small>
+          </div>
+          <div class="session-meta">460 kcal</div>
+        </div>
+      </div>
+
+      <!-- Teaser -->
+      <div class="card" style="background:#131b2e;border-style:dashed;">
+        <div style="font-size:12px;color:#64748b;">💡 Bientôt : graphiques d'évolution, records personnels et analyses détaillées.</div>
+      </div>
+    </div>
+
+    <div class="tabbar">
+      <div class="tab">
+        <div class="icon">🏠</div>
+        <span>Aujourd'hui</span>
+      </div>
+      <div class="tab active">
+        <div class="icon">📈</div>
+        <span>Progression</span>
+        <div class="dot"></div>
+      </div>
+      <div class="coach-btn">
+        <div class="coach-circle">💬</div>
+        <div class="coach-label">Coach</div>
+      </div>
+      <div class="tab">
+        <div class="icon">📅</div>
+        <span>Journal</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2 class="section-title">Page 3 — Journal (inchangé, timeline enrichie)</h2>
+<div class="phones">
+  <div class="phone">
+    <div class="page-label">JOURNAL</div>
+    <div class="header">
+      <h1><span class="accent">The Perfect</span> Coach</h1>
+      <div class="avatar">A</div>
+    </div>
+    <div class="content">
+      <div class="day-nav">
+        <div class="arrow">‹</div>
+        <div class="date">
+          <strong>Aujourd'hui</strong>
+          <small>8 mars 2026</small>
+        </div>
+        <div class="arrow">›</div>
+      </div>
+
+      <!-- Rings -->
+      <div class="card">
+        <div class="rings-row">
+          <div class="ring">
+            <div class="ring-circle cal"><span>🔥</span></div>
+            <div class="ring-label">Calories</div>
+            <div class="ring-value">1420<small>/2755</small></div>
+          </div>
+          <div class="ring">
+            <div class="ring-circle prot"><span>🥩</span></div>
+            <div class="ring-label">Protéines</div>
+            <div class="ring-value">85g<small>/152</small></div>
+          </div>
+          <div class="ring">
+            <div class="ring-circle water"><span>💧</span></div>
+            <div class="ring-label">Eau</div>
+            <div class="ring-value">1.2L<small>/2</small></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timeline -->
+      <div class="health-label">Activité du jour</div>
+      <div class="card" style="padding: 8px 16px;">
+        <div class="timeline-item">
+          <div class="timeline-time">08:15</div>
+          <div class="timeline-dot meal"></div>
+          <div class="timeline-content">
+            <strong>Petit-déjeuner</strong>
+            <p>Oeufs brouillés, pain complet, café — 420 kcal</p>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-time">10:30</div>
+          <div class="timeline-dot workout"></div>
+          <div class="timeline-content">
+            <strong>Push Day — Pecs & Triceps</strong>
+            <p>52 min • 485 kcal brûlées</p>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-time">12:45</div>
+          <div class="timeline-dot meal"></div>
+          <div class="timeline-content">
+            <strong>Déjeuner</strong>
+            <p>Poulet grillé, riz, brocolis — 650 kcal</p>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-time">14:00</div>
+          <div class="timeline-dot water"></div>
+          <div class="timeline-content">
+            <strong>Hydratation</strong>
+            <p>+500ml (total: 1.2L)</p>
+          </div>
+        </div>
+        <div class="timeline-item" style="border:none;">
+          <div class="timeline-time">19:30</div>
+          <div class="timeline-dot meal"></div>
+          <div class="timeline-content">
+            <strong>Dîner</strong>
+            <p>Saumon, quinoa, légumes — 580 kcal</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabbar">
+      <div class="tab">
+        <div class="icon">🏠</div>
+        <span>Aujourd'hui</span>
+      </div>
+      <div class="tab">
+        <div class="icon">📈</div>
+        <span>Progression</span>
+      </div>
+      <div class="coach-btn">
+        <div class="coach-circle">💬</div>
+        <div class="coach-label">Coach</div>
+      </div>
+      <div class="tab active">
+        <div class="icon">📅</div>
+        <span>Journal</span>
+        <div class="dot"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2 class="section-title">Navigation — Comparaison Avant / Après</h2>
+<div class="comparison">
+  <div>
+    <div class="comp-label"><strong>AVANT</strong> — 4 onglets</div>
+    <div style="width:390px; background:#0d1320; border-radius:0 0 20px 20px; border:2px solid #1e293b; overflow:hidden;">
+      <div class="tabbar" style="border-radius:0;">
+        <div class="tab active"><div class="icon">🏠</div><span>Accueil</span></div>
+        <div class="tab"><div class="icon">📅</div><span>Journal</span></div>
+        <div class="coach-btn"><div class="coach-circle">💬</div><div class="coach-label">Coach</div></div>
+        <div class="tab"><div class="icon">👤</div><span>Profil</span></div>
+      </div>
+    </div>
+    <div style="font-size:11px; color:#ef4444; margin-top:8px; text-align:center;">
+      ❌ Training & Performance inaccessibles<br>
+      ❌ Profil occupe un slot quotidien
+    </div>
+  </div>
+  <div>
+    <div class="comp-label"><strong>APRÈS</strong> — 3 onglets + Profil en haut</div>
+    <div style="width:390px; background:#0d1320; border-radius:0 0 20px 20px; border:2px solid #2dd4bf44; overflow:hidden;">
+      <div class="tabbar" style="border-radius:0;">
+        <div class="tab active"><div class="icon">🏠</div><span>Aujourd'hui</span></div>
+        <div class="tab"><div class="icon">📈</div><span>Progression</span></div>
+        <div class="coach-btn"><div class="coach-circle">💬</div><div class="coach-label">Coach</div></div>
+        <div class="tab"><div class="icon">📅</div><span>Journal</span></div>
+      </div>
+    </div>
+    <div style="font-size:11px; color:#2dd4bf; margin-top:8px; text-align:center;">
+      ✅ Tout est accessible<br>
+      ✅ Profil = avatar en haut à droite
+    </div>
+  </div>
+</div>
+
+<div style="height:40px;"></div>
+
+</body>
+</html>

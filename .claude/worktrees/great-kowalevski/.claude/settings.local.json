@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc --noEmit)",
+      "Bash(pushd \"C:/Users/antho/Documents/Cursor/7. HealthLab v2/le-coach-73eda645\")",
+      "Bash(popd)",
+      "Bash(npm run build)"
+    ]
+  }
+}

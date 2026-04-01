@@ -13,27 +13,28 @@ const corsHeaders = {
  */
 async function generatePositionsImage(exerciseName: string, movementDescription: string, apiKey: string): Promise<string | null> {
   try {
-    const prompt = `Create a single wide landscape illustration showing exactly TWO key positions of the exercise "${exerciseName}" placed side by side (LEFT = starting position, RIGHT = peak/end position).
+    const prompt = `Create a single illustration of the gym exercise "${exerciseName}".
 
-EXERCISE DESCRIPTION (use this to understand the exact body positions):
+EXACT BODY POSITION (follow this precisely, do NOT improvise):
 ${movementDescription}
 
-POSITION REQUIREMENTS:
-- The LEFT figure must show the exact starting position described above.
-- The RIGHT figure must show the exact end/peak position described above.
-- The two positions MUST be visually DIFFERENT — different joint angles, different limb positions. If the exercise involves extending an arm or leg, the LEFT should show it tucked/bent and the RIGHT should show it fully extended.
-- A curved red arrow between the two figures indicating the direction of movement.
+CRITICAL POSITIONING RULES:
+- The person MUST be making physical contact with any equipment or bench described. If lying on a bench, the back MUST rest flat on the bench surface. If sitting, the body MUST sit ON the seat.
+- Show the MIDPOINT of the movement (halfway between start and end position).
+- Anatomically correct human proportions — no distorted limbs, correct joint angles.
+- Gravity applies: the person is grounded, not floating.
 
-STYLE (MANDATORY):
-- Anatomical écorché figure: human body WITHOUT SKIN, showing raw musculature (like "Strength Training Anatomy" by Frédéric Delavier).
-- Muscles actively engaged in the exercise highlighted in red/crimson. Other muscles in natural pinkish tone.
-- Realistic human proportions, athletic male build.
-- Both figures must be the SAME person from the SAME camera angle.
+STYLE:
+- 3D rendered athletic male, realistic skin, wearing dark fitted shorts only.
+- Dark gym environment, dramatic top lighting.
+- Realistic metallic equipment (barbell, dumbbells, bench, cables).
+- Premium fitness app illustration style.
+- Camera angle: 3/4 side view showing full body and correct form.
 
 TECHNICAL:
-- Plain white background, only necessary equipment (barbell, dumbbell, bench, etc.).
-- No text, no labels, no annotations.
-- Wide landscape aspect ratio (roughly 2:1).`;
+- Dark background.
+- No text, no labels, no watermarks.
+- Square 1:1 format.`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`,
@@ -78,17 +79,21 @@ async function generateMuscleDiagram(exerciseName: string, muscles: string[], ap
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: `Create an anatomical muscle map for the exercise "${exerciseName}".
+          contents: [{ parts: [{ text: `Create a clean muscle map for the exercise "${exerciseName}".
 
-Show exactly TWO full-body écorché figures side by side:
-- LEFT figure: front/anterior view
-- RIGHT figure: back/posterior view
+Show TWO full-body figures side by side:
+- LEFT: front view
+- RIGHT: back view
 
-The targeted muscles (${muscleList}) must be highlighted in vivid red/crimson with strong saturation. All other muscles rendered in pale gray/beige with subtle shading to show muscle definition.
+The targeted muscles (${muscleList}) must be highlighted in bright teal/cyan (#1fbfa0) with a glow effect. All other muscles rendered in dark gray with subtle outlines.
 
-STYLE: Frédéric Delavier "Strength Training Anatomy" — skinless anatomical figure, every muscle group clearly delineated with clean outlines and realistic shading. Athletic male build, neutral standing pose (arms slightly away from body so all muscles visible).
+STYLE:
+- 3D rendered muscular male figure, dark skin-tight bodysuit showing muscle definition underneath.
+- Dark charcoal background (#0d1117).
+- Clean modern fitness app style, not medical/anatomical.
+- Athletic male build, neutral standing pose.
 
-TECHNICAL: White background. No text, no labels, no annotations. High detail, professional medical illustration quality. Portrait orientation.` }] }],
+TECHNICAL: Dark background. No text, no labels. Square format.` }] }],
           generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
         }),
       }
@@ -170,7 +175,7 @@ serve(async (req) => {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase config missing");
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { exerciseName } = await req.json();
+    const { exerciseName, musclesOverride, forceRegenerate } = await req.json();
 
     if (!exerciseName) {
       return new Response(
@@ -191,8 +196,8 @@ serve(async (req) => {
       .from("chat-uploads")
       .list("exercise-images", { search: normalizedName });
 
-    const hasPositions = existingFiles?.some((f: any) => f.name === `${normalizedName}_positions.png`);
-    const hasMuscles = existingFiles?.some((f: any) => f.name === `${normalizedName}_muscles.png`);
+    const hasPositions = !forceRegenerate && existingFiles?.some((f: any) => f.name === `${normalizedName}_positions.png`);
+    const hasMuscles = !forceRegenerate && existingFiles?.some((f: any) => f.name === `${normalizedName}_muscles.png`);
 
     // Step 1: Get AI text details (need muscles for diagram)
     const aiDetail = await (async () => {
@@ -262,7 +267,7 @@ Règles:
       console.log("Generating exercise illustrations via Gemini...");
       const [positionsBase64, muscleBase64] = await Promise.all([
         !hasPositions ? generatePositionsImage(exerciseName, aiDetail.how_to || '', GEMINI_API_KEY) : Promise.resolve(null),
-        !hasMuscles ? generateMuscleDiagram(exerciseName, aiDetail.muscles_targeted || [], GEMINI_API_KEY) : Promise.resolve(null),
+        !hasMuscles ? generateMuscleDiagram(exerciseName, musclesOverride || aiDetail.muscles_targeted || [], GEMINI_API_KEY) : Promise.resolve(null),
       ]);
 
       // Upload to storage in parallel

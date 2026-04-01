@@ -1,0 +1,438 @@
+import { useEffect, useState, useCallback } from 'react';
+import { useNavigate, useOutletContext } from 'react-router-dom';
+import { Target } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/useProfile';
+import { healthProvider } from '@/providers/health';
+import { supabase } from '@/integrations/supabase/client';
+import type { HealthMetrics } from '@/providers/health';
+import { Skeleton } from '@/components/ui/skeleton';
+import GoalEditorModal from '@/components/profile/GoalEditorModal';
+
+
+import HealthStatsCard from '@/components/home/HealthStatsCard';
+import SmartActionCard from '@/components/home/SmartActionCard';
+import CircularProgressRings from '@/components/home/CircularProgressRings';
+import ContextualAlertChips from '@/components/home/ContextualAlertChips';
+import WorkoutPreviewSheet from '@/components/home/WorkoutPreviewSheet';
+import { ActiveWorkoutSession } from '@/components/training/ActiveWorkoutSession';
+import { useNutritionGoals } from '@/hooks/useNutritionGoals';
+import { Workout } from '@/components/training/NextWorkoutCard';
+
+interface OutletContextType {
+  onOpenCoach?: () => void;
+}
+
+const WORKOUT_STORAGE_KEY = 'prepared_workout';
+
+const HomePage = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { profile } = useProfile();
+  const outletContext = useOutletContext<OutletContextType>() || {};
+  const [metrics, setMetrics] = useState<HealthMetrics | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
+  const [weeklySessionsCompleted, setWeeklySessionsCompleted] = useState(0);
+  const [currentWeight, setCurrentWeight] = useState<number | null>(null);
+  const [currentBodyFat, setCurrentBodyFat] = useState<number | null>(null);
+  const [proteinConsumed, setProteinConsumed] = useState<number>(0);
+  const [caloriesConsumed, setCaloriesConsumed] = useState<number>(0);
+
+  const [preparedWorkout, setPreparedWorkout] = useState<Workout | null>(null);
+  const [isWorkoutPreviewOpen, setIsWorkoutPreviewOpen] = useState(false);
+  const [isSessionActive, setIsSessionActive] = useState(false);
+  const [isRefreshingWorkout, setIsRefreshingWorkout] = useState(false);
+  const [healthStats, setHealthStats] = useState({
+    sleepHours: null as number | null,
+    steps: null as number | null,
+    heartRateAvg: null as number | null,
+    heartRateResting: null as number | null,
+    activeMinutes: null as number | null,
+    floorsClimbed: null as number | null,
+  });
+
+  // Use shared nutrition goals calculation (same as NutritionPage)
+  const nutritionGoals = useNutritionGoals(profile);
+  const caloriesGoal = nutritionGoals.calories;
+  const proteinGoal = nutritionGoals.protein;
+  const waterGoal = profile?.target_water_ml ?? Math.round(nutritionGoals.hydrationLiters * 1000);
+
+  const fetchMetrics = useCallback(async () => {
+    if (!user) return;
+    healthProvider.setUserId(user.id);
+    const todayMetrics = await healthProvider.getTodayMetrics();
+    setMetrics(todayMetrics);
+    setIsLoading(false);
+  }, [user]);
+
+  // Fetch prepared workout from user_context
+  const fetchPreparedWorkout = useCallback(async () => {
+    if (!user) return;
+
+    const { data } = await supabase
+      .from('user_context')
+      .select('value')
+      .eq('user_id', user.id)
+      .eq('key', WORKOUT_STORAGE_KEY)
+      .maybeSingle();
+
+    if (data?.value) {
+      try {
+        const parsed = JSON.parse(data.value);
+        setPreparedWorkout(parsed as Workout);
+      } catch {
+        console.error('Error parsing prepared workout');
+      }
+    }
+  }, [user]);
+
+  // Fetch current weight and body fat from latest data
+  const fetchCurrentMetrics = useCallback(async () => {
+    if (!user) return;
+
+    const { data: dailyData } = await supabase
+      .from('daily_metrics')
+      .select('weight, body_fat_pct')
+      .eq('user_id', user.id)
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (dailyData?.weight) {
+      setCurrentWeight(dailyData.weight);
+    }
+    if (dailyData?.body_fat_pct) {
+      setCurrentBodyFat(dailyData.body_fat_pct);
+    }
+
+    const { data: bodyData } = await supabase
+      .from('body_composition')
+      .select('weight_kg, body_fat_pct')
+      .eq('user_id', user.id)
+      .order('measured_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (bodyData) {
+      if (!dailyData?.weight && bodyData.weight_kg) {
+        setCurrentWeight(bodyData.weight_kg);
+      }
+      if (!dailyData?.body_fat_pct && bodyData.body_fat_pct) {
+        setCurrentBodyFat(bodyData.body_fat_pct);
+      }
+    }
+  }, [user]);
+
+  // Fetch today's nutrition intake
+  const fetchNutritionIntake = useCallback(async () => {
+    if (!user) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const startOfDay = `${today}T00:00:00`;
+    const endOfDay = `${today}T23:59:59`;
+
+    const { data } = await supabase
+      .from('nutrition_logs')
+      .select('calories, protein, meal_type')
+      .eq('user_id', user.id)
+      .gte('logged_at', startOfDay)
+      .lte('logged_at', endOfDay);
+
+    if (data) {
+      const totalCalories = data.reduce((sum, log) => sum + (log.calories || 0), 0);
+      const totalProtein = data.reduce((sum, log) => sum + (log.protein || 0), 0);
+      setCaloriesConsumed(Math.round(totalCalories));
+      setProteinConsumed(Math.round(totalProtein));
+
+    }
+  }, [user]);
+
+  // Fetch weekly sessions count
+  const fetchWeeklySessions = useCallback(async () => {
+    if (!user) return;
+
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - diff);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const { count, error } = await supabase
+      .from('activities')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .gte('performed_at', startOfWeek.toISOString());
+
+    if (!error && count !== null) {
+      setWeeklySessionsCompleted(count);
+    }
+  }, [user]);
+
+  // Fetch health stats
+  const fetchHealthStats = useCallback(async () => {
+    if (!user) return;
+
+    const today = new Date().toISOString().split('T')[0];
+
+    const { data } = await supabase
+      .from('daily_metrics')
+      .select('sleep_hours, steps, heart_rate_avg, heart_rate_resting, active_minutes, floors_climbed')
+      .eq('user_id', user.id)
+      .eq('date', today)
+      .maybeSingle();
+
+    if (data) {
+      setHealthStats({
+        sleepHours: data.sleep_hours,
+        steps: data.steps,
+        heartRateAvg: data.heart_rate_avg,
+        heartRateResting: data.heart_rate_resting,
+        activeMinutes: data.active_minutes,
+        floorsClimbed: data.floors_climbed,
+      });
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchMetrics();
+    fetchWeeklySessions();
+    fetchCurrentMetrics();
+    fetchNutritionIntake();
+    fetchHealthStats();
+    fetchPreparedWorkout();
+
+    if (user) {
+      healthProvider.setUserId(user.id);
+      const unsubscribe = healthProvider.subscribeToMetrics((newMetrics) => {
+        setMetrics(newMetrics);
+      });
+
+      const activitiesChannel = supabase
+        .channel('homepage_activities')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'activities',
+          filter: `user_id=eq.${user.id}`,
+        }, () => {
+          fetchWeeklySessions();
+        })
+        .subscribe();
+
+      const nutritionChannel = supabase
+        .channel('homepage_nutrition')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'nutrition_logs',
+          filter: `user_id=eq.${user.id}`,
+        }, () => {
+          fetchNutritionIntake();
+        })
+        .subscribe();
+
+      const metricsChannel = supabase
+        .channel('homepage_daily_metrics')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'daily_metrics',
+          filter: `user_id=eq.${user.id}`,
+        }, () => {
+          fetchHealthStats();
+          fetchMetrics();
+        })
+        .subscribe();
+
+      const contextChannel = supabase
+        .channel('homepage_context')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'user_context',
+          filter: `user_id=eq.${user.id}`,
+        }, () => {
+          fetchPreparedWorkout();
+        })
+        .subscribe();
+
+      return () => {
+        unsubscribe();
+        supabase.removeChannel(activitiesChannel);
+        supabase.removeChannel(nutritionChannel);
+        supabase.removeChannel(metricsChannel);
+        supabase.removeChannel(contextChannel);
+      };
+    }
+  }, [user, fetchMetrics, fetchWeeklySessions, fetchCurrentMetrics, fetchNutritionIntake, fetchHealthStats, fetchPreparedWorkout]);
+
+  const waterConsumed = metrics?.waterMl || 0;
+  const caloriesPercentage = (caloriesConsumed / caloriesGoal) * 100;
+
+  const weeklySessionsTotal = profile?.activity_level === 'very_active' ? 6 
+    : profile?.activity_level === 'active' ? 5
+    : profile?.activity_level === 'moderate' ? 4
+    : profile?.activity_level === 'light' ? 3
+    : 2;
+
+  const handleStartWorkout = () => {
+    if (preparedWorkout) {
+      setIsWorkoutPreviewOpen(false);
+      setIsSessionActive(true);
+    }
+  };
+
+  const handleOpenCoach = () => {
+    outletContext.onOpenCoach?.();
+  };
+
+  const handlePreviewWorkout = () => {
+    if (preparedWorkout) {
+      setIsWorkoutPreviewOpen(true);
+    }
+  };
+
+  const handleRefreshWorkout = async () => {
+    if (!user) return;
+    setIsRefreshingWorkout(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data, error: fnError } = await supabase.functions.invoke('next-workout', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (fnError) throw fnError;
+      if (data?.error) throw new Error(data.error);
+
+      // Save to user_context
+      await supabase
+        .from('user_context')
+        .upsert({
+          user_id: user.id,
+          key: WORKOUT_STORAGE_KEY,
+          value: JSON.stringify(data),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,key' });
+
+      setPreparedWorkout(data);
+    } catch (err) {
+      console.error("Error refreshing workout:", err);
+    } finally {
+      setIsRefreshingWorkout(false);
+    }
+  };
+
+  const handleSessionComplete = async () => {
+    setIsSessionActive(false);
+    // Clear the saved workout and refresh
+    if (user) {
+      await supabase
+        .from('user_context')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('key', WORKOUT_STORAGE_KEY);
+      setPreparedWorkout(null);
+      // Generate a new workout
+      await handleRefreshWorkout();
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="safe-top px-4 pb-4 pt-2">
+        <div className="mb-6">
+          <Skeleton className="mb-2 h-4 w-24" />
+          <Skeleton className="h-8 w-48" />
+        </div>
+        <Skeleton className="mb-4 h-24 w-full rounded-2xl" />
+        <Skeleton className="mb-4 h-32 w-full rounded-2xl" />
+        <Skeleton className="mb-4 h-20 w-full rounded-2xl" />
+      </div>
+    );
+  }
+
+  // Show active session if active
+  if (isSessionActive && preparedWorkout) {
+    return (
+      <div className="safe-top px-4 pb-24 md:pb-4 pt-2">
+        <ActiveWorkoutSession 
+          workout={preparedWorkout}
+          onClose={() => setIsSessionActive(false)}
+          onComplete={handleSessionComplete}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="safe-top px-4 pb-24 md:pb-4 pt-2">
+      {/* Header */}
+      <div className="mb-4 text-center">
+        <h1 className="text-2xl font-bold tracking-tight">
+          <span className="text-gradient-primary">The Perfect</span>{' '}
+          <span className="text-foreground">Coach</span>
+        </h1>
+      </div>
+
+
+
+      {/* Smart Action Card - Hero Section */}
+      <SmartActionCard
+        preparedWorkout={preparedWorkout ? {
+          name: preparedWorkout.workout_name,
+          targetMuscles: preparedWorkout.target_muscles,
+        } : null}
+
+        onStartWorkout={handleStartWorkout}
+        onOpenCoach={handleOpenCoach}
+        onPreviewWorkout={handlePreviewWorkout}
+      />
+
+      {/* Circular Progress Rings */}
+      <CircularProgressRings
+        caloriesConsumed={caloriesConsumed}
+        caloriesGoal={caloriesGoal}
+        proteinConsumed={proteinConsumed}
+        proteinGoal={proteinGoal}
+        waterConsumed={waterConsumed}
+        waterGoal={waterGoal}
+      />
+
+
+
+      {/* Health Stats Section */}
+      <HealthStatsCard 
+        stats={healthStats}
+        isLoading={isLoading}
+        targetSteps={profile?.target_steps ?? 10000}
+        targetSleepHours={profile?.target_sleep_hours ?? 8}
+      />
+
+      {/* Goal Editor Modal */}
+      <GoalEditorModal
+        isOpen={isGoalModalOpen}
+        onClose={() => setIsGoalModalOpen(false)}
+        currentGoal={profile?.goal}
+        currentTargetWeight={profile?.target_weight_kg}
+      />
+
+      {/* Workout Preview Sheet */}
+      <WorkoutPreviewSheet
+        isOpen={isWorkoutPreviewOpen}
+        onClose={() => setIsWorkoutPreviewOpen(false)}
+        workout={preparedWorkout}
+        onStartWorkout={handleStartWorkout}
+        onRefresh={handleRefreshWorkout}
+        isRefreshing={isRefreshingWorkout}
+      />
+    </div>
+  );
+};
+
+export default HomePage;

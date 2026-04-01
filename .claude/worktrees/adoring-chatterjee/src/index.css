@@ -1,0 +1,340 @@
+/* Fontshare: Satoshi (headings) + Switzer (body) */
+@import url('https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700,900&f[]=switzer@300,400,500,600,700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light theme */
+    --background: 210 20% 98%;
+    --foreground: 220 20% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 10%;
+
+    --primary: 174 75% 42%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 174 90% 55%;
+
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 220 20% 25%;
+
+    --muted: 210 15% 94%;
+    --muted-foreground: 220 10% 50%;
+
+    --accent: 174 70% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 174 75% 42%;
+
+    --radius: 1rem;
+
+    /* Glass effect variables */
+    --glass-bg: 0 0% 100% / 0.7;
+    --glass-border: 0 0% 100% / 0.3;
+
+    /* Chat bubbles */
+    --coach-bubble: 220 14% 96%;
+    --coach-bubble-foreground: 220 20% 20%;
+    --user-bubble: 174 75% 42%;
+    --user-bubble-foreground: 0 0% 100%;
+
+    /* Charts */
+    --chart-real: 174 75% 42%;
+    --chart-target: 220 10% 70%;
+    --chart-grid: 220 13% 91%;
+
+    /* Progress rings */
+    --ring-progress: 174 75% 42%;
+    --ring-background: 220 14% 93%;
+
+    /* Safe areas - fallback values for browsers without notch */
+    --safe-area-top: env(safe-area-inset-top, 0px);
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 174 75% 42%;
+
+    /* Fitness specific colors */
+    --energy: 38 92% 50%;
+    --energy-light: 38 92% 90%;
+    --calories: 0 84% 60%;
+    --calories-light: 0 84% 90%;
+    --water: 199 89% 48%;
+    --water-light: 199 89% 90%;
+    --sleep: 262 83% 58%;
+    --sleep-light: 262 83% 90%;
+    --heart: 0 84% 60%;
+    --heart-light: 0 84% 90%;
+  }
+
+  .dark {
+    /* Dark "science premium" palette */
+    --background: 222 35% 8%;
+    --foreground: 210 20% 98%;
+
+    --card: 222 30% 12%;
+    --card-foreground: 210 20% 98%;
+
+    --popover: 222 30% 12%;
+    --popover-foreground: 210 20% 98%;
+
+    --primary: 174 75% 50%;
+    --primary-foreground: 222 35% 8%;
+    --primary-glow: 174 90% 60%;
+
+    --secondary: 222 25% 16%;
+    --secondary-foreground: 210 20% 90%;
+
+    --muted: 222 25% 18%;
+    --muted-foreground: 220 10% 55%;
+
+    --accent: 174 75% 50%;
+    --accent-foreground: 222 35% 8%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 222 20% 18%;
+    --input: 222 20% 18%;
+    --ring: 174 75% 50%;
+
+    /* Glass effect variables - dark */
+    --glass-bg: 222 30% 15% / 0.6;
+    --glass-border: 174 75% 50% / 0.15;
+
+    /* Chat bubbles - dark */
+    --coach-bubble: 222 25% 16%;
+    --coach-bubble-foreground: 210 20% 90%;
+    --user-bubble: 174 75% 45%;
+    --user-bubble-foreground: 0 0% 100%;
+
+    /* Charts - dark */
+    --chart-real: 174 75% 55%;
+    --chart-target: 220 10% 45%;
+    --chart-grid: 222 20% 22%;
+
+    /* Progress rings - dark */
+    --ring-progress: 174 75% 55%;
+    --ring-background: 222 20% 20%;
+
+    /* Sidebar - dark */
+    --sidebar-background: 222 30% 10%;
+    --sidebar-foreground: 210 20% 90%;
+    --sidebar-primary: 174 75% 55%;
+    --sidebar-primary-foreground: 222 35% 8%;
+    --sidebar-accent: 222 25% 15%;
+    --sidebar-accent-foreground: 210 20% 90%;
+    --sidebar-border: 222 20% 18%;
+    --sidebar-ring: 174 75% 50%;
+
+    /* Fitness specific colors - dark */
+    --energy: 38 92% 55%;
+    --energy-light: 38 50% 20%;
+    --calories: 0 75% 55%;
+    --calories-light: 0 50% 20%;
+    --water: 199 89% 55%;
+    --water-light: 199 50% 20%;
+    --sleep: 262 83% 65%;
+    --sleep-light: 262 50% 20%;
+    --heart: 0 75% 55%;
+    --heart-light: 0 50% 20%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html, body, #root {
+    @apply h-full w-full;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    touch-action: manipulation;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .snap-x-mandatory {
+    scroll-snap-type: x mandatory;
+  }
+
+  .snap-center {
+    scroll-snap-align: center;
+  }
+
+  .safe-top {
+    padding-top: var(--safe-area-top);
+  }
+
+  .safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+  }
+
+  /* Glass morphism effects */
+  .glass {
+    background: hsl(var(--glass-bg));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid hsl(var(--glass-border));
+  }
+
+  .glass-card {
+    background: hsl(var(--glass-bg));
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid hsl(var(--glass-border));
+    box-shadow: 0 8px 32px hsl(222 35% 5% / 0.3);
+  }
+
+  /* Glow effects */
+  .glow-sm {
+    box-shadow: 0 0 15px -3px hsl(var(--primary) / 0.4);
+  }
+
+  .glow-md {
+    box-shadow: 0 0 25px -5px hsl(var(--primary) / 0.5);
+  }
+
+  .glow-lg {
+    box-shadow: 0 0 40px -5px hsl(var(--primary) / 0.6);
+  }
+
+  .glow-text {
+    text-shadow: 0 0 20px hsl(var(--primary-glow) / 0.6);
+  }
+
+  /* Premium card styles */
+  .card-premium {
+    @apply rounded-2xl border border-border bg-card transition-all duration-300;
+    box-shadow: 0 4px 20px -4px hsl(222 35% 5% / 0.2);
+  }
+
+  .card-premium:hover {
+    box-shadow: 0 8px 30px -4px hsl(var(--primary) / 0.2);
+    border-color: hsl(var(--primary) / 0.3);
+  }
+
+  /* Background gradient glow */
+  .bg-gradient-glow {
+    background: 
+      radial-gradient(ellipse 80% 50% at 50% -20%, hsl(var(--primary) / 0.15), transparent),
+      hsl(var(--background));
+  }
+
+  /* Gradient text */
+  .text-gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Coach message markdown styling */
+  .coach-message-content {
+    @apply text-sm leading-relaxed;
+  }
+
+  .coach-message-content p {
+    @apply my-2 first:mt-0 last:mb-0;
+  }
+
+  .coach-message-content strong {
+    @apply font-semibold text-foreground;
+  }
+
+  .coach-message-content ul,
+  .coach-message-content ol {
+    @apply my-2 pl-4 space-y-1;
+  }
+
+  .coach-message-content ul {
+    @apply list-disc;
+  }
+
+  .coach-message-content ol {
+    @apply list-decimal;
+  }
+
+  .coach-message-content li {
+    @apply leading-relaxed;
+  }
+
+  .coach-message-content h1,
+  .coach-message-content h2,
+  .coach-message-content h3 {
+    @apply font-semibold mt-3 mb-1 first:mt-0;
+  }
+
+  .coach-message-content h1 {
+    @apply text-base;
+  }
+
+  .coach-message-content h2 {
+    @apply text-sm;
+  }
+
+  .coach-message-content h3 {
+    @apply text-sm;
+  }
+
+  .coach-message-content code {
+    @apply bg-muted px-1 py-0.5 rounded text-xs font-mono;
+  }
+
+  .coach-message-content pre {
+    @apply bg-muted p-2 rounded my-2 overflow-x-auto;
+  }
+
+  .coach-message-content blockquote {
+    @apply border-l-2 border-primary/50 pl-3 my-2 italic text-muted-foreground;
+  }
+
+  .coach-message-content hr {
+    @apply my-3 border-border;
+  }
+
+  .coach-message-content a {
+    @apply text-primary underline underline-offset-2;
+  }
+}

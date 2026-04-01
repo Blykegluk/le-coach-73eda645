@@ -1110,22 +1110,50 @@ serve(async (req) => {
       userId = user.id;
     }
 
-    // ── Rate limit: max 50 user messages per day ──
-    const DAILY_MESSAGE_LIMIT = 50;
-    const todayForLimit = getLocalDate();
-    const { count: todayMsgCount } = await supabase
-      .from("chat_messages")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("role", "user")
-      .gte("created_at", `${todayForLimit}T00:00:00`)
-      .lte("created_at", `${todayForLimit}T23:59:59`);
+    // ── Rate limit: tier-based daily message limit ──
+    const TIER_LIMITS: Record<string, number> = { trial: 10, essential: 10, pro: 30, unlimited: -1 };
+    const serviceClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 
-    if ((todayMsgCount || 0) >= DAILY_MESSAGE_LIMIT) {
-      return new Response(
-        JSON.stringify({ error: `Tu as atteint la limite de ${DAILY_MESSAGE_LIMIT} messages par jour. Reviens demain ! 💪` }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Check if tester (bypass limits)
+    const userEmail = (await supabase.auth.getUser(token)).data?.user?.email;
+    const { data: testerRow } = userEmail
+      ? await serviceClient.from("testers").select("id").eq("email", userEmail.toLowerCase()).maybeSingle()
+      : { data: null };
+
+    let dailyLimit = TIER_LIMITS.trial; // default: trial
+    if (testerRow) {
+      dailyLimit = -1; // unlimited for testers
+    } else {
+      const { data: entitlement } = await serviceClient
+        .from("subscription_entitlements")
+        .select("daily_message_limit, tier, expires_at")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (entitlement && entitlement.tier !== "trial" && entitlement.expires_at && new Date(entitlement.expires_at) > new Date()) {
+        dailyLimit = entitlement.daily_message_limit;
+      }
+    }
+
+    if (dailyLimit !== -1) {
+      const todayForLimit = getLocalDate();
+      const { count: todayMsgCount } = await supabase
+        .from("chat_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("role", "user")
+        .gte("created_at", `${todayForLimit}T00:00:00`)
+        .lte("created_at", `${todayForLimit}T23:59:59`);
+
+      if ((todayMsgCount || 0) >= dailyLimit) {
+        return new Response(
+          JSON.stringify({
+            error: `Tu as atteint ta limite de ${dailyLimit} messages par jour. Passe au plan supérieur pour continuer ! 💪`,
+            daily_message_limit: dailyLimit,
+          }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // ── Build context ──
