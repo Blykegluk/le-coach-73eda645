@@ -237,7 +237,7 @@ const AuthPage = () => {
         {/* Footer */}
         <div className="safe-bottom relative pb-8 text-center">
           <p className="text-xs text-muted-foreground">
-            En continuant, vous acceptez nos conditions d'utilisation
+            En continuant, vous acceptez nos <a href="/terms" class="underline text-teal-400">Terms of Service</a> et notre <a href="/privacy" class="underline text-teal-400">Privacy Policy</a>
           </p>
         </div>
       </div>

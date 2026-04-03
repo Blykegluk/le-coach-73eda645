@@ -21,6 +21,8 @@ const OnboardingPage = lazy(() => import("@/pages/OnboardingPage"));
 const ProgressPage = lazy(() => import("@/pages/ProgressPage"));
 const NutritionPage = lazy(() => import("@/pages/NutritionPage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
+const TermsPage = lazy(() => import("@/pages/TermsPage"));
+const PrivacyPage = lazy(() => import("@/pages/PrivacyPage"));
 
 function PageLoader() {
   return (
@@ -52,6 +54,8 @@ const App = () => (
                 <Suspense fallback={<PageLoader />}>
                 <Routes>
                   {/* Public route */}
+                  <Route path="/terms" element={<TermsPage />} />
+                  <Route path="/privacy" element={<PrivacyPage />} />
                   <Route path="/auth" element={<AuthPage />} />
                   
                   {/* Protected routes - require authentication */}
